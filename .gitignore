@@ -1,0 +1,30 @@
+# Build artifacts
+/target
+**/target
+
+# Cargo lock (workspace-level lock is kept at root)
+# Sub-crate locks are ignored
+
+# Environment files
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Zencoder / Zenflow
+.zencoder/
+.zenflow/
+
+# Gemini
+.gemini/

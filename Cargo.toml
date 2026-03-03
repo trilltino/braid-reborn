@@ -1,0 +1,16 @@
+[workspace]
+members = [
+    "braid-blob",
+    "braid-common",
+    "braid-core",
+    "braid-http",
+    "braidfs-daemon",
+    "braidfs-nfs",
+    "server",
+    "braid-iroh",
+    "references/iroh-gossip",
+    "references/iroh-h3/iroh-h3",
+    "references/iroh-h3/iroh-h3-client",
+    "references/iroh-h3/iroh-h3-axum",
+]
+resolver = "2"

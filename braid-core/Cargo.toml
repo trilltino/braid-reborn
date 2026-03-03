@@ -1,0 +1,134 @@
+[package]
+name = "braid-core"
+version = "0.1.4"
+edition = "2021"
+description = "Unified Braid Protocol implementation in Rust, including Braid-HTTP, Antimatter CRDT, and BraidFS."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/braid-org/braid-rs"
+readme = "README.md"
+keywords = ["braid", "http", "crdt", "synchronization", "fs"]
+categories = ["network-programming", "filesystem", "database-implementations"]
+include = [
+    "src/**/*",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE*",
+    "examples/**/*",
+    "tests/**/*",
+]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+    'cfg(feature, values("wchar_conversion", "merge_conflict_checks", "dot_export", "stats", "fuzzing"))',
+] }
+
+[features]
+default = ["server", "client", "blob", "fs", "smallvec", "serde", "native"]
+native = [
+    "dep:tokio",
+    "tokio?/full",
+    "dep:reqwest",
+    "dep:rusqlite",
+    "dep:notify",
+    "dep:clap",
+    "dep:dirs",
+]
+server = [
+    "dep:axum",
+    "dep:tower",
+    "dep:tower-http",
+    "native",
+    "dep:headers",
+    "dep:tokio-stream",
+    "tokio-stream?/net",
+    "serde",
+    "smallvec",
+]
+client = []
+blob = ["dep:braid-blob", "serde", "smallvec", "native"]
+fs = ["dep:dissimilar", "blob", "serde", "smallvec", "native"]
+smallvec = []
+serde = []
+lz4 = ["dep:lz4_flex"]
+storage = []
+gen_test_data = ["lz4"]
+nfs = ["dep:nfsserve", "blob", "serde", "smallvec", "native"]
+fuzzing = []
+
+[dependencies]
+# Async Runtime
+tokio = { version = "1.48", optional = true }
+tokio-stream = { version = "0.1", optional = true }
+http = "1.0"
+
+# Optional Server components
+axum = { version = "0.8.8", optional = true }
+headers = { version = "0.4", optional = true }
+tower = { version = "0.5.2", optional = true }
+tower-http = { version = "0.6.8", optional = true }
+
+# Serialization
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = { version = "1.0.149" }
+
+# Async
+futures = "0.3"
+async-stream = "0.3"
+async-trait = "0.1"
+async-channel = "2.3"
+
+# Utilities
+bytes = { version = "1.11.1", features = ["serde"] }
+uuid = { version = "1.20.0", features = ["v4", "serde", "js"] }
+tracing = { version = "0.1" }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+thiserror = { version = "2.0" }
+anyhow = "1.0.101"
+parking_lot = "0.12"
+base64 = "0.22"
+url = "2.5"
+once_cell = "1.18"
+chrono = { version = "0.4.43", features = ["serde"] }
+rand = "0.9"
+regex = "1.12.3"
+percent-encoding = "2.3"
+lazy_static = "1.4.0"
+smallvec = { version = "1.15.1", features = ["serde"] }
+lz4_flex = { version = "0.12.0", optional = true }
+smartstring = { version = "1.0.1", features = ["serde"] }
+str_indices = "0.4.3"
+bumpalo = { version = "3.16.0", features = ["collections"] }
+jumprope = "1.1.2"
+humansize = "2.0.0"
+num_enum = "0.7.2"
+crc = "3.0.0"
+libc = "0.2.139"
+
+# Client
+reqwest = { version = "0.13.1", features = [
+    "json",
+    "stream",
+    "hickory-dns",
+], optional = true }
+
+# Storage (for blob)
+rusqlite = { version = "0.32.1", optional = true }
+
+# Filesystem (for fs)
+notify = { version = "8.2.0", optional = true }
+clap = { version = "4.5.57", features = ["derive"], optional = true }
+dirs = { version = "6.0.0", optional = true }
+dissimilar = { version = "1.0.10", optional = true }
+sha2 = "0.10.9"
+nfsserve = { version = "0.10", optional = true }
+braid-http = { path = "../braid-http" }
+braid-blob = { path = "../braid-blob", optional = true }
+
+
+[dev-dependencies]
+lz4_flex = "0.12.0"
+tempfile = "3.10"
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["rlib", "cdylib"]

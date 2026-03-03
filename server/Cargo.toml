@@ -1,0 +1,70 @@
+[package]
+name = "local_link_server"
+version = "0.2.0"
+edition = "2021"
+authors = ["Braid Team"]
+license = "MIT OR Apache-2.0"
+description = "LocalLink Chat Server with Auth, JSON storage, CRDT sync, and daemon integration"
+
+[[bin]]
+name = "local_link_server"
+path = "src/main.rs"
+
+[dependencies]
+# Web framework
+axum = { version = "0.8.8", features = ["ws", "multipart"] }
+tokio = { version = "1.48", features = ["full"] }
+tower = "0.5.2"
+tower-http = { version = "0.6.8", features = ["cors", "trace"] }
+
+# Serialization
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+
+# Utilities
+uuid = { version = "1.20.0", features = ["v4", "serde"] }
+chrono = { version = "0.4.43", features = ["serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1.0"
+thiserror = "2.0"
+futures = "0.3"
+async-stream = "0.3"
+bytes = { version = "1.10.0", features = ["serde"] }
+parking_lot = "0.12"
+sha2 = "0.10"
+
+# Auth
+bcrypt = "0.18.0"
+sqlx = { version = "0.8", features = [
+    "sqlite",
+    "runtime-tokio",
+    "tls-native-tls",
+    "migrate",
+] }
+
+# HTTP client for daemon integration
+reqwest = { version = "0.13.1", features = ["json"] }
+
+# AI integration
+genai = "0.5.2"
+
+# Braid protocol support - using workspace crates
+braid-core = { path = "../braid-core" }
+braid-common = { path = "../braid-common" }
+braid-http = { path = "../braid-http" }
+braid-blob = { path = "../braid-blob" }
+
+# HTTP types
+http = "1.0"
+headers = "0.4"
+
+# File watching for daemon integration
+notify = "8.2.0"
+
+# Async traits
+async-trait = "0.1"
+
+[dev-dependencies]
+tempfile = "3.14"
+tokio-test = "0.4"
