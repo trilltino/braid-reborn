@@ -1,5 +1,11 @@
 # Engineering refactor status, 2026-10-23
 
+The validated code commit is
+[5ab2e55](https://github.com/trilltino/braid-reborn/commit/5ab2e55a8eea9a34d6da4ac35a5391a11ae90f4d).
+[All six conformance CI jobs passed](https://github.com/trilltino/braid-reborn/actions/runs/40005076872).
+[The dependency security workflow passed](https://github.com/trilltino/braid-reborn/actions/runs/40003356386)
+with the same dependency graph; subsequent changes affect CI/tooling only.
+
 The full release acceptance matrix is not complete. This continuation implements
 shared native synchronization, filesystem/NFS recovery and application/security
 repairs. Unsupported features and unverified runtime environments remain explicit.
@@ -72,9 +78,8 @@ timed out after 300 seconds; no unsafe-count result is claimed. Cargo machete is
 corroborating source evidence rather than proof of dead public APIs.
 
 The local WSL Ubuntu registration points at a missing ext4.vhdx and cannot boot
-(ERROR_PATH_NOT_FOUND). It was not modified. The real Linux mount test passed on the follow-up commit e7fcd6c. Sanitizing
-fuzz execution still needs the corrected explicit nightly selection; creating
-a job is not a passing result.
+(ERROR_PATH_NOT_FOUND). It was not modified. The real Linux mount test passed on the follow-up commit e7fcd6c. Sanitizing fuzz execution also passed after the explicit nightly selection and
+public API import were corrected; final results are recorded below.
 WASM is compile checked, with browser runtime behavior still unverified.
 
 ## Remaining release work
@@ -129,3 +134,22 @@ mutation, uses a fresh isolated clone for invalid/modified caches, verifies the
 pinned HEAD, and preserves the old cache. Its regression proves the parent HEAD
 and files remain unchanged and local source modifications are retained. The
 fuzz job sets its own RUSTUP_TOOLCHAIN so the root stable pin cannot override it.
+
+## Final observed CI results
+
+| Gate at code commit 5ab2e55 | Result |
+| --- | --- |
+| Windows all-feature workspace tests | 375 passed, 0 failed, 28 ignored |
+| Linux all-feature workspace tests | 381 passed, 0 failed, 29 ignored; platform-specific copied tests account for the different total |
+| Both native platforms | Formatting, all-target/all-feature check, warnings-denied Clippy and minimal core/HTTP/Iroh profiles passed |
+| WASM | Compile gate passed; browser runtime remains unverified |
+| Independent upstream | HTTP 2/2, subscriptions 7/7, reliable updates 15/15, Simpleton 12/12; isolated-checkout regression and bidirectional codec fixtures passed |
+| Real Linux NFSv3 mount | Create, binary offsets, truncation, sparse writes, open handle across rename, directory pagination and removal passed |
+| AddressSanitizer wire fuzzing | 1,274,253 executions in 61 seconds; no finding; bounded input/RSS settings |
+| AddressSanitizer scalar text fuzzing | 2,189,993 executions in 61 seconds; no finding; bounded input/RSS settings |
+| Locked fuzz dependency graph | Unchanged after instrumentation/build/runs |
+
+Corpus artifacts and detailed logs are attached to the linked CI run. These are
+bounded smoke campaigns, not exhaustive proofs. The release-work list above
+remains open; passing these gates does not imply support for the explicitly
+unsupported protocols, browser behavior, relay repair or every legacy checkpoint.

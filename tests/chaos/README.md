@@ -23,3 +23,10 @@ cancellation/crash-point coverage.
 temporary data root. It tests real file offsets, binary writes, truncation,
 sparse writes, open handles across rename, cookie pagination and removal. CI
 installs nfs-common and runs it separately from ordinary unit tests.
+
+Plain NFS READDIR is also tested through an independent TCP RPC client in
+`cargo test -p braid-core --all-features --test nfs_wire --locked`. This caught
+an upstream wire handler dropping continuation cookies before adapter dispatch.
+The test also verifies typed zero-budget READDIR/READDIRPLUS errors. Registry
+0.11.0 retains the defects; the narrow source/manifest patch is pinned under
+vendor/nfsserve. Final CI evidence is in docs/audit/engineering-status.md.

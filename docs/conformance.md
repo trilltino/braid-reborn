@@ -30,7 +30,7 @@ of drafts, not a claim of complete IETF standard conformance.
 | Coordinated native PUT/subscription state machine | ReliableChannel + production Simpleton client + filesystem | reliable_channel, audit_shared_channel, independent reliable-updates and Simpleton suites; browser/H3 channel ownership remains separate |
 | Full browser runtime/backpressure/cancellation semantics | wasm_network | compile check only; browser behavioral tests open |
 | Linked JSON, Range Query, multiplex network transport | extension modules | incomplete/unsupported; codec presence does not establish deployment support |
-| NFS offsets/truncate/rename/remove/restart | fs::nfs adapter/backing + fs::operations | binary/sparse/shell/attribute/inode/cookie unit tests; partitioned rename/restart/lost-ACK/offline-edit/remove integration; privileged mount is a separate CI job |
+| NFS offsets/truncate/rename/remove/restart | fs::nfs adapter/backing + fs::operations | binary/sparse/shell/attribute/inode/cookie unit tests; partitioned rename/restart/lost-ACK/offline-edit/remove integration; privileged Linux NFSv3 mount CI passed; raw TCP READDIR cookie/tiny-budget regression passed |
 | Partition/relay repair, ACL lifecycle, malicious peer isolation | Iroh/gossip | local allow/revoke tested; relay and anti-entropy tests open |
 | Process death and durable replay | ChannelJournal / SQLite / FS | reliable_channel kills an actual writer process and reopens/replays; exhaustive power-loss and cancellation matrix remains open |
 

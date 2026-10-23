@@ -14,3 +14,9 @@ replacement against an independent character-vector model. CI retains artifacts
 and corpora, including failure seeds. Time-bounded smoke runs do not establish
 exhaustive safety. Vendored binary checkpoint ingestion and multi-peer runtime
 state machines still need separate campaigns.
+
+The recorded Linux CI run at code commit 5ab2e55 passed both AddressSanitizer
+campaigns: wire 1,274,253 executions and text 2,189,993 executions, 61 seconds
+each. See [engineering status](../../docs/audit/engineering-status.md) for the
+run link and remaining coverage boundaries. The job sets RUSTUP_TOOLCHAIN
+explicitly because the root rust-toolchain.toml otherwise selects stable.
