@@ -1,0 +1,4409 @@
+[
+  {
+    "owner": "braid-blob",
+    "dependency": "async-trait",
+    "alias": "async-trait",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.1",
+    "locked": [
+      "0.1.89"
+    ],
+    "latest_stable": "0.1.92",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-blob/src/store.rs:1"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.1.89",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "9035ad2d096bed7955a320ee7e2230574d28fd3c3a0f186cbea1ff3c7eed5dbb"
+      }
+    ]
+  },
+  {
+    "owner": "braid-blob",
+    "dependency": "bytes",
+    "alias": "bytes",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.0",
+    "locked": [
+      "1.11.1"
+    ],
+    "latest_stable": "1.12.1",
+    "features": [
+      "serde"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braid-blob/src/objects.rs:99",
+      "crates/braid-blob/src/store.rs:5",
+      "crates/braid-blob/tests/streaming.rs:3"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.11.1",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "1e748733b7cbc798e1434b6ac524f0c1ff2ab456fe201501e6497c8417a4fc33"
+      }
+    ]
+  },
+  {
+    "owner": "braid-blob",
+    "dependency": "rusqlite",
+    "alias": "rusqlite",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.32",
+    "locked": [
+      "0.32.1"
+    ],
+    "latest_stable": "0.40.2",
+    "features": [
+      "bundled"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braid-blob/src/store.rs:7"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.32.1",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "7753b721174eb8ff87a9a0e799e2d7bc3749323e773db92e0984debb00019d6e"
+      }
+    ]
+  },
+  {
+    "owner": "braid-blob",
+    "dependency": "serde",
+    "alias": "serde",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.0",
+    "locked": [
+      "1.0.228"
+    ],
+    "latest_stable": "1.0.229",
+    "features": [
+      "derive"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-blob/src/store.rs:8"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.0.228",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "9a8e94ea7f378bd32cbbd37198a4a91436180c5bb472411e48b5ec2e2124ae9e"
+      }
+    ]
+  },
+  {
+    "owner": "braid-blob",
+    "dependency": "serde_json",
+    "alias": "serde_json",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.0",
+    "locked": [
+      "1.0.149"
+    ],
+    "latest_stable": "1.0.154",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-blob/src/store.rs:116"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.0.149",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
+      }
+    ]
+  },
+  {
+    "owner": "braid-blob",
+    "dependency": "sha2",
+    "alias": "sha2",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.10",
+    "locked": [
+      "0.10.9",
+      "0.11.1"
+    ],
+    "latest_stable": "0.11.1",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-blob/src/objects.rs:4",
+      "crates/braid-blob/src/store.rs:9",
+      "crates/braid-blob/tests/streaming.rs:4"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.10.9",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283"
+      },
+      {
+        "version": "0.11.1",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "47d7069beb7d6ac7b9acd1039986e73443f24234f41074da099d6f994ac9ad19"
+      }
+    ]
+  },
+  {
+    "owner": "braid-blob",
+    "dependency": "tokio",
+    "alias": "tokio",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.0",
+    "locked": [
+      "1.49.0"
+    ],
+    "latest_stable": "1.54.1",
+    "features": [
+      "full"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braid-blob/src/objects.rs:6",
+      "crates/braid-blob/src/store.rs:14",
+      "crates/braid-blob/tests/streaming.rs:10"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.49.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "72a2903cd7736441aac9df9d7688bd0ce48edccaadf181c3b90be801e81d3d86"
+      }
+    ]
+  },
+  {
+    "owner": "braid-blob",
+    "dependency": "tracing",
+    "alias": "tracing",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.1",
+    "locked": [
+      "0.1.44"
+    ],
+    "latest_stable": "0.1.44",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braid-blob/src/objects.rs:25"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.1.44",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "63e71662fa4b2a2c3a26f570f037eb95bb1f85397f3cd8076caed2f026a6d100"
+      }
+    ]
+  },
+  {
+    "owner": "braid-blob",
+    "dependency": "uuid",
+    "alias": "uuid",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.0",
+    "locked": [
+      "1.21.0"
+    ],
+    "latest_stable": "1.29.0",
+    "features": [
+      "v4"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "Apache-2.0 OR MIT"
+    ],
+    "source_files": [
+      "crates/braid-blob/src/objects.rs:44"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.21.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "b672338555252d43fd2240c714dc444b8c6fb0a5c5335e65a07bba7742735ddb"
+      }
+    ]
+  },
+  {
+    "owner": "braid-blob",
+    "dependency": "tempfile",
+    "alias": "tempfile",
+    "kind": "dev",
+    "target": "all",
+    "requirement": "3.10",
+    "locked": [
+      "3.25.0"
+    ],
+    "latest_stable": "3.27.0",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-blob/tests/streaming.rs:14"
+    ],
+    "locked_packages": [
+      {
+        "version": "3.25.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "0136791f7c95b1f6dd99f9cc786b91bb81c3800b639b3478e561ddb7be95e5f1"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "anyhow",
+    "alias": "anyhow",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.0.101",
+    "locked": [
+      "1.0.104"
+    ],
+    "latest_stable": "1.0.104",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-core/src/core/error.rs:78",
+      "crates/braid-core/src/fs/mapping.rs:2",
+      "crates/braid-core/src/fs/mount.rs:1",
+      "crates/braid-core/src/fs/nfs.rs:172"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.0.104",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "async-channel",
+    "alias": "async-channel",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "2.3",
+    "locked": [
+      "2.5.0"
+    ],
+    "latest_stable": "2.5.0",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "Apache-2.0 OR MIT"
+    ],
+    "source_files": [
+      "crates/braid-core/tests/audit_filesystem.rs:60",
+      "crates/braid-core/src/core/traits.rs:15",
+      "crates/braid-core/src/fs/mod.rs:189",
+      "crates/braid-core/src/fs/state.rs:52"
+    ],
+    "locked_packages": [
+      {
+        "version": "2.5.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "924ed96dd52d1b75e9c1a3e6275715fd320f5f9439fb5a4a11fa51f4221158d2"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "async-stream",
+    "alias": "async-stream",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.3",
+    "locked": [
+      "0.3.6"
+    ],
+    "latest_stable": "0.3.6",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braid-core/src/fs/local_server.rs:273",
+      "crates/braid-core/src/core/server/middleware.rs:152",
+      "crates/braid-core/src/core/server/replica_http.rs:55"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.3.6",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "0b5a71a6f37880a80d1d7f19efd781e4b5de42c88f0722cc13bcb6cc2cfe8476"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "async-trait",
+    "alias": "async-trait",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.1",
+    "locked": [
+      "0.1.89"
+    ],
+    "latest_stable": "0.1.92",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-core/src/core/traits.rs:3",
+      "crates/braid-core/src/fs/nfs.rs:3"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.1.89",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "9035ad2d096bed7955a320ee7e2230574d28fd3c3a0f186cbea1ff3c7eed5dbb"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "axum",
+    "alias": "axum",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.8.8",
+    "locked": [
+      "0.8.8"
+    ],
+    "latest_stable": "0.8.9",
+    "features": [],
+    "default_features": true,
+    "optional": true,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braid-core/tests/audit_filesystem.rs:25",
+      "crates/braid-core/tests/audit_replica.rs:182",
+      "crates/braid-core/src/fs/api.rs:7",
+      "crates/braid-core/src/fs/blob_handlers.rs:2",
+      "crates/braid-core/src/fs/local_server.rs:12",
+      "crates/braid-core/src/fs/server_handlers.rs:5",
+      "crates/braid-core/src/core/server/middleware.rs:7",
+      "crates/braid-core/src/core/server/parse_update.rs:29",
+      "crates/braid-core/src/core/server/replica_http.rs:3",
+      "crates/braid-core/src/core/server/send_update.rs:34",
+      "crates/braid-core/src/core/server/subscription.rs:3",
+      "crates/braid-core/src/core/server/utils.rs:5"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.8.8",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "8b52af3cb4058c895d37317bb27508dccc8e5f2d39454016b297bf4a400597b8"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "base64",
+    "alias": "base64",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.22",
+    "locked": [
+      "0.22.1",
+      "0.23.1"
+    ],
+    "latest_stable": "0.23.1",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-core/src/replica.rs:191",
+      "crates/braid-core/src/core/merge/diamond.rs:73"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.22.1",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
+      },
+      {
+        "version": "0.23.1",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "bumpalo",
+    "alias": "bumpalo",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "3.16.0",
+    "locked": [
+      "3.20.2"
+    ],
+    "latest_stable": "3.20.3",
+    "features": [
+      "collections"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-core/src/vendor/diamond_types/oplog.rs:505",
+      "crates/braid-core/src/vendor/diamond_types/wal.rs:27",
+      "crates/braid-core/src/vendor/diamond_types/causalgraph/storage.rs:31",
+      "crates/braid-core/src/vendor/diamond_types/encoding/cg_entry.rs:6",
+      "crates/braid-core/src/vendor/diamond_types/encoding/op.rs:1",
+      "crates/braid-core/src/vendor/diamond_types/encoding/op_contents.rs:1",
+      "crates/braid-core/src/vendor/diamond_types/encoding/parents.rs:1",
+      "crates/braid-core/src/vendor/diamond_types/encoding/tools.rs:2",
+      "crates/braid-core/src/vendor/diamond_types/listmerge/plan.rs:7",
+      "crates/braid-core/src/vendor/diamond_types/listmerge2/action_plan.rs:4"
+    ],
+    "locked_packages": [
+      {
+        "version": "3.20.2",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "5d20789868f4b01b2f2caec9f5c4e0213b41e3e5702a50157d699ae31ced2fcb"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "bytes",
+    "alias": "bytes",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.11.1",
+    "locked": [
+      "1.11.1"
+    ],
+    "latest_stable": "1.12.1",
+    "features": [
+      "serde"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braid-core/tests/audit_filesystem.rs:27",
+      "crates/braid-core/tests/audit_replica.rs:154",
+      "crates/braid-core/tests/sync_integrity_tests.rs:34",
+      "crates/braid-core/src/core/traits.rs:22",
+      "crates/braid-core/src/fs/api.rs:137",
+      "crates/braid-core/src/fs/blob_handlers.rs:9",
+      "crates/braid-core/src/fs/diff.rs:20",
+      "crates/braid-core/src/fs/local_server.rs:281",
+      "crates/braid-core/src/fs/nfs.rs:15",
+      "crates/braid-core/src/fs/subscription.rs:183",
+      "crates/braid-core/src/fs/sync.rs:204",
+      "crates/braid-core/src/fs/versions.rs:66",
+      "crates/braid-core/src/vendor/diamond_types/frontier.rs:529",
+      "crates/braid-core/src/vendor/diamond_types/wal.rs:122",
+      "crates/braid-core/src/vendor/diamond_types/causalgraph/storage.rs:3",
+      "crates/braid-core/src/vendor/diamond_types/encoding/bufparser.rs:121",
+      "crates/braid-core/src/vendor/diamond_types/encoding/chunk_reader.rs:5",
+      "crates/braid-core/src/vendor/diamond_types/encoding/mod.rs:29",
+      "crates/braid-core/src/vendor/diamond_types/encoding/parents.rs:86",
+      "crates/braid-core/src/vendor/diamond_types/encoding/tools.rs:43",
+      "crates/braid-core/src/vendor/diamond_types/encoding/varint.rs:44",
+      "crates/braid-core/src/vendor/diamond_types/list/list.rs:152",
+      "crates/braid-core/src/vendor/diamond_types/list/op_metrics.rs:370",
+      "crates/braid-core/src/vendor/diamond_types/list/stochastic_summary.rs:28",
+      "crates/braid-core/src/vendor/diamond_types/listmerge/merge.rs:1431",
+      "crates/braid-core/src/vendor/diamond_types/listmerge/plan.rs:900",
+      "crates/braid-core/src/vendor/diamond_types/listmerge/yjsspan.rs:283",
+      "crates/braid-core/src/vendor/diamond_types/listmerge2/action_plan.rs:972",
+      "crates/braid-core/src/vendor/diamond_types/listmerge2/test_conversion.rs:448",
+      "crates/braid-core/src/vendor/diamond_types/listmerge2/yjsspan.rs:155",
+      "crates/braid-core/src/vendor/diamond_types/storage/file.rs:119",
+      "crates/braid-core/src/vendor/diamond_types/storage/mod.rs:27",
+      "crates/braid-core/src/vendor/diamond_types/storage/page.rs:23",
+      "crates/braid-core/src/vendor/diamond_types/list/encoding/decode_oplog.rs:190",
+      "crates/braid-core/src/vendor/diamond_types/list/encoding/decode_tools.rs:127",
+      "crates/braid-core/src/vendor/diamond_types/list/encoding/encode_oplog.rs:226",
+      "crates/braid-core/src/vendor/diamond_types/list/encoding/encode_tools.rs:34",
+      "crates/braid-core/src/vendor/diamond_types/list/encoding/fuzzer.rs:25",
+      "crates/braid-core/src/vendor/diamond_types/list/encoding/leb.rs:110",
+      "crates/braid-core/src/vendor/diamond_types/list/encoding/mod.rs:32",
+      "crates/braid-core/src/vendor/diamond_types/list/encoding/tests.rs:93",
+      "crates/braid-core/src/vendor/diamond_types/list/encoding/txn_trace.rs:526",
+      "crates/braid-core/src/vendor/diamond_types/causalgraph/agent_assignment/mod.rs:97",
+      "crates/braid-core/src/core/merge/diamond.rs:67",
+      "crates/braid-core/src/core/server/parse_update.rs:30",
+      "crates/braid-core/src/core/server/replica_http.rs:9",
+      "crates/braid-core/src/core/server/send_update.rs:48"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.11.1",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "1e748733b7cbc798e1434b6ac524f0c1ff2ab456fe201501e6497c8417a4fc33"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "chrono",
+    "alias": "chrono",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.4.43",
+    "locked": [
+      "0.4.43"
+    ],
+    "latest_stable": "0.4.45",
+    "features": [
+      "serde"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-core/src/fs/api.rs:306"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.4.43",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "fac4744fb15ae8337dc853fee7fb3f4e48c0fbaa23d0afe49c447b4fab126118"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "crc",
+    "alias": "crc",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "3.0.0",
+    "locked": [
+      "3.4.0"
+    ],
+    "latest_stable": "3.4.0",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-core/src/vendor/diamond_types/encoding/tools.rs:112"
+    ],
+    "locked_packages": [
+      {
+        "version": "3.4.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "5eb8a2a1cd12ab0d987a5d5e825195d372001a4094a0376319d5a0ad71c1ba0d"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "dissimilar",
+    "alias": "dissimilar",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.0.10",
+    "locked": [
+      "1.0.10"
+    ],
+    "latest_stable": "1.0.11",
+    "features": [],
+    "default_features": true,
+    "optional": true,
+    "licenses": [
+      "Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-core/src/fs/diff.rs:2"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.0.10",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "8975ffdaa0ef3661bfe02dbdcc06c9f829dfafe6a3c474de366a8d5e44276921"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "futures",
+    "alias": "futures",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.3",
+    "locked": [
+      "0.3.32"
+    ],
+    "latest_stable": "0.3.34",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-core/src/core/server/middleware.rs:8",
+      "crates/braid-core/src/core/server/subscription.rs:4"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.3.32",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "8b147ee9d1f6d097cef9ce628cd2ee62288d963e16fb287bd9286455b241382d"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "headers",
+    "alias": "headers",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.4",
+    "locked": [
+      "0.4.1"
+    ],
+    "latest_stable": "0.4.2",
+    "features": [],
+    "default_features": true,
+    "optional": true,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braid-core/src/replica.rs:120",
+      "crates/braid-core/tests/audit_filesystem.rs:27",
+      "crates/braid-core/tests/audit_replica.rs:184",
+      "crates/braid-core/src/fs/api.rs:476",
+      "crates/braid-core/src/fs/blob_handlers.rs:10",
+      "crates/braid-core/src/vendor/diamond_types/storage/mod.rs:386",
+      "crates/braid-core/src/core/merge/diamond.rs:681",
+      "crates/braid-core/src/core/server/middleware.rs:5",
+      "crates/braid-core/src/core/server/parse_update.rs:3",
+      "crates/braid-core/src/core/server/replica_http.rs:22",
+      "crates/braid-core/src/core/server/send_update.rs:4",
+      "crates/braid-core/src/core/server/utils.rs:7"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.4.1",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "b3314d5adb5d94bcdf56771f2e50dbbc80bb4bdf88967526706205ac9eff24eb"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "http",
+    "alias": "http",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.0",
+    "locked": [
+      "1.4.0"
+    ],
+    "latest_stable": "1.5.0",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-core/tests/audit_filesystem.rs:27",
+      "crates/braid-core/tests/audit_replica.rs:184",
+      "crates/braid-core/src/core/mod.rs:10",
+      "crates/braid-core/src/fs/api.rs:476",
+      "crates/braid-core/src/fs/blob_handlers.rs:10",
+      "crates/braid-core/src/fs/config.rs:56",
+      "crates/braid-core/src/fs/local_server.rs:75",
+      "crates/braid-core/src/fs/mapping.rs:13",
+      "crates/braid-core/src/fs/rate_limiter.rs:134",
+      "crates/braid-core/src/fs/scanner.rs:216",
+      "crates/braid-core/src/fs/server_handlers.rs:7",
+      "crates/braid-core/src/fs/versions.rs:112",
+      "crates/braid-core/src/core/merge/diamond.rs:55",
+      "crates/braid-core/src/core/merge/mod.rs:9",
+      "crates/braid-core/src/core/server/middleware.rs:42",
+      "crates/braid-core/src/core/server/parse_update.rs:24",
+      "crates/braid-core/src/core/server/replica_http.rs:5",
+      "crates/braid-core/src/core/server/send_update.rs:28",
+      "crates/braid-core/src/core/server/utils.rs:62"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.4.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "e3ba2a386d7f85a81f119ad7498ebe444d2e22c2af0b86b069416ace48b3311a"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "humansize",
+    "alias": "humansize",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "2.0.0",
+    "locked": [
+      "2.1.3"
+    ],
+    "latest_stable": "2.1.3",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT/Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-core/src/vendor/diamond_types/list/list.rs:2",
+      "crates/braid-core/src/vendor/diamond_types/rle/rle_vec.rs:6"
+    ],
+    "locked_packages": [
+      {
+        "version": "2.1.3",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "6cb51c9a029ddc91b07a787f1d86b53ccfa49b0e86688c946ebe8d3555685dd7"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "jumprope",
+    "alias": "jumprope",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.1.2",
+    "locked": [
+      "1.1.2"
+    ],
+    "latest_stable": "1.1.2",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "ISC OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-core/src/vendor/diamond_types/branch.rs:221",
+      "crates/braid-core/src/vendor/diamond_types/list_fuzzer_tools.rs:7",
+      "crates/braid-core/src/vendor/diamond_types/mod.rs:190",
+      "crates/braid-core/src/vendor/diamond_types/oplog.rs:4",
+      "crates/braid-core/src/vendor/diamond_types/textinfo.rs:1",
+      "crates/braid-core/src/vendor/diamond_types/list/branch.rs:2",
+      "crates/braid-core/src/vendor/diamond_types/list/check.rs:1",
+      "crates/braid-core/src/vendor/diamond_types/list/mod.rs:80",
+      "crates/braid-core/src/vendor/diamond_types/list/old_fuzzer_tools.rs:2",
+      "crates/braid-core/src/vendor/diamond_types/listmerge/fuzzer.rs:1",
+      "crates/braid-core/src/vendor/diamond_types/listmerge/merge.rs:7",
+      "crates/braid-core/src/vendor/diamond_types/listmerge/simple_oplog.rs:2",
+      "crates/braid-core/src/vendor/diamond_types/list/encoding/encode_oplog.rs:1"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.1.2",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "829c74fe88dda0d2a5425b022b44921574a65c4eb78e6e39a61b40eb416a4ef8"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "lazy_static",
+    "alias": "lazy_static",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.4.0",
+    "locked": [
+      "1.5.0"
+    ],
+    "latest_stable": "1.5.1",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-core/src/fs/mod.rs:46"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.5.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "libc",
+    "alias": "libc",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.2.139",
+    "locked": [
+      "0.2.182"
+    ],
+    "latest_stable": "0.2.191",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-core/src/vendor/diamond_types/storage/file.rs:64"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.2.182",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "6800badb6cb2082ffd7b6a67e6125bb39f18782f793520caee8cb8846be06112"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "lz4_flex",
+    "alias": "lz4_flex",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.12.0",
+    "locked": [
+      "0.12.2"
+    ],
+    "latest_stable": "0.14.0",
+    "features": [],
+    "default_features": true,
+    "optional": true,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braid-core/src/vendor/diamond_types/encoding/parseerror.rs:23",
+      "crates/braid-core/src/vendor/diamond_types/list/encoding/decode_oplog.rs:626",
+      "crates/braid-core/src/vendor/diamond_types/list/encoding/encode_oplog.rs:280",
+      "crates/braid-core/src/vendor/diamond_types/list/encoding/tests.rs:1"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.12.2",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "90071f8077f8e40adfc4b7fe9cd495ce316263f19e75c2211eeff3fdf475a3d9"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "nfsserve",
+    "alias": "nfsserve",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.10",
+    "locked": [
+      "0.10.2"
+    ],
+    "latest_stable": "0.11.0",
+    "features": [],
+    "default_features": true,
+    "optional": true,
+    "licenses": [
+      "BSD-3-Clause"
+    ],
+    "source_files": [
+      "crates/braid-core/src/fs/mod.rs:505",
+      "crates/braid-core/src/fs/nfs.rs:5"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.10.2",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "d73615e054238e6bf5e554407b5b23e82fc63616db459057c51b794799eda6fb"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "notify",
+    "alias": "notify",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "8.2.0",
+    "locked": [
+      "8.2.0"
+    ],
+    "latest_stable": "8.2.0",
+    "features": [],
+    "default_features": true,
+    "optional": true,
+    "licenses": [
+      "CC0-1.0"
+    ],
+    "source_files": [
+      "crates/braid-core/src/core/error.rs:69",
+      "crates/braid-core/src/fs/mod.rs:12",
+      "crates/braid-core/src/fs/watcher.rs:3",
+      "crates/braid-core/src/vendor/diamond_types/ost/content_tree.rs:34"
+    ],
+    "locked_packages": [
+      {
+        "version": "8.2.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "4d3d07927151ff8575b7087f245456e549fea62edf0ec4e565a5ee50c8402bc3"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "num_enum",
+    "alias": "num_enum",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.7.2",
+    "locked": [
+      "0.7.5"
+    ],
+    "latest_stable": "0.7.6",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "BSD-3-Clause OR MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-core/src/vendor/diamond_types/encoding/mod.rs:4",
+      "crates/braid-core/src/vendor/diamond_types/encoding/op_contents.rs:4",
+      "crates/braid-core/src/vendor/diamond_types/storage/mod.rs:15",
+      "crates/braid-core/src/vendor/diamond_types/list/encoding/mod.rs:21"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.7.5",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "b1207a7e20ad57b847bbddc6776b968420d38292bbfe2089accff5e19e82454c"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "parking_lot",
+    "alias": "parking_lot",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.12",
+    "locked": [
+      "0.12.5"
+    ],
+    "latest_stable": "0.13.0",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-core/tests/audit_filesystem.rs:86",
+      "crates/braid-core/src/fs/mod.rs:13",
+      "crates/braid-core/src/fs/nfs.rs:7",
+      "crates/braid-core/src/fs/state.rs:7",
+      "crates/braid-core/src/core/merge/diamond.rs:60",
+      "crates/braid-core/src/core/server/resource_state.rs:5"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.12.5",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "93857453250e3077bd71ff98b6a65ea6621a19bb0f559a85248955ac12c45a1a"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "percent-encoding",
+    "alias": "percent-encoding",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "2.3",
+    "locked": [
+      "2.3.2"
+    ],
+    "latest_stable": "2.3.2",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-core/src/fs/api.rs:330",
+      "crates/braid-core/src/fs/mapping.rs:43"
+    ],
+    "locked_packages": [
+      {
+        "version": "2.3.2",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "rand",
+    "alias": "rand",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.9",
+    "locked": [
+      "0.8.8",
+      "0.9.5",
+      "0.10.3"
+    ],
+    "latest_stable": "0.10.3",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-core/src/vendor/diamond_types/fuzzer.rs:1",
+      "crates/braid-core/src/vendor/diamond_types/list_fuzzer_tools.rs:6",
+      "crates/braid-core/src/vendor/diamond_types/causalgraph/enc_fuzzer.rs:1",
+      "crates/braid-core/src/vendor/diamond_types/encoding/varint.rs:564",
+      "crates/braid-core/src/vendor/diamond_types/list/gen_random.rs:1",
+      "crates/braid-core/src/vendor/diamond_types/list/old_fuzzer_tools.rs:1",
+      "crates/braid-core/src/vendor/diamond_types/list/oplog_merge_fuzzer.rs:1",
+      "crates/braid-core/src/vendor/diamond_types/listmerge/fuzzer.rs:2",
+      "crates/braid-core/src/vendor/diamond_types/listmerge/plan.rs:434",
+      "crates/braid-core/src/vendor/diamond_types/listmerge2/index_gap_buffer.rs:1039",
+      "crates/braid-core/src/vendor/diamond_types/ost/content_tree.rs:1515",
+      "crates/braid-core/src/vendor/diamond_types/ost/index_tree.rs:1466",
+      "crates/braid-core/src/vendor/diamond_types/storage/file.rs:96",
+      "crates/braid-core/src/vendor/diamond_types/list/encoding/fuzzer.rs:1",
+      "crates/braid-core/src/vendor/diamond_types/list/encoding/leb.rs:195",
+      "crates/braid-core/src/vendor/diamond_types/causalgraph/graph/conflict_subgraph.rs:361",
+      "crates/braid-core/src/vendor/diamond_types/causalgraph/graph/random_graphs.rs:5",
+      "crates/braid-core/src/core/server/middleware.rs:150"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.8.8",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "e058c7de0b26af77780c769414d6257830bb240f3c38477dbc2c16e5f54d6d4c"
+      },
+      {
+        "version": "0.9.5",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "b9ef1d0d795eb7d84685bca4f72f3649f064e6641543d3a8c415898726a57b41"
+      },
+      {
+        "version": "0.10.3",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "65c9fb96cbc91e3478eaae79a69fcd3f1ae4ad052e471fe6732fff548984b4af"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "rusqlite",
+    "alias": "rusqlite",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.32.1",
+    "locked": [
+      "0.32.1"
+    ],
+    "latest_stable": "0.40.2",
+    "features": [],
+    "default_features": true,
+    "optional": true,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braid-core/tests/audit_filesystem.rs:87",
+      "crates/braid-core/src/fs/mod.rs:14",
+      "crates/braid-core/src/fs/nfs.rs:8",
+      "crates/braid-core/src/fs/state.rs:8"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.32.1",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "7753b721174eb8ff87a9a0e799e2d7bc3749323e773db92e0984debb00019d6e"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "serde",
+    "alias": "serde",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.0.228",
+    "locked": [
+      "1.0.228"
+    ],
+    "latest_stable": "1.0.229",
+    "features": [
+      "derive"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-core/src/lib.rs:15",
+      "crates/braid-core/src/replica.rs:13",
+      "crates/braid-core/src/core/mod.rs:4",
+      "crates/braid-core/src/fs/api.rs:12",
+      "crates/braid-core/src/fs/config.rs:2",
+      "crates/braid-core/src/fs/server_handlers.rs:11",
+      "crates/braid-core/src/fs/versions.rs:3",
+      "crates/braid-core/src/vendor/diamond_types/dtrange.rs:8",
+      "crates/braid-core/src/vendor/diamond_types/frontier.rs:6",
+      "crates/braid-core/src/vendor/diamond_types/mod.rs:191",
+      "crates/braid-core/src/vendor/diamond_types/oplog.rs:7",
+      "crates/braid-core/src/vendor/diamond_types/rev_range.rs:5",
+      "crates/braid-core/src/vendor/diamond_types/serde_helpers.rs:3",
+      "crates/braid-core/src/vendor/diamond_types/causalgraph/summary.rs:6",
+      "crates/braid-core/src/vendor/diamond_types/list/operation.rs:17",
+      "crates/braid-core/src/vendor/diamond_types/list/oplog.rs:15",
+      "crates/braid-core/src/vendor/diamond_types/list/op_metrics.rs:9",
+      "crates/braid-core/src/vendor/diamond_types/listmerge/markers.rs:3",
+      "crates/braid-core/src/vendor/diamond_types/ost/mod.rs:16",
+      "crates/braid-core/src/vendor/diamond_types/rle/rle_vec.rs:13",
+      "crates/braid-core/src/vendor/diamond_types/list/encoding/encode_tools.rs:7",
+      "crates/braid-core/src/vendor/diamond_types/causalgraph/agent_assignment/remote_ids.rs:5",
+      "crates/braid-core/src/vendor/diamond_types/causalgraph/graph/mod.rs:19",
+      "crates/braid-core/src/vendor/diamond_types/causalgraph/graph/tools.rs:7",
+      "crates/braid-core/src/core/merge/merge_type.rs:21",
+      "crates/braid-core/src/core/merge/simpleton.rs:6"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.0.228",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "9a8e94ea7f378bd32cbbd37198a4a91436180c5bb472411e48b5ec2e2124ae9e"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "serde_json",
+    "alias": "serde_json",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.0.149",
+    "locked": [
+      "1.0.149"
+    ],
+    "latest_stable": "1.0.154",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-core/src/replica.rs:14",
+      "crates/braid-core/tests/audit_replica.rs:88",
+      "crates/braid-core/src/core/error.rs:32",
+      "crates/braid-core/src/fs/api.rs:95",
+      "crates/braid-core/src/fs/binary_sync.rs:89",
+      "crates/braid-core/src/fs/blob_handlers.rs:29",
+      "crates/braid-core/src/fs/config.rs:47",
+      "crates/braid-core/src/fs/versions.rs:55",
+      "crates/braid-core/src/vendor/diamond_types/oplog.rs:705",
+      "crates/braid-core/src/vendor/diamond_types/rev_range.rs:232",
+      "crates/braid-core/src/vendor/diamond_types/causalgraph/summary.rs:380",
+      "crates/braid-core/src/vendor/diamond_types/list/op_metrics.rs:422",
+      "crates/braid-core/src/vendor/diamond_types/causalgraph/graph/tools.rs:1068",
+      "crates/braid-core/src/core/merge/diamond.rs:61",
+      "crates/braid-core/src/core/merge/merge_type.rs:16",
+      "crates/braid-core/src/core/merge/simpleton.rs:7",
+      "crates/braid-core/src/core/server/conflict_resolver.rs:20",
+      "crates/braid-core/src/core/server/resource_state.rs:6"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.0.149",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "sha2",
+    "alias": "sha2",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.10.9",
+    "locked": [
+      "0.10.9",
+      "0.11.1"
+    ],
+    "latest_stable": "0.11.1",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-core/src/replica.rs:15",
+      "crates/braid-core/src/fs/blob_handlers.rs:30",
+      "crates/braid-core/src/fs/sync.rs:5",
+      "crates/braid-core/src/core/merge/diamond.rs:74"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.10.9",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283"
+      },
+      {
+        "version": "0.11.1",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "47d7069beb7d6ac7b9acd1039986e73443f24234f41074da099d6f994ac9ad19"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "smallvec",
+    "alias": "smallvec",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.15.1",
+    "locked": [
+      "1.15.1"
+    ],
+    "latest_stable": "1.16.3",
+    "features": [
+      "serde"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-core/src/lib.rs:10",
+      "crates/braid-core/src/core/mod.rs:4",
+      "crates/braid-core/src/vendor/diamond_types/branch.rs:2",
+      "crates/braid-core/src/vendor/diamond_types/frontier.rs:8",
+      "crates/braid-core/src/vendor/diamond_types/list_fuzzer_tools.rs:9",
+      "crates/braid-core/src/vendor/diamond_types/mod.rs:193",
+      "crates/braid-core/src/vendor/diamond_types/oplog.rs:2",
+      "crates/braid-core/src/vendor/rle/append_rle.rs:1",
+      "crates/braid-core/src/vendor/diamond_types/causalgraph/causalgraph.rs:1",
+      "crates/braid-core/src/vendor/diamond_types/causalgraph/summary.rs:1",
+      "crates/braid-core/src/vendor/diamond_types/encoding/parents.rs:2",
+      "crates/braid-core/src/vendor/diamond_types/list/branch.rs:37",
+      "crates/braid-core/src/vendor/diamond_types/list/old_fuzzer_tools.rs:4",
+      "crates/braid-core/src/vendor/diamond_types/list/oplog_merge.rs:2",
+      "crates/braid-core/src/vendor/diamond_types/list/op_iter.rs:1",
+      "crates/braid-core/src/vendor/diamond_types/listmerge/dot.rs:12",
+      "crates/braid-core/src/vendor/diamond_types/listmerge/merge.rs:1538",
+      "crates/braid-core/src/vendor/diamond_types/listmerge/plan.rs:8",
+      "crates/braid-core/src/vendor/diamond_types/listmerge/xf_old.rs:1",
+      "crates/braid-core/src/vendor/diamond_types/listmerge2/action_plan.rs:5",
+      "crates/braid-core/src/vendor/diamond_types/listmerge2/dot.rs:13",
+      "crates/braid-core/src/vendor/diamond_types/listmerge2/mod.rs:11",
+      "crates/braid-core/src/vendor/diamond_types/listmerge2/test_conversion.rs:2",
+      "crates/braid-core/src/vendor/diamond_types/storage/mod.rs:16",
+      "crates/braid-core/src/vendor/diamond_types/storage/page.rs:9",
+      "crates/braid-core/src/vendor/diamond_types/list/encoding/decode_oplog.rs:1",
+      "crates/braid-core/src/vendor/diamond_types/list/encoding/txn_trace.rs:30",
+      "crates/braid-core/src/vendor/diamond_types/causalgraph/agent_assignment/remote_ids.rs:7",
+      "crates/braid-core/src/vendor/diamond_types/causalgraph/graph/conflict_subgraph.rs:16",
+      "crates/braid-core/src/vendor/diamond_types/causalgraph/graph/mod.rs:21",
+      "crates/braid-core/src/vendor/diamond_types/causalgraph/graph/scope.rs:4",
+      "crates/braid-core/src/vendor/diamond_types/causalgraph/graph/subgraph.rs:2",
+      "crates/braid-core/src/vendor/diamond_types/causalgraph/graph/tools.rs:9"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.15.1",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "smartstring",
+    "alias": "smartstring",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.0.1",
+    "locked": [
+      "1.0.1"
+    ],
+    "latest_stable": "1.0.1",
+    "features": [
+      "serde"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MPL-2.0+"
+    ],
+    "source_files": [
+      "crates/braid-core/src/vendor/diamond_types/branch.rs:4",
+      "crates/braid-core/src/vendor/diamond_types/mod.rs:194",
+      "crates/braid-core/src/vendor/diamond_types/oplog.rs:5",
+      "crates/braid-core/src/vendor/diamond_types/serde_helpers.rs:9",
+      "crates/braid-core/src/vendor/diamond_types/simple_checkout.rs:3",
+      "crates/braid-core/src/vendor/diamond_types/causalgraph/summary.rs:2",
+      "crates/braid-core/src/vendor/diamond_types/list/branch.rs:4",
+      "crates/braid-core/src/vendor/diamond_types/list/mod.rs:8",
+      "crates/braid-core/src/vendor/diamond_types/list/operation.rs:9",
+      "crates/braid-core/src/vendor/diamond_types/listmerge/merge.rs:8",
+      "crates/braid-core/src/vendor/diamond_types/listmerge/simple_oplog.rs:3",
+      "crates/braid-core/src/vendor/diamond_types/causalgraph/agent_assignment/mod.rs:2",
+      "crates/braid-core/src/vendor/diamond_types/causalgraph/agent_assignment/remote_ids.rs:4"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.0.1",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "3fb72c633efbaa2dd666986505016c32c3044395ceaf881518399d2f4127ee29"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "str_indices",
+    "alias": "str_indices",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.4.3",
+    "locked": [
+      "0.4.4"
+    ],
+    "latest_stable": "0.4.4",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-core/src/vendor/diamond_types/unicount.rs:11"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.4.4",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "d08889ec5408683408db66ad89e0e1f93dff55c73a4ccc71c427d5b277ee47e6"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "thiserror",
+    "alias": "thiserror",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "2.0",
+    "locked": [
+      "1.0.69",
+      "2.0.18"
+    ],
+    "latest_stable": "2.0.21",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-core/src/replica.rs:23",
+      "crates/braid-core/src/core/error.rs:4"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.0.69",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52"
+      },
+      {
+        "version": "2.0.18",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "tokio",
+    "alias": "tokio",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.48",
+    "locked": [
+      "1.49.0"
+    ],
+    "latest_stable": "1.54.1",
+    "features": [],
+    "default_features": true,
+    "optional": true,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braid-core/src/replica.rs:21",
+      "crates/braid-core/tests/audit_filesystem.rs:13",
+      "crates/braid-core/tests/audit_replica.rs:7",
+      "crates/braid-core/tests/engineering_causality.rs:17",
+      "crates/braid-core/tests/sync_integrity_tests.rs:5",
+      "crates/braid-core/src/fs/api.rs:86",
+      "crates/braid-core/src/fs/binary_sync.rs:13",
+      "crates/braid-core/src/fs/config.rs:5",
+      "crates/braid-core/src/fs/debouncer.rs:4",
+      "crates/braid-core/src/fs/local_server.rs:17",
+      "crates/braid-core/src/fs/mod.rs:19",
+      "crates/braid-core/src/fs/nfs.rs:11",
+      "crates/braid-core/src/fs/rate_limiter.rs:9",
+      "crates/braid-core/src/fs/scanner.rs:13",
+      "crates/braid-core/src/fs/server_handlers.rs:49",
+      "crates/braid-core/src/fs/state.rs:11",
+      "crates/braid-core/src/fs/subscription.rs:9",
+      "crates/braid-core/src/fs/versions.rs:6",
+      "crates/braid-core/src/core/server/conflict_resolver.rs:413",
+      "crates/braid-core/src/core/server/middleware.rs:149",
+      "crates/braid-core/src/core/server/mod.rs:25",
+      "crates/braid-core/src/core/server/multiplex.rs:6",
+      "crates/braid-core/src/core/server/replica_http.rs:60",
+      "crates/braid-core/src/core/server/resource_state.rs:27",
+      "crates/braid-core/src/core/server/subscription.rs:7"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.49.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "72a2903cd7736441aac9df9d7688bd0ce48edccaadf181c3b90be801e81d3d86"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "tower",
+    "alias": "tower",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.5.2",
+    "locked": [
+      "0.5.3"
+    ],
+    "latest_stable": "0.5.3",
+    "features": [],
+    "default_features": true,
+    "optional": true,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braid-core/src/core/server/middleware.rs:123"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.5.3",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "ebe5ef63511595f1344e2d5cfa636d973292adc0eec1f0ad45fae9f0851ab1d4"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "tracing",
+    "alias": "tracing",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.1",
+    "locked": [
+      "0.1.44"
+    ],
+    "latest_stable": "0.1.44",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braid-core/src/fs/api.rs:84",
+      "crates/braid-core/src/fs/binary_sync.rs:80",
+      "crates/braid-core/src/fs/blob_handlers.rs:62",
+      "crates/braid-core/src/fs/config.rs:57",
+      "crates/braid-core/src/fs/debouncer.rs:7",
+      "crates/braid-core/src/fs/local_server.rs:19",
+      "crates/braid-core/src/fs/mod.rs:172",
+      "crates/braid-core/src/fs/mount.rs:4",
+      "crates/braid-core/src/fs/nfs.rs:12",
+      "crates/braid-core/src/fs/rate_limiter.rs:87",
+      "crates/braid-core/src/fs/scanner.rs:62",
+      "crates/braid-core/src/fs/server_handlers.rs:24",
+      "crates/braid-core/src/fs/subscription.rs:12",
+      "crates/braid-core/src/fs/sync.rs:7",
+      "crates/braid-core/src/fs/versions.rs:61",
+      "crates/braid-core/src/fs/watcher.rs:9",
+      "crates/braid-core/src/core/merge/simpleton.rs:9",
+      "crates/braid-core/src/core/server/send_update.rs:41"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.1.44",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "63e71662fa4b2a2c3a26f570f037eb95bb1f85397f3cd8076caed2f026a6d100"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "url",
+    "alias": "url",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "2.5",
+    "locked": [
+      "2.5.8"
+    ],
+    "latest_stable": "2.5.8",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-core/tests/audit_filesystem.rs:49",
+      "crates/braid-core/tests/audit_replica.rs:206",
+      "crates/braid-core/src/core/traits.rs:10",
+      "crates/braid-core/src/fs/api.rs:17",
+      "crates/braid-core/src/fs/binary_sync.rs:19",
+      "crates/braid-core/src/fs/debouncer.rs:15",
+      "crates/braid-core/src/fs/local_server.rs:71",
+      "crates/braid-core/src/fs/mapping.rs:4",
+      "crates/braid-core/src/fs/mod.rs:112",
+      "crates/braid-core/src/fs/nfs.rs:13",
+      "crates/braid-core/src/fs/rate_limiter.rs:55",
+      "crates/braid-core/src/fs/scanner.rs:102",
+      "crates/braid-core/src/fs/server_handlers.rs:16",
+      "crates/braid-core/src/fs/state.rs:16",
+      "crates/braid-core/src/fs/subscription.rs:8",
+      "crates/braid-core/src/fs/sync.rs:11",
+      "crates/braid-core/src/fs/versions.rs:74",
+      "crates/braid-core/src/fs/watcher.rs:42"
+    ],
+    "locked_packages": [
+      {
+        "version": "2.5.8",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "ff67a8a4397373c3ef660812acab3268222035010ab8680ec4215f38ba3d0eed"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "uuid",
+    "alias": "uuid",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.20.0",
+    "locked": [
+      "1.21.0"
+    ],
+    "latest_stable": "1.29.0",
+    "features": [
+      "v4",
+      "serde",
+      "js"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "Apache-2.0 OR MIT"
+    ],
+    "source_files": [
+      "crates/braid-core/src/fs/api.rs:369",
+      "crates/braid-core/src/fs/binary_sync.rs:36",
+      "crates/braid-core/src/fs/config.rs:50",
+      "crates/braid-core/src/fs/sync.rs:111",
+      "crates/braid-core/src/core/merge/diamond.rs:32"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.21.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "b672338555252d43fd2240c714dc444b8c6fb0a5c5335e65a07bba7742735ddb"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "lz4_flex",
+    "alias": "lz4_flex",
+    "kind": "dev",
+    "target": "all",
+    "requirement": "0.12.0",
+    "locked": [
+      "0.12.2"
+    ],
+    "latest_stable": "0.14.0",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braid-core/src/vendor/diamond_types/encoding/parseerror.rs:23",
+      "crates/braid-core/src/vendor/diamond_types/list/encoding/decode_oplog.rs:626",
+      "crates/braid-core/src/vendor/diamond_types/list/encoding/encode_oplog.rs:280",
+      "crates/braid-core/src/vendor/diamond_types/list/encoding/tests.rs:1"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.12.2",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "90071f8077f8e40adfc4b7fe9cd495ce316263f19e75c2211eeff3fdf475a3d9"
+      }
+    ]
+  },
+  {
+    "owner": "braid-core",
+    "dependency": "tempfile",
+    "alias": "tempfile",
+    "kind": "dev",
+    "target": "all",
+    "requirement": "3.10",
+    "locked": [
+      "3.25.0"
+    ],
+    "latest_stable": "3.27.0",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-core/tests/audit_filesystem.rs:17",
+      "crates/braid-core/tests/audit_replica.rs:9",
+      "crates/braid-core/tests/engineering_causality.rs:19",
+      "crates/braid-core/tests/sync_integrity_tests.rs:3"
+    ],
+    "locked_packages": [
+      {
+        "version": "3.25.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "0136791f7c95b1f6dd99f9cc786b91bb81c3800b639b3478e561ddb7be95e5f1"
+      }
+    ]
+  },
+  {
+    "owner": "braid-http",
+    "dependency": "arbitrary",
+    "alias": "arbitrary",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.4",
+    "locked": [
+      "1.5.0"
+    ],
+    "latest_stable": "unrecorded",
+    "features": [
+      "derive"
+    ],
+    "default_features": true,
+    "optional": true,
+    "licenses": [],
+    "source_files": [
+      "crates/braid-http/src/client/fuzzer.rs:6",
+      "crates/braid-http/src/types/content_range.rs:8",
+      "crates/braid-http/src/types/patch.rs:20",
+      "crates/braid-http/src/types/response.rs:93",
+      "crates/braid-http/src/types/update.rs:35",
+      "crates/braid-http/src/types/version.rs:7"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.5.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "3bc62ac97cc33321f50863d514c3bc38a453947a8f9e781137e47c7401020aed"
+      }
+    ]
+  },
+  {
+    "owner": "braid-http",
+    "dependency": "async-channel",
+    "alias": "async-channel",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "2.3",
+    "locked": [
+      "2.5.0"
+    ],
+    "latest_stable": "2.5.0",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "Apache-2.0 OR MIT"
+    ],
+    "source_files": [
+      "crates/braid-http/src/traits.rs:31",
+      "crates/braid-http/src/client/fetch.rs:306",
+      "crates/braid-http/src/client/multiplex.rs:68",
+      "crates/braid-http/src/client/native_network.rs:84",
+      "crates/braid-http/src/client/reliable.rs:10",
+      "crates/braid-http/src/client/subscription.rs:12",
+      "crates/braid-http/src/client/wasm_network.rs:51"
+    ],
+    "locked_packages": [
+      {
+        "version": "2.5.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "924ed96dd52d1b75e9c1a3e6275715fd320f5f9439fb5a4a11fa51f4221158d2"
+      }
+    ]
+  },
+  {
+    "owner": "braid-http",
+    "dependency": "async-trait",
+    "alias": "async-trait",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.1",
+    "locked": [
+      "0.1.89"
+    ],
+    "latest_stable": "0.1.92",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-http/src/traits.rs:3",
+      "crates/braid-http/src/client/native_network.rs:5",
+      "crates/braid-http/src/client/wasm_network.rs:8"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.1.89",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "9035ad2d096bed7955a320ee7e2230574d28fd3c3a0f186cbea1ff3c7eed5dbb"
+      }
+    ]
+  },
+  {
+    "owner": "braid-http",
+    "dependency": "bytes",
+    "alias": "bytes",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1",
+    "locked": [
+      "1.11.1"
+    ],
+    "latest_stable": "1.12.1",
+    "features": [
+      "serde"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braid-http/src/error.rs:13",
+      "crates/braid-http/src/traits.rs:38",
+      "crates/braid-http/tests/audit_conformance.rs:6",
+      "crates/braid-http/tests/engineering_wire.rs:70",
+      "crates/braid-http/tests/js_fixtures.rs:46",
+      "crates/braid-http/src/client/fetch.rs:340",
+      "crates/braid-http/src/client/fuzzer.rs:6",
+      "crates/braid-http/src/client/headers.rs:206",
+      "crates/braid-http/src/client/multiplex.rs:47",
+      "crates/braid-http/src/client/native_network.rs:64",
+      "crates/braid-http/src/client/parser.rs:4",
+      "crates/braid-http/src/client/utils.rs:7",
+      "crates/braid-http/src/client/wasm_network.rs:31",
+      "crates/braid-http/src/protocol/formatter.rs:4",
+      "crates/braid-http/src/protocol/headers.rs:81",
+      "crates/braid-http/src/protocol/multiplex.rs:22",
+      "crates/braid-http/src/types/content_range.rs:10",
+      "crates/braid-http/src/types/patch.rs:3",
+      "crates/braid-http/src/types/request.rs:19",
+      "crates/braid-http/src/types/response.rs:5",
+      "crates/braid-http/src/types/update.rs:4"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.11.1",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "1e748733b7cbc798e1434b6ac524f0c1ff2ab456fe201501e6497c8417a4fc33"
+      }
+    ]
+  },
+  {
+    "owner": "braid-http",
+    "dependency": "futures",
+    "alias": "futures",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.3",
+    "locked": [
+      "0.3.32"
+    ],
+    "latest_stable": "0.3.34",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-http/src/traits.rs:8",
+      "crates/braid-http/src/client/multiplex.rs:6",
+      "crates/braid-http/src/client/native_network.rs:6",
+      "crates/braid-http/src/client/subscription.rs:4",
+      "crates/braid-http/src/client/wasm_network.rs:9"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.3.32",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "8b147ee9d1f6d097cef9ce628cd2ee62288d963e16fb287bd9286455b241382d"
+      }
+    ]
+  },
+  {
+    "owner": "braid-http",
+    "dependency": "gloo-timers",
+    "alias": "gloo-timers",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.3",
+    "locked": [
+      "0.3.0"
+    ],
+    "latest_stable": "0.4.0",
+    "features": [
+      "futures"
+    ],
+    "default_features": true,
+    "optional": true,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-http/src/traits.rs:75",
+      "crates/braid-http/src/client/subscription.rs:61",
+      "crates/braid-http/src/client/utils.rs:124",
+      "crates/braid-http/src/client/wasm_network.rs:80"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.3.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "bbb143cf96099802033e0d4f4963b19fd2e0b728bcf076cd9cf7f6634f092994"
+      }
+    ]
+  },
+  {
+    "owner": "braid-http",
+    "dependency": "http",
+    "alias": "http",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1",
+    "locked": [
+      "1.4.0"
+    ],
+    "latest_stable": "1.5.0",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-http/examples/fuzz_controller.rs:76",
+      "crates/braid-http/tests/audit_conformance.rs:140",
+      "crates/braid-http/tests/engineering_wire.rs:6",
+      "crates/braid-http/src/client/config.rs:74",
+      "crates/braid-http/src/client/fetch.rs:68",
+      "crates/braid-http/src/client/headers.rs:6",
+      "crates/braid-http/src/protocol/constants.rs:55",
+      "crates/braid-http/src/protocol/formatter.rs:209",
+      "crates/braid-http/src/protocol/headers.rs:8"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.4.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "e3ba2a386d7f85a81f119ad7498ebe444d2e22c2af0b86b069416ace48b3311a"
+      }
+    ]
+  },
+  {
+    "owner": "braid-http",
+    "dependency": "js-sys",
+    "alias": "js-sys",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.3",
+    "locked": [
+      "0.3.106"
+    ],
+    "latest_stable": "0.3.106",
+    "features": [],
+    "default_features": true,
+    "optional": true,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-http/src/traits.rs:79"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.3.106",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "7883d941dae510fb2d978fc3fe018c71c9e2892fd38854de3e8b92c2e5ad9cc5"
+      }
+    ]
+  },
+  {
+    "owner": "braid-http",
+    "dependency": "rand",
+    "alias": "rand",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.8",
+    "locked": [
+      "0.8.8",
+      "0.9.5",
+      "0.10.3"
+    ],
+    "latest_stable": "0.10.3",
+    "features": [
+      "small_rng"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-http/src/client/fetch.rs:254",
+      "crates/braid-http/src/client/fuzzer.rs:2",
+      "crates/braid-http/src/client/reliable.rs:105"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.8.8",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "e058c7de0b26af77780c769414d6257830bb240f3c38477dbc2c16e5f54d6d4c"
+      },
+      {
+        "version": "0.9.5",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "b9ef1d0d795eb7d84685bca4f72f3649f064e6641543d3a8c415898726a57b41"
+      },
+      {
+        "version": "0.10.3",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "65c9fb96cbc91e3478eaae79a69fcd3f1ae4ad052e471fe6732fff548984b4af"
+      }
+    ]
+  },
+  {
+    "owner": "braid-http",
+    "dependency": "serde",
+    "alias": "serde",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.0",
+    "locked": [
+      "1.0.228"
+    ],
+    "latest_stable": "1.0.229",
+    "features": [
+      "derive"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-http/src/types/content_range.rs:7",
+      "crates/braid-http/src/types/patch.rs:4",
+      "crates/braid-http/src/types/update.rs:8",
+      "crates/braid-http/src/types/version.rs:6"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.0.228",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "9a8e94ea7f378bd32cbbd37198a4a91436180c5bb472411e48b5ec2e2124ae9e"
+      }
+    ]
+  },
+  {
+    "owner": "braid-http",
+    "dependency": "serde_json",
+    "alias": "serde_json",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.0",
+    "locked": [
+      "1.0.149"
+    ],
+    "latest_stable": "1.0.154",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-http/examples/codec_fixtures.rs:6",
+      "crates/braid-http/examples/fuzz_controller.rs:7",
+      "crates/braid-http/src/error.rs:34",
+      "crates/braid-http/tests/js_fixtures.rs:7",
+      "crates/braid-http/src/protocol/formatter.rs:115",
+      "crates/braid-http/src/protocol/headers.rs:97",
+      "crates/braid-http/src/types/update.rs:181",
+      "crates/braid-http/src/types/version.rs:62"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.0.149",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
+      }
+    ]
+  },
+  {
+    "owner": "braid-http",
+    "dependency": "sfv",
+    "alias": "sfv",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.14",
+    "locked": [
+      "0.14.0"
+    ],
+    "latest_stable": "0.16.0",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT/Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-http/src/protocol/headers.rs:46"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.14.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "0d471eaefb14f4b30032525bdb124b36e55ba9cb1292080e06f1a236cd10fe87"
+      }
+    ]
+  },
+  {
+    "owner": "braid-http",
+    "dependency": "thiserror",
+    "alias": "thiserror",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "2.0",
+    "locked": [
+      "1.0.69",
+      "2.0.18"
+    ],
+    "latest_stable": "2.0.21",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-http/src/error.rs:4"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.0.69",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52"
+      },
+      {
+        "version": "2.0.18",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4"
+      }
+    ]
+  },
+  {
+    "owner": "braid-http",
+    "dependency": "tracing",
+    "alias": "tracing",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.1",
+    "locked": [
+      "0.1.44"
+    ],
+    "latest_stable": "0.1.44",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braid-http/src/client/fetch.rs:194"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.1.44",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "63e71662fa4b2a2c3a26f570f037eb95bb1f85397f3cd8076caed2f026a6d100"
+      }
+    ]
+  },
+  {
+    "owner": "braid-http",
+    "dependency": "url",
+    "alias": "url",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "2",
+    "locked": [
+      "2.5.8"
+    ],
+    "latest_stable": "2.5.8",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-http/examples/fuzz_controller.rs:100",
+      "crates/braid-http/src/traits.rs:26",
+      "crates/braid-http/src/client/fetch.rs:105",
+      "crates/braid-http/src/client/native_network.rs:39",
+      "crates/braid-http/src/client/parser.rs:177",
+      "crates/braid-http/src/client/reliable.rs:35",
+      "crates/braid-http/src/client/utils.rs:96",
+      "crates/braid-http/src/client/wasm_network.rs:11",
+      "crates/braid-http/src/types/update.rs:31"
+    ],
+    "locked_packages": [
+      {
+        "version": "2.5.8",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "ff67a8a4397373c3ef660812acab3268222035010ab8680ec4215f38ba3d0eed"
+      }
+    ]
+  },
+  {
+    "owner": "braid-http",
+    "dependency": "uuid",
+    "alias": "uuid",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1",
+    "locked": [
+      "1.21.0"
+    ],
+    "latest_stable": "1.29.0",
+    "features": [
+      "v4",
+      "serde",
+      "js"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "Apache-2.0 OR MIT"
+    ],
+    "source_files": [
+      "crates/braid-http/src/durable.rs:15",
+      "crates/braid-http/src/client/fetch.rs:122"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.21.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "b672338555252d43fd2240c714dc444b8c6fb0a5c5335e65a07bba7742735ddb"
+      }
+    ]
+  },
+  {
+    "owner": "braid-http",
+    "dependency": "wasm-bindgen-futures",
+    "alias": "wasm-bindgen-futures",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.4",
+    "locked": [
+      "0.4.79"
+    ],
+    "latest_stable": "0.4.79",
+    "features": [],
+    "default_features": true,
+    "optional": true,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-http/src/traits.rs:71",
+      "crates/braid-http/src/client/utils.rs:114",
+      "crates/braid-http/src/client/wasm_network.rs:74"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.4.79",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "3cbab34de2d982e9b48e18d216d04c4a6f641066ff19ffb699980f591ee3610e"
+      }
+    ]
+  },
+  {
+    "owner": "braid-http",
+    "dependency": "reqwest",
+    "alias": "reqwest",
+    "kind": "normal",
+    "target": "cfg(not(target_arch = \"wasm32\"))",
+    "requirement": "0.13.1",
+    "locked": [
+      "0.13.2"
+    ],
+    "latest_stable": "0.13.5",
+    "features": [
+      "json",
+      "stream",
+      "multipart"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-http/src/client/fetch.rs:42",
+      "crates/braid-http/src/client/multiplex.rs:25",
+      "crates/braid-http/src/client/native_network.rs:7",
+      "crates/braid-http/src/client/wasm_network.rs:11"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.13.2",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "ab3f43e3283ab1488b624b44b0e988d0acea0b3214e694730a055cb6b2efa801"
+      }
+    ]
+  },
+  {
+    "owner": "braid-http",
+    "dependency": "tokio",
+    "alias": "tokio",
+    "kind": "normal",
+    "target": "cfg(not(target_arch = \"wasm32\"))",
+    "requirement": "1",
+    "locked": [
+      "1.49.0"
+    ],
+    "latest_stable": "1.54.1",
+    "features": [
+      "full"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braid-http/examples/fuzz_controller.rs:8",
+      "crates/braid-http/src/durable.rs:7",
+      "crates/braid-http/src/traits.rs:50",
+      "crates/braid-http/src/client/fetch.rs:24",
+      "crates/braid-http/src/client/multiplex.rs:9",
+      "crates/braid-http/src/client/native_network.rs:87",
+      "crates/braid-http/src/client/reliable.rs:12",
+      "crates/braid-http/src/client/subscription.rs:59",
+      "crates/braid-http/src/client/utils.rs:106"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.49.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "72a2903cd7736441aac9df9d7688bd0ce48edccaadf181c3b90be801e81d3d86"
+      }
+    ]
+  },
+  {
+    "owner": "braid-http",
+    "dependency": "getrandom",
+    "alias": "getrandom",
+    "kind": "normal",
+    "target": "cfg(target_arch = \"wasm32\")",
+    "requirement": "0.2",
+    "locked": [
+      "0.2.17",
+      "0.3.4",
+      "0.4.1"
+    ],
+    "latest_stable": "0.4.3",
+    "features": [
+      "js"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [],
+    "locked_packages": [
+      {
+        "version": "0.2.17",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "ff2abc00be7fca6ebc474524697ae276ad847ad0a6b3faa4bcb027e9a4614ad0"
+      },
+      {
+        "version": "0.3.4",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "899def5c37c4fd7b2664648c28120ecec138e4d395b459e5ca34f9cce2dd77fd"
+      },
+      {
+        "version": "0.4.1",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "139ef39800118c7683f2fd3c98c1b23c09ae076556b435f8e9064ae108aaeeec"
+      }
+    ]
+  },
+  {
+    "owner": "braid-http",
+    "dependency": "reqwest",
+    "alias": "reqwest",
+    "kind": "normal",
+    "target": "cfg(target_arch = \"wasm32\")",
+    "requirement": "0.13.1",
+    "locked": [
+      "0.13.2"
+    ],
+    "latest_stable": "0.13.5",
+    "features": [
+      "json",
+      "stream"
+    ],
+    "default_features": false,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-http/src/client/fetch.rs:42",
+      "crates/braid-http/src/client/multiplex.rs:25",
+      "crates/braid-http/src/client/native_network.rs:7",
+      "crates/braid-http/src/client/wasm_network.rs:11"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.13.2",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "ab3f43e3283ab1488b624b44b0e988d0acea0b3214e694730a055cb6b2efa801"
+      }
+    ]
+  },
+  {
+    "owner": "braid-http",
+    "dependency": "tokio",
+    "alias": "tokio",
+    "kind": "normal",
+    "target": "cfg(target_arch = \"wasm32\")",
+    "requirement": "1",
+    "locked": [
+      "1.49.0"
+    ],
+    "latest_stable": "1.54.1",
+    "features": [
+      "sync"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braid-http/examples/fuzz_controller.rs:8",
+      "crates/braid-http/src/durable.rs:7",
+      "crates/braid-http/src/traits.rs:50",
+      "crates/braid-http/src/client/fetch.rs:24",
+      "crates/braid-http/src/client/multiplex.rs:9",
+      "crates/braid-http/src/client/native_network.rs:87",
+      "crates/braid-http/src/client/reliable.rs:12",
+      "crates/braid-http/src/client/subscription.rs:59",
+      "crates/braid-http/src/client/utils.rs:106"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.49.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "72a2903cd7736441aac9df9d7688bd0ce48edccaadf181c3b90be801e81d3d86"
+      }
+    ]
+  },
+  {
+    "owner": "braid-iroh",
+    "dependency": "anyhow",
+    "alias": "anyhow",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1",
+    "locked": [
+      "1.0.104"
+    ],
+    "latest_stable": "1.0.104",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-iroh/src/lib.rs:26",
+      "crates/braid-iroh/src/node.rs:81",
+      "crates/braid-iroh/src/proxy.rs:54",
+      "crates/braid-iroh/src/subscription.rs:73"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.0.104",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
+      }
+    ]
+  },
+  {
+    "owner": "braid-iroh",
+    "dependency": "async-stream",
+    "alias": "async-stream",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.3",
+    "locked": [
+      "0.3.6"
+    ],
+    "latest_stable": "0.3.6",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braid-iroh/src/protocol.rs:62"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.3.6",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "0b5a71a6f37880a80d1d7f19efd781e4b5de42c88f0722cc13bcb6cc2cfe8476"
+      }
+    ]
+  },
+  {
+    "owner": "braid-iroh",
+    "dependency": "axum",
+    "alias": "axum",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.8",
+    "locked": [
+      "0.8.8"
+    ],
+    "latest_stable": "0.8.9",
+    "features": [
+      "ws"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braid-iroh/src/protocol.rs:2",
+      "crates/braid-iroh/src/proxy.rs:11"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.8.8",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "8b52af3cb4058c895d37317bb27508dccc8e5f2d39454016b297bf4a400597b8"
+      }
+    ]
+  },
+  {
+    "owner": "braid-iroh",
+    "dependency": "blake3",
+    "alias": "blake3",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1",
+    "locked": [
+      "1.8.3"
+    ],
+    "latest_stable": "1.8.7",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "CC0-1.0 OR Apache-2.0 OR Apache-2.0 WITH LLVM-exception"
+    ],
+    "source_files": [
+      "crates/braid-iroh/src/lib.rs:90",
+      "crates/braid-iroh/src/subscription.rs:28"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.8.3",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "2468ef7d57b3fb7e16b576e8377cdbde2320c60e1491e961d11da40fc4f02a2d"
+      }
+    ]
+  },
+  {
+    "owner": "braid-iroh",
+    "dependency": "bytes",
+    "alias": "bytes",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1",
+    "locked": [
+      "1.11.1"
+    ],
+    "latest_stable": "1.12.1",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braid-iroh/src/lib.rs:113",
+      "crates/braid-iroh/src/protocol.rs:10",
+      "crates/braid-iroh/src/proxy.rs:77",
+      "crates/braid-iroh/src/subscription.rs:9"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.11.1",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "1e748733b7cbc798e1434b6ac524f0c1ff2ab456fe201501e6497c8417a4fc33"
+      }
+    ]
+  },
+  {
+    "owner": "braid-iroh",
+    "dependency": "futures",
+    "alias": "futures",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.3",
+    "locked": [
+      "0.3.32"
+    ],
+    "latest_stable": "0.3.34",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-iroh/src/protocol.rs:63",
+      "crates/braid-iroh/tests/transport.rs:2"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.3.32",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "8b147ee9d1f6d097cef9ce628cd2ee62288d963e16fb287bd9286455b241382d"
+      }
+    ]
+  },
+  {
+    "owner": "braid-iroh",
+    "dependency": "http",
+    "alias": "http",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1",
+    "locked": [
+      "1.4.0"
+    ],
+    "latest_stable": "1.5.0",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-iroh/src/protocol.rs:4",
+      "crates/braid-iroh/src/proxy.rs:4"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.4.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "e3ba2a386d7f85a81f119ad7498ebe444d2e22c2af0b86b069416ace48b3311a"
+      }
+    ]
+  },
+  {
+    "owner": "braid-iroh",
+    "dependency": "iroh",
+    "alias": "iroh",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "=1.4.1",
+    "locked": [
+      "1.4.1"
+    ],
+    "latest_stable": "1.4.1",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-iroh/src/discovery.rs:5",
+      "crates/braid-iroh/src/lib.rs:24",
+      "crates/braid-iroh/src/node.rs:3",
+      "crates/braid-iroh/src/protocol.rs:11",
+      "crates/braid-iroh/src/proxy.rs:5",
+      "crates/braid-iroh/src/subscription.rs:3",
+      "crates/braid-iroh/tests/transport.rs:33"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.4.1",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "e3689cab508af9bcef7816c1201b403595ec6aa20e7d15e1f9683bb4be4a5b17"
+      }
+    ]
+  },
+  {
+    "owner": "braid-iroh",
+    "dependency": "iroh-gossip",
+    "alias": "iroh-gossip",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "=0.101.0",
+    "locked": [
+      "0.101.0"
+    ],
+    "latest_stable": "unrecorded",
+    "features": [
+      "net"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [],
+    "source_files": [
+      "crates/braid-iroh/src/lib.rs:26",
+      "crates/braid-iroh/src/node.rs:10",
+      "crates/braid-iroh/src/subscription.rs:11"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.101.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "4e1dc4b05f73e7a1b9e83b531eb63c3fd671b0af3aeb13b59c546dd7ca747515"
+      }
+    ]
+  },
+  {
+    "owner": "braid-iroh",
+    "dependency": "iroh-h3-axum",
+    "alias": "iroh-h3-axum",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "=0.4.0",
+    "locked": [
+      "0.4.0"
+    ],
+    "latest_stable": "unrecorded",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [],
+    "source_files": [
+      "crates/braid-iroh/src/protocol.rs:12"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.4.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "4f2946914aa9292d14c1ae06aa1b797d1e906a67451587f6947ec89075803027"
+      }
+    ]
+  },
+  {
+    "owner": "braid-iroh",
+    "dependency": "iroh-h3-client",
+    "alias": "iroh-h3-client",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "=0.5.0",
+    "locked": [
+      "0.5.0"
+    ],
+    "latest_stable": "unrecorded",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [],
+    "source_files": [
+      "crates/braid-iroh/src/proxy.rs:19",
+      "crates/braid-iroh/tests/transport.rs:3"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.5.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "6f2f5901cdd6c85e022fc011be81665e4895a508b0ee3423c116bff41bf4237c"
+      }
+    ]
+  },
+  {
+    "owner": "braid-iroh",
+    "dependency": "n0-future",
+    "alias": "n0-future",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.3.2",
+    "locked": [
+      "0.3.2"
+    ],
+    "latest_stable": "0.3.2",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-iroh/src/discovery.rs:15"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.3.2",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "e2ab99dfb861450e68853d34ae665243a88b8c493d01ba957321a1e9b2312bbe"
+      }
+    ]
+  },
+  {
+    "owner": "braid-iroh",
+    "dependency": "parking_lot",
+    "alias": "parking_lot",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.12",
+    "locked": [
+      "0.12.5"
+    ],
+    "latest_stable": "0.13.0",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-iroh/src/discovery.rs:7",
+      "crates/braid-iroh/src/node.rs:65",
+      "crates/braid-iroh/src/protocol.rs:13"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.12.5",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "93857453250e3077bd71ff98b6a65ea6621a19bb0f559a85248955ac12c45a1a"
+      }
+    ]
+  },
+  {
+    "owner": "braid-iroh",
+    "dependency": "rand",
+    "alias": "rand",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.10.1",
+    "locked": [
+      "0.8.8",
+      "0.9.5",
+      "0.10.3"
+    ],
+    "latest_stable": "0.10.3",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-iroh/src/lib.rs:128"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.8.8",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "e058c7de0b26af77780c769414d6257830bb240f3c38477dbc2c16e5f54d6d4c"
+      },
+      {
+        "version": "0.9.5",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "b9ef1d0d795eb7d84685bca4f72f3649f064e6641543d3a8c415898726a57b41"
+      },
+      {
+        "version": "0.10.3",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "65c9fb96cbc91e3478eaae79a69fcd3f1ae4ad052e471fe6732fff548984b4af"
+      }
+    ]
+  },
+  {
+    "owner": "braid-iroh",
+    "dependency": "serde",
+    "alias": "serde",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1",
+    "locked": [
+      "1.0.228"
+    ],
+    "latest_stable": "1.0.229",
+    "features": [
+      "derive"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-iroh/src/subscription.rs:14"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.0.228",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "9a8e94ea7f378bd32cbbd37198a4a91436180c5bb472411e48b5ec2e2124ae9e"
+      }
+    ]
+  },
+  {
+    "owner": "braid-iroh",
+    "dependency": "serde_json",
+    "alias": "serde_json",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1",
+    "locked": [
+      "1.0.149"
+    ],
+    "latest_stable": "1.0.154",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-iroh/src/subscription.rs:89"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.0.149",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
+      }
+    ]
+  },
+  {
+    "owner": "braid-iroh",
+    "dependency": "tokio",
+    "alias": "tokio",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1",
+    "locked": [
+      "1.49.0"
+    ],
+    "latest_stable": "1.54.1",
+    "features": [
+      "full"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braid-iroh/src/lib.rs:95",
+      "crates/braid-iroh/src/node.rs:66",
+      "crates/braid-iroh/src/protocol.rs:38",
+      "crates/braid-iroh/src/proxy.rs:67",
+      "crates/braid-iroh/src/subscription.rs:17",
+      "crates/braid-iroh/tests/transport.rs:6"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.49.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "72a2903cd7736441aac9df9d7688bd0ce48edccaadf181c3b90be801e81d3d86"
+      }
+    ]
+  },
+  {
+    "owner": "braid-iroh",
+    "dependency": "tower-http",
+    "alias": "tower-http",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.6",
+    "locked": [
+      "0.6.8"
+    ],
+    "latest_stable": "0.7.1",
+    "features": [
+      "cors",
+      "trace",
+      "fs"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braid-iroh/src/proxy.rs:21"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.6.8",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "d4e6559d53cc268e5031cd8429d05415bc4cb4aefc4aa5d6cc35fbf5b924a1f8"
+      }
+    ]
+  },
+  {
+    "owner": "braid-iroh",
+    "dependency": "tracing",
+    "alias": "tracing",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.1",
+    "locked": [
+      "0.1.44"
+    ],
+    "latest_stable": "0.1.44",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braid-iroh/src/lib.rs:66",
+      "crates/braid-iroh/src/node.rs:110",
+      "crates/braid-iroh/src/proxy.rs:65"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.1.44",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "63e71662fa4b2a2c3a26f570f037eb95bb1f85397f3cd8076caed2f026a6d100"
+      }
+    ]
+  },
+  {
+    "owner": "braid-iroh",
+    "dependency": "tempfile",
+    "alias": "tempfile",
+    "kind": "dev",
+    "target": "all",
+    "requirement": "3.10",
+    "locked": [
+      "3.25.0"
+    ],
+    "latest_stable": "3.27.0",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braid-iroh/tests/transport.rs:14"
+    ],
+    "locked_packages": [
+      {
+        "version": "3.25.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "0136791f7c95b1f6dd99f9cc786b91bb81c3800b639b3478e561ddb7be95e5f1"
+      }
+    ]
+  },
+  {
+    "owner": "braidfs-daemon",
+    "dependency": "anyhow",
+    "alias": "anyhow",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.0",
+    "locked": [
+      "1.0.104"
+    ],
+    "latest_stable": "1.0.104",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braidfs-daemon/src/main.rs:14"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.0.104",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
+      }
+    ]
+  },
+  {
+    "owner": "braidfs-daemon",
+    "dependency": "clap",
+    "alias": "clap",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "4.5",
+    "locked": [
+      "4.5.60"
+    ],
+    "latest_stable": "4.6.7",
+    "features": [
+      "derive"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braidfs-daemon/src/main.rs:2"
+    ],
+    "locked_packages": [
+      {
+        "version": "4.5.60",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "2797f34da339ce31042b27d23607e051786132987f595b02ba4f6a6dffb7030a"
+      }
+    ]
+  },
+  {
+    "owner": "braidfs-daemon",
+    "dependency": "tokio",
+    "alias": "tokio",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.48",
+    "locked": [
+      "1.49.0"
+    ],
+    "latest_stable": "1.54.1",
+    "features": [
+      "full"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braidfs-daemon/src/main.rs:13"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.49.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "72a2903cd7736441aac9df9d7688bd0ce48edccaadf181c3b90be801e81d3d86"
+      }
+    ]
+  },
+  {
+    "owner": "braidfs-daemon",
+    "dependency": "tracing",
+    "alias": "tracing",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.1",
+    "locked": [
+      "0.1.44"
+    ],
+    "latest_stable": "0.1.44",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braidfs-daemon/src/main.rs:3"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.1.44",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "63e71662fa4b2a2c3a26f570f037eb95bb1f85397f3cd8076caed2f026a6d100"
+      }
+    ]
+  },
+  {
+    "owner": "braidfs-daemon",
+    "dependency": "tracing-subscriber",
+    "alias": "tracing-subscriber",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.3",
+    "locked": [
+      "0.3.22"
+    ],
+    "latest_stable": "0.3.23",
+    "features": [
+      "env-filter"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braidfs-daemon/src/main.rs:15"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.3.22",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "2f30143827ddab0d256fd843b7a66d164e9f271cfa0dde49142c5ca0ca291f1e"
+      }
+    ]
+  },
+  {
+    "owner": "braidfs-nfs",
+    "dependency": "anyhow",
+    "alias": "anyhow",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.0",
+    "locked": [
+      "1.0.104"
+    ],
+    "latest_stable": "1.0.104",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braidfs-nfs/src/main.rs:23"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.0.104",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
+      }
+    ]
+  },
+  {
+    "owner": "braidfs-nfs",
+    "dependency": "async-channel",
+    "alias": "async-channel",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "2.3",
+    "locked": [
+      "2.5.0"
+    ],
+    "latest_stable": "2.5.0",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "Apache-2.0 OR MIT"
+    ],
+    "source_files": [
+      "crates/braidfs-nfs/src/main.rs:69"
+    ],
+    "locked_packages": [
+      {
+        "version": "2.5.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "924ed96dd52d1b75e9c1a3e6275715fd320f5f9439fb5a4a11fa51f4221158d2"
+      }
+    ]
+  },
+  {
+    "owner": "braidfs-nfs",
+    "dependency": "clap",
+    "alias": "clap",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "4.5",
+    "locked": [
+      "4.5.60"
+    ],
+    "latest_stable": "4.6.7",
+    "features": [
+      "derive"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braidfs-nfs/src/main.rs:3"
+    ],
+    "locked_packages": [
+      {
+        "version": "4.5.60",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "2797f34da339ce31042b27d23607e051786132987f595b02ba4f6a6dffb7030a"
+      }
+    ]
+  },
+  {
+    "owner": "braidfs-nfs",
+    "dependency": "nfsserve",
+    "alias": "nfsserve",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.10",
+    "locked": [
+      "0.10.2"
+    ],
+    "latest_stable": "0.11.0",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "BSD-3-Clause"
+    ],
+    "source_files": [
+      "crates/braidfs-nfs/src/main.rs:4"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.10.2",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "d73615e054238e6bf5e554407b5b23e82fc63616db459057c51b794799eda6fb"
+      }
+    ]
+  },
+  {
+    "owner": "braidfs-nfs",
+    "dependency": "parking_lot",
+    "alias": "parking_lot",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.12",
+    "locked": [
+      "0.12.5"
+    ],
+    "latest_stable": "0.13.0",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/braidfs-nfs/src/main.rs:5"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.12.5",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "93857453250e3077bd71ff98b6a65ea6621a19bb0f559a85248955ac12c45a1a"
+      }
+    ]
+  },
+  {
+    "owner": "braidfs-nfs",
+    "dependency": "rusqlite",
+    "alias": "rusqlite",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.32",
+    "locked": [
+      "0.32.1"
+    ],
+    "latest_stable": "0.40.2",
+    "features": [
+      "bundled"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braidfs-nfs/src/main.rs:6"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.32.1",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "7753b721174eb8ff87a9a0e799e2d7bc3749323e773db92e0984debb00019d6e"
+      }
+    ]
+  },
+  {
+    "owner": "braidfs-nfs",
+    "dependency": "tokio",
+    "alias": "tokio",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.48",
+    "locked": [
+      "1.49.0"
+    ],
+    "latest_stable": "1.54.1",
+    "features": [
+      "full"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braidfs-nfs/src/main.rs:9"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.49.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "72a2903cd7736441aac9df9d7688bd0ce48edccaadf181c3b90be801e81d3d86"
+      }
+    ]
+  },
+  {
+    "owner": "braidfs-nfs",
+    "dependency": "tracing",
+    "alias": "tracing",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.1",
+    "locked": [
+      "0.1.44"
+    ],
+    "latest_stable": "0.1.44",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braidfs-nfs/src/main.rs:10"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.1.44",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "63e71662fa4b2a2c3a26f570f037eb95bb1f85397f3cd8076caed2f026a6d100"
+      }
+    ]
+  },
+  {
+    "owner": "braidfs-nfs",
+    "dependency": "tracing-subscriber",
+    "alias": "tracing-subscriber",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.3",
+    "locked": [
+      "0.3.22"
+    ],
+    "latest_stable": "0.3.23",
+    "features": [
+      "env-filter"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/braidfs-nfs/src/main.rs:24"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.3.22",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "2f30143827ddab0d256fd843b7a66d164e9f271cfa0dde49142c5ca0ca291f1e"
+      }
+    ]
+  },
+  {
+    "owner": "local_link_server",
+    "dependency": "anyhow",
+    "alias": "anyhow",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.0",
+    "locked": [
+      "1.0.104"
+    ],
+    "latest_stable": "1.0.104",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/server/examples/ai_context_test.rs:10",
+      "crates/server/src/lib.rs:39",
+      "crates/server/src/main.rs:2",
+      "crates/server/src/chat/crdt.rs:198",
+      "crates/server/src/core/config.rs:68",
+      "crates/server/src/core/error.rs:58",
+      "crates/server/src/core/auth/mod.rs:9",
+      "crates/server/src/core/daemon/mod.rs:11",
+      "crates/server/src/core/pages/local_org.rs:66",
+      "crates/server/src/core/pages/manager.rs:64",
+      "crates/server/src/core/store/json_store.rs:11",
+      "crates/server/src/chat/ai/mod.rs:12",
+      "crates/server/src/chat/friends/mod.rs:6",
+      "crates/server/src/chat/mail/mod.rs:9"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.0.104",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
+      }
+    ]
+  },
+  {
+    "owner": "local_link_server",
+    "dependency": "async-stream",
+    "alias": "async-stream",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.3",
+    "locked": [
+      "0.3.6"
+    ],
+    "latest_stable": "0.3.6",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/server/src/chat/handlers/braid_subscribe.rs:211",
+      "crates/server/src/chat/mail/mod.rs:706"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.3.6",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "0b5a71a6f37880a80d1d7f19efd781e4b5de42c88f0722cc13bcb6cc2cfe8476"
+      }
+    ]
+  },
+  {
+    "owner": "local_link_server",
+    "dependency": "axum",
+    "alias": "axum",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.8.8",
+    "locked": [
+      "0.8.8"
+    ],
+    "latest_stable": "0.8.9",
+    "features": [
+      "ws",
+      "multipart"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/server/src/lib.rs:15",
+      "crates/server/tests/engineering_auth.rs:1",
+      "crates/server/src/core/blobs.rs:8",
+      "crates/server/src/core/ctx.rs:2",
+      "crates/server/src/core/error.rs:1",
+      "crates/server/src/core/router.rs:8",
+      "crates/server/src/core/auth/middleware.rs:4",
+      "crates/server/src/core/pages/handlers.rs:7",
+      "crates/server/src/core/pages/handlers_v2.rs:4",
+      "crates/server/src/core/pages/mod.rs:20",
+      "crates/server/src/core/protocol/mod.rs:9",
+      "crates/server/src/core/auth/handlers/auth.rs:4",
+      "crates/server/src/core/auth/handlers/auth_me.rs:5",
+      "crates/server/src/chat/handlers/braid_subscribe.rs:37",
+      "crates/server/src/chat/handlers/chat.rs:13",
+      "crates/server/src/chat/handlers/friends.rs:5",
+      "crates/server/src/chat/handlers/handler_config.rs:2",
+      "crates/server/src/chat/handlers/mod.rs:6",
+      "crates/server/src/chat/handlers/presence.rs:3",
+      "crates/server/src/chat/handlers/typing.rs:3",
+      "crates/server/src/chat/mail/mod.rs:10"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.8.8",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "8b52af3cb4058c895d37317bb27508dccc8e5f2d39454016b297bf4a400597b8"
+      }
+    ]
+  },
+  {
+    "owner": "local_link_server",
+    "dependency": "bcrypt",
+    "alias": "bcrypt",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.18.0",
+    "locked": [
+      "0.18.0"
+    ],
+    "latest_stable": "0.19.3",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/server/src/core/auth/mod.rs:10"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.18.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "9a0f5948f30df5f43ac29d310b7476793be97c50787e6ef4a63d960a0d0be827"
+      }
+    ]
+  },
+  {
+    "owner": "local_link_server",
+    "dependency": "bytes",
+    "alias": "bytes",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.10.0",
+    "locked": [
+      "1.11.1"
+    ],
+    "latest_stable": "1.12.1",
+    "features": [
+      "serde"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/server/src/lib.rs:213",
+      "crates/server/tests/chat_sync_integrity.rs:53",
+      "crates/server/src/core/blobs.rs:41",
+      "crates/server/src/core/config.rs:31",
+      "crates/server/src/core/pages/handlers.rs:13",
+      "crates/server/src/core/pages/handlers_v2.rs:11",
+      "crates/server/src/core/pages/versioned_storage.rs:28",
+      "crates/server/src/chat/handlers/braid_subscribe.rs:47",
+      "crates/server/src/chat/mail/mod.rs:716"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.11.1",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "1e748733b7cbc798e1434b6ac524f0c1ff2ab456fe201501e6497c8417a4fc33"
+      }
+    ]
+  },
+  {
+    "owner": "local_link_server",
+    "dependency": "chrono",
+    "alias": "chrono",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.4.43",
+    "locked": [
+      "0.4.43"
+    ],
+    "latest_stable": "0.4.45",
+    "features": [
+      "serde"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/server/src/chat/crdt.rs:7",
+      "crates/server/src/core/auth/mod.rs:11",
+      "crates/server/src/core/daemon/mod.rs:352",
+      "crates/server/src/core/models/mod.rs:1",
+      "crates/server/src/core/store/json_store.rs:13",
+      "crates/server/src/chat/friends/mod.rs:7",
+      "crates/server/src/chat/handlers/presence.rs:8",
+      "crates/server/src/chat/handlers/typing.rs:8",
+      "crates/server/src/chat/mail/mod.rs:598"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.4.43",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "fac4744fb15ae8337dc853fee7fb3f4e48c0fbaa23d0afe49c447b4fab126118"
+      }
+    ]
+  },
+  {
+    "owner": "local_link_server",
+    "dependency": "futures",
+    "alias": "futures",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.3",
+    "locked": [
+      "0.3.32"
+    ],
+    "latest_stable": "0.3.34",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/server/src/chat/mail/mod.rs:18"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.3.32",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "8b147ee9d1f6d097cef9ce628cd2ee62288d963e16fb287bd9286455b241382d"
+      }
+    ]
+  },
+  {
+    "owner": "local_link_server",
+    "dependency": "genai",
+    "alias": "genai",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.5.2",
+    "locked": [
+      "0.5.3"
+    ],
+    "latest_stable": "0.7.0",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/server/src/chat/ai/mod.rs:4"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.5.3",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "98221799e645192a607502de51a6423ebb6f36729938a9351f1ca488a1a62d7e"
+      }
+    ]
+  },
+  {
+    "owner": "local_link_server",
+    "dependency": "headers",
+    "alias": "headers",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.4",
+    "locked": [
+      "0.4.1"
+    ],
+    "latest_stable": "0.4.2",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/server/src/lib.rs:173",
+      "crates/server/src/core/blobs.rs:18",
+      "crates/server/src/core/auth/middleware.rs:15",
+      "crates/server/src/core/pages/handlers.rs:21",
+      "crates/server/src/core/pages/handlers_v2.rs:22",
+      "crates/server/src/core/protocol/mod.rs:6",
+      "crates/server/src/chat/handlers/braid_subscribe.rs:11",
+      "crates/server/src/chat/handlers/chat.rs:3",
+      "crates/server/src/chat/handlers/friends.rs:31",
+      "crates/server/src/chat/mail/mod.rs:16"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.4.1",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "b3314d5adb5d94bcdf56771f2e50dbbc80bb4bdf88967526706205ac9eff24eb"
+      }
+    ]
+  },
+  {
+    "owner": "local_link_server",
+    "dependency": "http",
+    "alias": "http",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.0",
+    "locked": [
+      "1.4.0"
+    ],
+    "latest_stable": "1.5.0",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/server/src/lib.rs:129",
+      "crates/server/tests/engineering_auth.rs:3",
+      "crates/server/src/core/blobs.rs:10",
+      "crates/server/src/core/ctx.rs:2",
+      "crates/server/src/core/error.rs:2",
+      "crates/server/src/handlers/mod.rs:3",
+      "crates/server/src/core/auth/middleware.rs:6",
+      "crates/server/src/core/daemon/mod.rs:56",
+      "crates/server/src/core/pages/handlers.rs:9",
+      "crates/server/src/core/pages/handlers_v2.rs:6",
+      "crates/server/src/core/protocol/mod.rs:3",
+      "crates/server/src/core/auth/handlers/auth.rs:6",
+      "crates/server/src/chat/handlers/braid_subscribe.rs:3",
+      "crates/server/src/chat/handlers/chat.rs:3",
+      "crates/server/src/chat/handlers/friends.rs:7",
+      "crates/server/src/chat/handlers/mod.rs:26",
+      "crates/server/src/chat/handlers/presence.rs:5",
+      "crates/server/src/chat/handlers/typing.rs:5",
+      "crates/server/src/chat/mail/mod.rs:13"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.4.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "e3ba2a386d7f85a81f119ad7498ebe444d2e22c2af0b86b069416ace48b3311a"
+      }
+    ]
+  },
+  {
+    "owner": "local_link_server",
+    "dependency": "notify",
+    "alias": "notify",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "8.2.0",
+    "locked": [
+      "8.2.0"
+    ],
+    "latest_stable": "8.2.0",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "CC0-1.0"
+    ],
+    "source_files": [
+      "crates/server/src/core/daemon/mod.rs:12",
+      "crates/server/src/core/pages/manager.rs:140",
+      "crates/server/src/chat/ai/mod.rs:13"
+    ],
+    "locked_packages": [
+      {
+        "version": "8.2.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "4d3d07927151ff8575b7087f245456e549fea62edf0ec4e565a5ee50c8402bc3"
+      }
+    ]
+  },
+  {
+    "owner": "local_link_server",
+    "dependency": "reqwest",
+    "alias": "reqwest",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.13.1",
+    "locked": [
+      "0.13.2"
+    ],
+    "latest_stable": "0.13.5",
+    "features": [
+      "json"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/server/src/core/daemon/mod.rs:25",
+      "crates/server/src/chat/mail/mod.rs:227"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.13.2",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "ab3f43e3283ab1488b624b44b0e988d0acea0b3214e694730a055cb6b2efa801"
+      }
+    ]
+  },
+  {
+    "owner": "local_link_server",
+    "dependency": "serde",
+    "alias": "serde",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.0.228",
+    "locked": [
+      "1.0.228"
+    ],
+    "latest_stable": "1.0.229",
+    "features": [
+      "derive"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/server/src/chat/crdt.rs:8",
+      "crates/server/src/core/auth/mod.rs:12",
+      "crates/server/src/core/models/mod.rs:2",
+      "crates/server/src/core/pages/handlers.rs:14",
+      "crates/server/src/core/pages/handlers_v2.rs:12",
+      "crates/server/src/core/pages/local_org.rs:6",
+      "crates/server/src/core/pages/manager.rs:6",
+      "crates/server/src/core/pages/versioned_storage.rs:3",
+      "crates/server/src/core/auth/handlers/auth.rs:9",
+      "crates/server/src/chat/friends/mod.rs:8",
+      "crates/server/src/chat/handlers/friends.rs:10",
+      "crates/server/src/chat/handlers/handler_config.rs:3",
+      "crates/server/src/chat/mail/mod.rs:19"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.0.228",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "9a8e94ea7f378bd32cbbd37198a4a91436180c5bb472411e48b5ec2e2124ae9e"
+      }
+    ]
+  },
+  {
+    "owner": "local_link_server",
+    "dependency": "serde_json",
+    "alias": "serde_json",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.0.149",
+    "locked": [
+      "1.0.149"
+    ],
+    "latest_stable": "1.0.154",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/server/src/lib.rs:247",
+      "crates/server/src/chat/crdt.rs:382",
+      "crates/server/src/core/error.rs:6",
+      "crates/server/src/core/daemon/mod.rs:257",
+      "crates/server/src/core/pages/handlers_v2.rs:64",
+      "crates/server/src/core/pages/versioned_storage.rs:29",
+      "crates/server/src/core/store/json_store.rs:32",
+      "crates/server/src/chat/handlers/braid_subscribe.rs:55",
+      "crates/server/src/chat/handlers/handler_config.rs:14",
+      "crates/server/src/chat/handlers/presence.rs:80",
+      "crates/server/src/chat/handlers/typing.rs:78",
+      "crates/server/src/chat/mail/mod.rs:238"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.0.149",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
+      }
+    ]
+  },
+  {
+    "owner": "local_link_server",
+    "dependency": "sha2",
+    "alias": "sha2",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.10",
+    "locked": [
+      "0.10.9",
+      "0.11.1"
+    ],
+    "latest_stable": "0.11.1",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/server/tests/chat_sync_integrity.rs:56",
+      "crates/server/src/core/blobs.rs:21",
+      "crates/server/src/core/pages/handlers.rs:89"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.10.9",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283"
+      },
+      {
+        "version": "0.11.1",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "47d7069beb7d6ac7b9acd1039986e73443f24234f41074da099d6f994ac9ad19"
+      }
+    ]
+  },
+  {
+    "owner": "local_link_server",
+    "dependency": "sqlx",
+    "alias": "sqlx",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.8",
+    "locked": [
+      "0.8.6"
+    ],
+    "latest_stable": "0.9.0",
+    "features": [
+      "sqlite",
+      "runtime-tokio",
+      "tls-native-tls",
+      "migrate"
+    ],
+    "default_features": false,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/server/src/core/error.rs:58",
+      "crates/server/src/core/auth/mod.rs:90",
+      "crates/server/src/chat/friends/mod.rs:79"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.8.6",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "1fefb893899429669dcdd979aff487bd78f4064e5e7907e4269081e0ef7d97dc"
+      }
+    ]
+  },
+  {
+    "owner": "local_link_server",
+    "dependency": "tokio",
+    "alias": "tokio",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.48",
+    "locked": [
+      "1.49.0"
+    ],
+    "latest_stable": "1.54.1",
+    "features": [
+      "full"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/server/examples/ai_context_test.rs:7",
+      "crates/server/src/lib.rs:96",
+      "crates/server/src/main.rs:1",
+      "crates/server/tests/chat_sync_integrity.rs:7",
+      "crates/server/tests/engineering_auth.rs:17",
+      "crates/server/tests/engineering_storage.rs:6",
+      "crates/server/src/core/config.rs:69",
+      "crates/server/src/core/auth/mod.rs:14",
+      "crates/server/src/core/daemon/mod.rs:16",
+      "crates/server/src/core/pages/handlers.rs:16",
+      "crates/server/src/core/pages/local_org.rs:10",
+      "crates/server/src/core/pages/manager.rs:10",
+      "crates/server/src/core/pages/versioned_storage.rs:23",
+      "crates/server/src/core/store/json_store.rs:17",
+      "crates/server/src/chat/ai/mod.rs:17",
+      "crates/server/src/chat/handlers/braid_subscribe.rs:219",
+      "crates/server/src/chat/handlers/presence.rs:11",
+      "crates/server/src/chat/handlers/typing.rs:11",
+      "crates/server/src/chat/mail/mod.rs:23"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.49.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "72a2903cd7736441aac9df9d7688bd0ce48edccaadf181c3b90be801e81d3d86"
+      }
+    ]
+  },
+  {
+    "owner": "local_link_server",
+    "dependency": "tower",
+    "alias": "tower",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.5.2",
+    "locked": [
+      "0.5.3"
+    ],
+    "latest_stable": "0.5.3",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/server/tests/engineering_auth.rs:15"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.5.3",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "ebe5ef63511595f1344e2d5cfa636d973292adc0eec1f0ad45fae9f0851ab1d4"
+      }
+    ]
+  },
+  {
+    "owner": "local_link_server",
+    "dependency": "tower-http",
+    "alias": "tower-http",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.6.8",
+    "locked": [
+      "0.6.8"
+    ],
+    "latest_stable": "0.7.1",
+    "features": [
+      "cors",
+      "trace"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/server/src/lib.rs:159"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.6.8",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "d4e6559d53cc268e5031cd8429d05415bc4cb4aefc4aa5d6cc35fbf5b924a1f8"
+      }
+    ]
+  },
+  {
+    "owner": "local_link_server",
+    "dependency": "tracing",
+    "alias": "tracing",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.1",
+    "locked": [
+      "0.1.44"
+    ],
+    "latest_stable": "0.1.44",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/server/src/lib.rs:25",
+      "crates/server/src/core/blobs.rs:13",
+      "crates/server/src/core/auth/middleware.rs:10",
+      "crates/server/src/core/auth/mod.rs:15",
+      "crates/server/src/core/daemon/mod.rs:18",
+      "crates/server/src/core/pages/local_org.rs:13",
+      "crates/server/src/core/pages/manager.rs:13",
+      "crates/server/src/core/store/json_store.rs:19",
+      "crates/server/src/core/auth/handlers/auth.rs:10",
+      "crates/server/src/chat/ai/mod.rs:18",
+      "crates/server/src/chat/friends/mod.rs:10",
+      "crates/server/src/chat/handlers/braid_subscribe.rs:50",
+      "crates/server/src/chat/handlers/chat.rs:22",
+      "crates/server/src/chat/handlers/friends.rs:11",
+      "crates/server/src/chat/handlers/presence.rs:12",
+      "crates/server/src/chat/handlers/typing.rs:12",
+      "crates/server/src/chat/mail/mod.rs:24"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.1.44",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "63e71662fa4b2a2c3a26f570f037eb95bb1f85397f3cd8076caed2f026a6d100"
+      }
+    ]
+  },
+  {
+    "owner": "local_link_server",
+    "dependency": "tracing-subscriber",
+    "alias": "tracing-subscriber",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "0.3",
+    "locked": [
+      "0.3.22"
+    ],
+    "latest_stable": "0.3.23",
+    "features": [
+      "env-filter"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [
+      "crates/server/src/lib.rs:26"
+    ],
+    "locked_packages": [
+      {
+        "version": "0.3.22",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "2f30143827ddab0d256fd843b7a66d164e9f271cfa0dde49142c5ca0ca291f1e"
+      }
+    ]
+  },
+  {
+    "owner": "local_link_server",
+    "dependency": "uuid",
+    "alias": "uuid",
+    "kind": "normal",
+    "target": "all",
+    "requirement": "1.20.0",
+    "locked": [
+      "1.21.0"
+    ],
+    "latest_stable": "1.29.0",
+    "features": [
+      "v4",
+      "serde"
+    ],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "Apache-2.0 OR MIT"
+    ],
+    "source_files": [
+      "crates/server/src/chat/crdt.rs:10",
+      "crates/server/src/core/config.rs:51",
+      "crates/server/src/core/auth/mod.rs:16",
+      "crates/server/src/core/store/json_store.rs:20",
+      "crates/server/src/chat/friends/mod.rs:11",
+      "crates/server/src/chat/mail/mod.rs:574"
+    ],
+    "locked_packages": [
+      {
+        "version": "1.21.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "b672338555252d43fd2240c714dc444b8c6fb0a5c5335e65a07bba7742735ddb"
+      }
+    ]
+  },
+  {
+    "owner": "local_link_server",
+    "dependency": "tempfile",
+    "alias": "tempfile",
+    "kind": "dev",
+    "target": "all",
+    "requirement": "3.14",
+    "locked": [
+      "3.25.0"
+    ],
+    "latest_stable": "3.27.0",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT OR Apache-2.0"
+    ],
+    "source_files": [
+      "crates/server/examples/ai_context_test.rs:6",
+      "crates/server/tests/chat_sync_integrity.rs:5",
+      "crates/server/tests/engineering_auth.rs:19",
+      "crates/server/tests/engineering_storage.rs:8",
+      "crates/server/src/core/store/json_store.rs:587"
+    ],
+    "locked_packages": [
+      {
+        "version": "3.25.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "0136791f7c95b1f6dd99f9cc786b91bb81c3800b639b3478e561ddb7be95e5f1"
+      }
+    ]
+  },
+  {
+    "owner": "local_link_server",
+    "dependency": "tokio-test",
+    "alias": "tokio-test",
+    "kind": "dev",
+    "target": "all",
+    "requirement": "0.4",
+    "locked": [
+      "0.4.6"
+    ],
+    "latest_stable": "0.4.6",
+    "features": [],
+    "default_features": true,
+    "optional": false,
+    "licenses": [
+      "MIT"
+    ],
+    "source_files": [],
+    "locked_packages": [
+      {
+        "version": "0.4.6",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "12bc5db7778a8e08ee255090861e0e7aac55e784300077e7ed293c7be36168b2"
+      }
+    ]
+  }
+]

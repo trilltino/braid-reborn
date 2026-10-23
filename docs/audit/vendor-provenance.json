@@ -1,0 +1,120 @@
+[
+  {
+    "package": "iroh-gossip",
+    "declared_baseline_version": "0.96.0",
+    "baseline_sha": "4f5275b9ab83bc3cff1ef91ff068be6539edbfa2",
+    "baseline_path": "references/iroh-gossip",
+    "local_sha256": {
+      ".gitignore": "44c92e3a70ad3307b7056871c2bdb096d8bfa9373f5bf06a79bb6324a20ff2fb",
+      "Cargo.toml": "b3b4df40f27de07fd308a92983f92a438b4575a348b277f3ddaef99cb6c60344",
+      "CHANGELOG.md": "889d37cb642c43ad3b7109c6bf79dfa726c91e155f1bcf503b38eb58570f92ac",
+      "cliff.toml": "a12774df3cffdca454b9672a83197185b8ea2c79ce00bafe2cdd00ab984bb0db",
+      "code_of_conduct.md": "3129503225c984a0fab0c6a660ac180d4509ba99c4d995ee0b7f4a8d36050267",
+      "deny.toml": "0765d60ce2c92481149684d388cf79c24b15f89467342be7af5ed88a7412ff66",
+      "LICENSE-APACHE": "7986218ec4ea89de3511a843ae27fea2584a525036c220ff7b26589179f07888",
+      "LICENSE-MIT": "33616ec4c88b6e00de66e6c06f1a55d80bb32a9d7939f3aa83d28e673a1adcae",
+      "Makefile.toml": "eaf92708136c40f3259f0f92d24234f87218744c08c4716473bd6584bba70c2b",
+      "README.md": "26b4f2c2a0867a88372694c02ecd4f6f68bef1c8e2379895f780b3be73a45baf",
+      "release.toml": "42d3db287e922cd11f881afbacbcaa0d65bc9431e05351ee93414737027f9ad5",
+      ".cargo/config.toml": "1b5983c984353846eac50cadc183c2e373af72355b606eff975099c31661ea8f",
+      ".config/nextest.toml": "3bcc217545699bded1f2a0694b1458f369479a63a77737bd17ed1ecc63696765",
+      ".github/dependabot.yaml": "2ab843b48c3aaa76f083b45d309e3554806afc07833cbe71ae1d9c546ebcc18f",
+      ".github/pull_request_template.md": "b03232560219968db813da291059cc82001246226005211a7aa88825bccb5cf3",
+      "examples/chat.rs": "9f9754386b438b6fa01f409ebeb32cfef06fdf18f71826cf8d085070f7a7dc50",
+      "examples/setup.rs": "fd27899eac9beb944ca25891697a842e675b8e2bc4ff28ea85d4ff6717e7a529",
+      "simulations/all.toml": "1664cf5dca9377628406066f03068057b7da9c6f2281b233d52ae23eb34a5e1a",
+      "src/api.rs": "b1447497b176d872eddbc9950087d00dffb64bc17187cc3746dba657302a289e",
+      "src/lib.rs": "4604bf6c49586199874bc8c11f0191a7d79438673ca84d70c82069fafbad1b35",
+      "src/metrics.rs": "77bd5311f08039af2af5cc127acf5bdca534f1450e468c2b0cc5e0b3a3390931",
+      "src/net.rs": "63c5c7f5bd7e104f200bb5b0aa4aba33f9ef3b72284773c712f93e795f92a2aa",
+      "src/proto.rs": "4d9c670f41b36d6cb5bcccd1fc6bea60c268cbdf6d8c535e3d792bf2b403a512",
+      "tests/sim.rs": "ab2f69c48013f20e26feffe0619016b29c1ac01d3c8b6d5c86081949a80c9b6a",
+      "src/bin/sim.rs": "a37119304ad69cd7e6ec23d706e08ebded15ba1e34fb7a669ed77db7238f81a8",
+      "src/net/address_lookup.rs": "5a783451e34e69acabfc46e81dfecc1024a41a582933895c53bb814a27cc1505",
+      "src/net/util.rs": "39c73c89f7e4e3cceb1233e69b62055b0f3a6f5a6ec42662b8145068eb53f24b",
+      "src/proto/hyparview.rs": "56af2deeefd3eae859dbbc5634ab8513e554943a55ce842d64789d098a3f457a",
+      "src/proto/plumtree.rs": "8b707921346274ec857e0eed7361ca7cb7e58cbb45c08c76815e06a0cd522e21",
+      "src/proto/sim.rs": "1e4dcfe524cd2656c2dc94788ed7024aa8a96590ec260bfcd0cbf1947c5490f7",
+      "src/proto/state.rs": "eeb5ac427c6d31dccb90535584b289c78b55c46fc2153bc0b2a389eee84716cc",
+      "src/proto/topic.rs": "7bd374585f51e14f32da8e3602a9a60c52cee81413c78fa14d710ef90603c6ff",
+      "src/proto/util.rs": "5f388431ea80bb965bc812235602607f784dd9f7739f8a984fe7dc98c1f70dd6",
+      ".github/workflows/beta.yaml": "6d4b3ce6bd2493e6a92ef7f9ac06b5effb1693d6e9e96d9fa551aa4b48c2d9e2",
+      ".github/workflows/ci.yaml": "04325e696f26bcbcfd156b22664e8a1eb9032739114be94e299b65a98e33c8ee",
+      ".github/workflows/cleanup.yaml": "689aa605884a03787d4d9907591521cbf3d3a06632bd8d506995cf440c16e1b5",
+      ".github/workflows/commit.yaml": "e373668f3ea43987cce22b9c002fb9b05ec4d8b2125229b19905160cdb33c2b4",
+      ".github/workflows/docs.yaml": "cc1aeb648c021d1a5f9cb76953cd1763b41e3d5def0c3e93c9d91fb3031981fc",
+      ".github/workflows/flaky.yaml": "6f742a013c59618fca9adeac0b8744ba72b320821720b18cd155da01a5971603",
+      ".github/workflows/release.yaml": "bb4320076a8f8203cfcc0e5f1f657cde22985257c1fd7a154ef749372e515bf7",
+      ".github/workflows/simulation.yaml": "1a42416eab934aaaeb858adc8b4b603ebf50d130993bfb17aefc4a5fbba41c3e",
+      ".github/workflows/tests.yaml": "5ed2290a8fc8c0039f879bd4e737c93cd6e933b29780a3078655adba6e1297ad"
+    },
+    "registry_archive_sha256": "1d04f83254c847ac61a9b2215b95a36d598d87af033ca12a546cd1c6a2e06dab",
+    "different_or_local_only_files": [
+      "Cargo.toml",
+      "src/proto/plumtree.rs"
+    ]
+  },
+  {
+    "package": "iroh-h3",
+    "declared_baseline_version": "0.1.0",
+    "baseline_sha": "4f5275b9ab83bc3cff1ef91ff068be6539edbfa2",
+    "baseline_path": "references/iroh-h3/iroh-h3",
+    "local_sha256": {
+      "Cargo.toml": "baca9b21ecd5f96ed4a577055b8c68a5d178bcdf0a737d087df938a518191ec4",
+      "src/lib.rs": "eee62eb9aef97b5019cf7e8377b4a91da283aa12a5095d570cd97109ddb5bfca"
+    },
+    "registry_archive_sha256": "6764e7dcea06b88e5afc37572a39a989b41a2cc50e4c74e0039515329e125abf",
+    "different_or_local_only_files": [
+      "Cargo.toml",
+      "src/lib.rs"
+    ]
+  },
+  {
+    "package": "iroh-h3-client",
+    "declared_baseline_version": "0.3.0",
+    "baseline_sha": "4f5275b9ab83bc3cff1ef91ff068be6539edbfa2",
+    "baseline_path": "references/iroh-h3/iroh-h3-client",
+    "local_sha256": {
+      "Cargo.toml": "e29c4232b07e033d3df27594b51efc63c8d7fb100c53f8797f6addecbb5bd29f",
+      "README.md": "7172b2dca94e58b756cfd7454ee42856a3b18bcc66d6ea8dba3e229460ee185a",
+      "webdriver.json": "389333d2b5af39f5698ce92d7a7077660bb725b94bf9d5bfcfd0e0f745a34106",
+      "src/body.rs": "012bf03f99dc6d0e8fc2715d97e953b0c4a29bf5b60679006d5b30c766d79436",
+      "src/connection_manager.rs": "37817d42c81ac073b830f56c10d8d9a19574756012778b1c8e7cf4f131b87a0d",
+      "src/error.rs": "cfd93eaa86e56e55438351d16342ba6a81ea8008e2f5c7ce28f71b0b18f491e0",
+      "src/lib.rs": "5f9bc6ba14b6e4ba0abd91de219a28ea8836140dcb00f89e3546ab60c6487496",
+      "src/middleware.rs": "b5259daea509c1cefe5c7491555ec77699bd62af068590c7917da6c14acd9ebd",
+      "src/request.rs": "5553e1f04f02c6e08e0f1b706b9f1533a295e497cd226e32a7a3d73fbf110d22",
+      "src/response.rs": "d8a06ff8e5fcae97001b64b5cbac4c681c914825377cdcce38d447cf8d94f317",
+      "tests/base.rs": "b84f561a9d46baed67e42335f95bb93627b159029ec1fa78c3f798ca3da87265",
+      "tests/connection_reuse.rs": "ab32e4b579badaeb2c66e7beaeefacfaca8c22e6ed4c5476ba9dab468f6a2fa8",
+      "tests/error_handling.rs": "11b51b9979dcaac329225556527009d1ed1b4a9c65da4050240eaeee93757fec",
+      "tests/full_body.rs": "1ec2f3c88484c22bbcd0cb84c76338a0773cb01ef4518da0d091d378d5b74926",
+      "tests/json.rs": "c7dc613b4d126b5e25824eead31a5fce4d0b5723e4237870f4eb9e63d3393588",
+      "tests/sse.rs": "23dae1834e92eb52b8096ca2dcfb9aa1a2abd8ca8bedc1deb807aa4af596d35c",
+      "tests/streaming_bodies.rs": "9bfa5059d02c2d7a1145369503c70b932e07ff0790ba2506fc7b5ac44b37765d",
+      "src/middleware/cookie_jar.rs": "d0a02f08c40e3772ed0f5ae42e0538c410e8da7f3f71103781da9302d2c68977",
+      "src/middleware/follow_redirects.rs": "8f54772235ee7bc91ff088d0afaa2e87497e83ee13beb7de6969aa5477c546f4",
+      "src/middleware/retry_failures.rs": "a73362edbf1f4f58271438f2d8ea2c38b10b0145e5cde07cc4202f66ec09c666",
+      "src/middleware/timeout.rs": "048e113343b0f123b94cf8cc982851807a2136ab9f85fe4bfc882569c5343602",
+      "src/response/ndjson.rs": "ffe3189a71197c36e12d0dfc12754ba86979df77a2653a5dba359b3ba818aace",
+      "src/response/sse.rs": "2d9faaf8273b6d4f3cc06721861cc482130589f53e915c4749b8ebf5abb0c41e"
+    },
+    "registry_archive_sha256": "403c2da35eb004742043adb03e3d6bb55b7c78ae43083ee03b12d78e96062ac4",
+    "different_or_local_only_files": [
+      "Cargo.toml"
+    ]
+  },
+  {
+    "package": "iroh-h3-axum",
+    "declared_baseline_version": "0.2.0",
+    "baseline_sha": "4f5275b9ab83bc3cff1ef91ff068be6539edbfa2",
+    "baseline_path": "references/iroh-h3/iroh-h3-axum",
+    "local_sha256": {
+      "Cargo.toml": "648ee66ab10495d295825d1df29bbbe392b6bc9a412e126c6762e827e5ce4e1c",
+      "webdriver.json": "389333d2b5af39f5698ce92d7a7077660bb725b94bf9d5bfcfd0e0f745a34106",
+      "src/lib.rs": "8aa0cd7f6306355263d6583b6116d6737426a000e0d71e30a0abdfb3eac0264b",
+      "tests/remote_id.rs": "dcae8788373ecb8461e395aba55a6693bcb998493e25cac93db3b5e9d9885092"
+    },
+    "comparison_unavailable": "HTTP Error 403: "
+  }
+]

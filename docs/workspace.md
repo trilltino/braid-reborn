@@ -6,21 +6,17 @@ All eight project packages live in `crates/`, including the server and filesyste
 binaries. Their package names and `cargo -p` selectors are unchanged. The server's
 package name is `local_link_server`.
 
-`references/` contains source dependencies used by `braid-iroh`: the Iroh gossip
-fork and HTTP/3 adapter packages. These are active Cargo workspace members, not
-disposable reference material. Their upstream examples, licenses and manifests
-are retained. The HTTP/3 example is also a workspace member because the adapters
-use it in their development dependencies.
-
-The root `Cargo.toml` defines the workspace, and the root `Cargo.lock` is the
-shared dependency lockfile. Plain Cargo commands select the project packages;
-`--workspace` includes the vendored members as well. Run commands from the root
-to share `target/` and keep relative application data paths consistent.
+The root Cargo.toml and Cargo.lock define all eight project packages. Iroh,
+Gossip and H3 adapters use compatible registry releases. Removed source remains
+recoverable from the baseline Git commit. See
+[upstream compatibility](upstream-compatibility.md) for patch comparison evidence.
+Run commands from the root to share target/ and keep data paths consistent.
 
 ## Build and check
 
-Install the stable Rust toolchain and the native build prerequisites required by
-your platform. The project crates use Rust 2021; the HTTP/3 forks use Rust 2024.
+Install pinned Rust 1.99.0 and native build prerequisites. Project crates use
+Rust 2021; registry HTTP/3 adapters use Rust 2024. This is a validated toolchain
+pin, not an established minimum Rust version.
 For browser builds, install the WASM target:
 
 ```sh
