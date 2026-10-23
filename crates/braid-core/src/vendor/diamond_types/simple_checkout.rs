@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use crate::vendor::diamond_types::{Branch, CRDTKind, LV, Primitive, RegisterValue, ROOT_CRDT_ID};
-use smartstring::alias::String as SmartString;
+use compact_str::CompactString as SmartString;
 
 #[derive(Debug, Clone)]
 pub enum SimpleVal {

@@ -120,7 +120,8 @@ impl BraidIrohNode {
             .unwrap_or_else(|| "braid_data".into());
         let replica = braid_http_rs::replica::ReplicaStore::new(
             root.join("iroh").join(endpoint.id().to_string()),
-        );
+        )
+        .map_err(|error| anyhow::anyhow!(error))?;
         let subscription_mgr = Arc::new(SubscriptionManager::new(gossip.clone()));
         let access = Arc::new(parking_lot::RwLock::new(config.access));
         let (policy_changed, _) = tokio::sync::watch::channel(0);

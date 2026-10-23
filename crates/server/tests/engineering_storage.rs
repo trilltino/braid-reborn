@@ -99,6 +99,24 @@ async fn failed_disk_commit_keeps_the_previous_visible_chat_state() {
 }
 
 #[tokio::test]
+async fn a_second_chat_writer_is_rejected_until_the_owner_shuts_down() {
+    let root = tempfile::tempdir().unwrap();
+    let config = ChatServerConfig::with_base_dir(root.path());
+    let owner = JsonChatStore::new(config.clone()).await.unwrap();
+    assert!(JsonChatStore::new(config.clone()).await.is_err());
+    owner
+        .add_message("room", "alice", "durable", MessageType::Text, None, vec![])
+        .await
+        .unwrap();
+    drop(owner);
+    let reopened = JsonChatStore::new(config).await.unwrap();
+    assert_eq!(
+        reopened.get_messages("room", None).await.unwrap()[0].content,
+        "durable"
+    );
+}
+
+#[tokio::test]
 async fn remote_chat_edit_batches_persist_and_replay_after_restart() {
     let temp = tempfile::tempdir().unwrap();
     let config = ChatServerConfig::with_base_dir(temp.path());

@@ -38,6 +38,9 @@ pub enum Command {
 /// Unified state for the BraidFS daemon.
 #[derive(Clone)]
 pub struct DaemonState {
+    /// The shared GET/PUT owner for each active text resource.
+    pub text_sessions:
+        Arc<tokio::sync::Mutex<HashMap<String, Arc<crate::simpleton::SimpletonClient>>>>,
     pub config: Arc<RwLock<Config>>,
     pub content_cache: Arc<RwLock<HashMap<String, String>>>,
     pub version_store: Arc<RwLock<VersionStore>>,

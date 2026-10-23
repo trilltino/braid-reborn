@@ -80,3 +80,36 @@ from the new source-level codec harness at braid-http SHA 639b811. Do not collap
 these distinct tests into one version claim. Upstream reliable tests 14/15 need
 Simpleton controller support; HTTP-only controller success does not establish
 coordinated Simpleton convergence.
+
+## Continuation source and dependency decisions
+
+The nine recorded upstream HEADs were rechecked on 2026-10-23 and remained at
+these pins. The complete modern Simpleton/text-client sources and reliable
+GET/PUT channel implementation were read alongside their runner contract. The
+new core example drives the production Rust client for all text suites. The
+pinned fuzz runner installs braid-http 1.3.125 and braid-text 0.5.3 explicitly;
+those published versions are distinct from the modern source pins above.
+The committed independent runner npm graph uses a compatible send 0.19.0
+override for its HTTP bridge's XSS advisory; runner algorithms and protocol
+library versions are unchanged. All four suites pass with this locked graph.
+
+The client retains a stable peer and scalar counter, ignores updates whose
+parents are not its current view, bounds outstanding PUTs, stores offline text,
+and validates representation digests. Reconnect uses the oldest queued PUT's
+parents while its ACK is uncertain; resuming at its optimistic ID incorrectly
+produced HTTP 409 before the server had received it. The partitioned NFS test
+reproduced and guards this boundary. The Rust Simpleton server still rejects
+stale positional writes instead of claiming transforming-server compatibility.
+
+Maintained compact_str 0.10.0 replaces smartstring in thirteen copied Diamond
+modules. Inline capacity/allocation behavior can differ; serialized strings
+remain strings and copied algorithm regressions are run. Agent names must be
+strictly shorter than 50 bytes and cannot be ROOT; SHA-256 encoded IDs bound
+untrusted longer names. A name of exactly 50 bytes previously reached a copied
+engine assertion and was reproduced by the shared filesystem integration test.
+
+The narrow netlink 0.8.1 patch replaces only its macro dependency, as recorded in
+[vendor/README.md](../vendor/README.md). Netlink 0.9.0's upstream source SHA is
+4652ced0cd685430a3df0207a50a95445d3b9aa5, and comparison HEAD was
+4b49dd4548b43ab744962cd31236aa15cb1cde20. Its incompatible removed macro API
+precludes an isolated transitive upgrade. No advisory suppression is used.

@@ -16,7 +16,7 @@ use tokio::sync::RwLock;
 async fn lost_ack_restart_dirty_reconnect_and_failed_materialization_preserve_edits() {
     let temp = tempfile::tempdir().unwrap();
     std::env::set_var("BRAID_ROOT", temp.path());
-    let store = ReplicaStore::new(temp.path().join("remote"));
+    let store = ReplicaStore::new(temp.path().join("remote")).unwrap();
     let seed = Update::snapshot(Version::new("seed"), "a😀");
     store.commit("doc", &seed, "simpleton").await.unwrap();
     let attempts = Arc::new(AtomicUsize::new(0));
@@ -59,6 +59,7 @@ async fn lost_ack_restart_dirty_reconnect_and_failed_materialization_preserve_ed
     );
     let (tx, _) = async_channel::bounded(1);
     let state = DaemonState {
+        text_sessions: Default::default(),
         config: Arc::new(RwLock::new(config)),
         content_cache: Default::default(),
         version_store: Arc::new(RwLock::new(

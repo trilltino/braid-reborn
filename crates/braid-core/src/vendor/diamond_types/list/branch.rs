@@ -1,7 +1,7 @@
 use std::ops::Range;
 use jumprope::JumpRope;
 use crate::vendor::diamond_types::list::{ListBranch, ListOpLog};
-use smartstring::SmartString;
+use compact_str::CompactString as SmartString;
 use crate::vendor::diamond_types::list::list::{apply_local_operations};
 use crate::vendor::diamond_types::list::operation::ListOpKind::*;
 use crate::vendor::diamond_types::list::operation::{TextOperation, ListOpKind};
@@ -94,7 +94,7 @@ impl ListBranch {
 
     pub fn make_delete_op(&self, loc: Range<usize>) -> TextOperation {
         assert!(loc.end <= self.content.len_chars());
-        let mut s = SmartString::new();
+        let mut s = SmartString::default();
         s.extend(self.content.slice_chars(loc.clone()));
         TextOperation::new_delete_with_content_range(loc, s)
     }

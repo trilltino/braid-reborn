@@ -1,6 +1,6 @@
 use std::ops::Range;
 use jumprope::JumpRope;
-use smartstring::SmartString;
+use compact_str::CompactString as SmartString;
 use crate::vendor::rle::HasLength;
 use crate::vendor::diamond_types::list::operation::TextOperation;
 use crate::vendor::diamond_types::{CausalGraph, Frontier, LV};
@@ -108,7 +108,7 @@ impl SimpleBranch {
 
     pub fn make_delete_op(&self, loc: Range<usize>) -> TextOperation {
         assert!(loc.end <= self.content.len_chars());
-        let mut s = SmartString::new();
+        let mut s = SmartString::default();
         s.extend(self.content.slice_chars(loc.clone()));
         TextOperation::new_delete_with_content_range(loc, s)
     }

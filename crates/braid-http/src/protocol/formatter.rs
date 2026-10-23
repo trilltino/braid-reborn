@@ -176,7 +176,9 @@ fn encode_parts(update: &Update) -> Result<(BTreeMap<String, String>, Bytes)> {
     let body = if let Some(patches) = &update.patches {
         headers.insert("patches".into(), patches.len().to_string());
         if let Some(representation_type) = &update.content_type {
-            headers.insert("repr-type".into(), representation_type.clone());
+            headers
+                .entry("repr-type".into())
+                .or_insert_with(|| representation_type.clone());
         }
         headers.insert(
             "content-type".into(),

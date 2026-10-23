@@ -1,3 +1,8 @@
+#![cfg_attr(
+    not(test),
+    deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
+)]
+#![forbid(unsafe_code)]
 use braid_core::fs;
 use clap::Parser;
 use tracing::info;

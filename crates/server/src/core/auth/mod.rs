@@ -6,12 +6,11 @@
 pub mod handlers;
 pub mod middleware;
 
+use crate::core::database as sqlx;
 use anyhow::{Context, Result};
 use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use tokio::sync::RwLock;
 use tracing::{info, warn};
 use uuid::Uuid;
 
@@ -63,8 +62,7 @@ pub struct Session {
 /// Auth manager handles all authentication
 pub struct AuthManager {
     db_path: std::path::PathBuf,
-    /// In-memory session cache
-    sessions: RwLock<HashMap<String, Session>>,
+    pool: sqlx::SqlitePool,
 }
 
 impl AuthManager {
@@ -72,10 +70,8 @@ impl AuthManager {
     pub async fn new(base_dir: &std::path::Path) -> Result<Self> {
         let db_path = base_dir.join("users.sqlite");
 
-        let manager = Self {
-            db_path,
-            sessions: RwLock::new(HashMap::new()),
-        };
+        let pool = sqlx::open(&db_path).await?;
+        let manager = Self { db_path, pool };
 
         // Initialize database
         manager.init_db().await?;
@@ -87,15 +83,7 @@ impl AuthManager {
 
     /// Initialize SQLite database
     async fn init_db(&self) -> Result<()> {
-        use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
-        use std::str::FromStr;
-
-        let options = SqliteConnectOptions::from_str(&format!(
-            "sqlite://{}",
-            self.db_path.to_string_lossy().replace('\\', "/")
-        ))?
-        .create_if_missing(true);
-        let pool = SqlitePoolOptions::new().connect_with(options).await?;
+        let pool = self.pool.clone();
 
         // Create users table
         sqlx::query(
@@ -135,21 +123,16 @@ impl AuthManager {
         .execute(&pool)
         .await?;
 
-        pool.close().await;
         Ok(())
     }
 
     /// Get database connection
     async fn get_pool(&self) -> Result<sqlx::SqlitePool> {
-        use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
-        use std::str::FromStr;
+        Ok(self.pool.clone())
+    }
 
-        let options = SqliteConnectOptions::from_str(&format!(
-            "sqlite://{}",
-            self.db_path.to_string_lossy().replace('\\', "/")
-        ))?
-        .create_if_missing(true);
-        Ok(SqlitePoolOptions::new().connect_with(options).await?)
+    pub(crate) fn pool(&self) -> sqlx::SqlitePool {
+        self.pool.clone()
     }
 
     /// Register a new user
@@ -173,7 +156,7 @@ impl AuthManager {
         }
 
         // Hash password
-        let password_hash = hash(&password, DEFAULT_COST).context("Failed to hash password")?;
+        let password_hash = password_hash(password).await?;
 
         // Create user
         let user = User {
@@ -201,8 +184,6 @@ impl AuthManager {
         .execute(&pool)
         .await?;
 
-        pool.close().await;
-
         info!("[Auth] User registered: {} ({})", username, email);
 
         Ok(user)
@@ -224,7 +205,8 @@ impl AuthManager {
             row.ok_or_else(|| anyhow::anyhow!("Invalid email or password"))?;
 
         // Verify password
-        let valid = verify(&password, &password_hash).context("Failed to verify password")?;
+        let stored_hash = password_hash.clone();
+        let valid = password_work(move || verify(password, &stored_hash)).await?;
 
         if !valid {
             warn!("[Auth] Failed login attempt for {}", email);
@@ -247,12 +229,12 @@ impl AuthManager {
             username,
             password_hash: String::new(), // Don't return hash
             avatar_blob_hash,
-            created_at: created_at.parse().unwrap_or_else(|_| Utc::now()),
+            created_at: created_at
+                .parse()
+                .context("Invalid stored user creation timestamp")?,
             last_login: Some(Utc::now()),
             is_active: true,
         };
-
-        pool.close().await;
 
         info!("[Auth] User logged in: {}", user.username);
 
@@ -278,45 +260,11 @@ impl AuthManager {
         .execute(pool)
         .await?;
 
-        // Cache session
-        self.sessions
-            .write()
-            .await
-            .insert(session.token.clone(), session.clone());
-
         Ok(session)
     }
 
     /// Validate session token
     pub async fn validate_session(&self, token: &str) -> Result<UserInfo> {
-        // Check cache first
-        {
-            let sessions = self.sessions.read().await;
-            if let Some(session) = sessions.get(token) {
-                if session.expires_at > Utc::now() {
-                    // Get user info
-                    let pool = self.get_pool().await?;
-                    let row: Option<(String, String, String, Option<String>, String)> = sqlx::query_as(
-                        "SELECT id, email, username, avatar_blob_hash, created_at FROM users WHERE id = ?"
-                    )
-                    .bind(&session.user_id)
-                    .fetch_optional(&pool)
-                    .await?;
-                    pool.close().await;
-
-                    if let Some((id, email, username, avatar_blob_hash, created_at)) = row {
-                        return Ok(UserInfo {
-                            id,
-                            email,
-                            username,
-                            avatar_blob_hash,
-                            created_at: created_at.parse().unwrap_or_else(|_| Utc::now()),
-                        });
-                    }
-                }
-            }
-        }
-
         // Check database
         let pool = self.get_pool().await?;
 
@@ -325,14 +273,12 @@ impl AuthManager {
             SELECT u.id, u.email, u.username, u.avatar_blob_hash, u.created_at, s.expires_at 
             FROM users u 
             JOIN sessions s ON u.id = s.user_id 
-            WHERE s.token = ?
+            WHERE s.token = ? AND u.is_active = 1
             "#,
         )
         .bind(token)
         .fetch_optional(&pool)
         .await?;
-
-        pool.close().await;
 
         if let Some((id, email, username, avatar_blob_hash, created_at, expires_at)) = row {
             let expires: DateTime<Utc> = expires_at
@@ -344,7 +290,9 @@ impl AuthManager {
                     email,
                     username,
                     avatar_blob_hash,
-                    created_at: created_at.parse().unwrap_or_else(|_| Utc::now()),
+                    created_at: created_at
+                        .parse()
+                        .context("Invalid stored user creation timestamp")?,
                 });
             }
         }
@@ -354,16 +302,12 @@ impl AuthManager {
 
     /// Logout user (invalidate session)
     pub async fn logout(&self, token: &str) -> Result<()> {
-        // Remove from cache
-        self.sessions.write().await.remove(token);
-
         // Remove from database
         let pool = self.get_pool().await?;
         sqlx::query("DELETE FROM sessions WHERE token = ?")
             .bind(token)
             .execute(&pool)
             .await?;
-        pool.close().await;
 
         info!("[Auth] Session invalidated");
 
@@ -381,15 +325,15 @@ impl AuthManager {
         .fetch_optional(&pool)
         .await?;
 
-        pool.close().await;
-
         if let Some((id, email, username, avatar_blob_hash, created_at)) = row {
             Ok(UserInfo {
                 id,
                 email,
                 username,
                 avatar_blob_hash,
-                created_at: created_at.parse().unwrap_or_else(|_| Utc::now()),
+                created_at: created_at
+                    .parse()
+                    .context("Invalid stored user creation timestamp")?,
             })
         } else {
             Err(anyhow::anyhow!("User not found"))
@@ -406,20 +350,19 @@ impl AuthManager {
         .fetch_all(&pool)
         .await?;
 
-        pool.close().await;
-
-        Ok(rows
-            .into_iter()
-            .map(
-                |(id, email, username, avatar_blob_hash, created_at)| UserInfo {
+        rows.into_iter()
+            .map(|(id, email, username, avatar_blob_hash, created_at)| {
+                Ok(UserInfo {
                     id,
                     email,
                     username,
                     avatar_blob_hash,
-                    created_at: created_at.parse().unwrap_or_else(|_| Utc::now()),
-                },
-            )
-            .collect())
+                    created_at: created_at
+                        .parse()
+                        .context("Invalid stored user creation timestamp")?,
+                })
+            })
+            .collect()
     }
 
     /// Update user profile
@@ -462,7 +405,7 @@ impl AuthManager {
         }
 
         if let Some(password) = password {
-            let password_hash = hash(&password, DEFAULT_COST).context("Failed to hash password")?;
+            let password_hash = password_hash(password).await?;
 
             sqlx::query("UPDATE users SET password_hash = ? WHERE id = ?")
                 .bind(password_hash)
@@ -480,7 +423,6 @@ impl AuthManager {
         }
 
         let user = self.get_user(user_id).await?;
-        pool.close().await;
         Ok(user)
     }
 
@@ -492,7 +434,26 @@ impl AuthManager {
             .bind(user_id)
             .execute(&pool)
             .await?;
-        pool.close().await;
         Ok(())
     }
+}
+
+async fn password_work<T: Send + 'static>(
+    work: impl FnOnce() -> bcrypt::BcryptResult<T> + Send + 'static,
+) -> Result<T> {
+    static LIMIT: std::sync::OnceLock<std::sync::Arc<tokio::sync::Semaphore>> =
+        std::sync::OnceLock::new();
+    let permit = LIMIT
+        .get_or_init(|| std::sync::Arc::new(tokio::sync::Semaphore::new(4)))
+        .clone()
+        .acquire_owned()
+        .await?;
+    Ok(tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        work()
+    })
+    .await??)
+}
+async fn password_hash(password: String) -> Result<String> {
+    password_work(move || hash(password, DEFAULT_COST)).await
 }

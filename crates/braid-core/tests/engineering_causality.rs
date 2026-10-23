@@ -17,8 +17,8 @@ fn edit(id: &str, parent: &str, offset: usize, content: &str) -> Update {
 #[tokio::test]
 async fn concurrent_diamond_edits_converge_and_keep_both_heads_after_restart() {
     let temp = tempfile::tempdir().unwrap();
-    let left = ReplicaStore::new(temp.path().join("left"));
-    let right = ReplicaStore::new(temp.path().join("right"));
+    let left = ReplicaStore::new(temp.path().join("left")).unwrap();
+    let right = ReplicaStore::new(temp.path().join("right")).unwrap();
     let mut seed = Update::snapshot(Version::new("seed"), "a😀b");
     seed.merge_type = Some("diamond".into());
     for store in [&left, &right] {
@@ -30,7 +30,7 @@ async fn concurrent_diamond_edits_converge_and_keep_both_heads_after_restart() {
     left.commit("doc", &bob, "diamond").await.unwrap();
     right.commit("doc", &bob, "diamond").await.unwrap();
     right.commit("doc", &alice, "diamond").await.unwrap();
-    let left = ReplicaStore::new(temp.path().join("left"));
+    let left = ReplicaStore::new(temp.path().join("left")).unwrap();
     let document = left.load("doc").await.unwrap().unwrap();
     assert_eq!(
         document.content,
@@ -56,7 +56,7 @@ async fn concurrent_diamond_edits_converge_and_keep_both_heads_after_restart() {
 #[tokio::test]
 async fn concurrent_simpleton_writes_still_return_a_conflict_without_mutation() {
     let temp = tempfile::tempdir().unwrap();
-    let store = ReplicaStore::new(temp.path().to_owned());
+    let store = ReplicaStore::new(temp.path().to_owned()).unwrap();
     let seed = Update::snapshot(Version::new("seed"), "abc");
     store.commit("doc", &seed, "simpleton").await.unwrap();
     let mut first = edit("first", "seed", 1, "X");
@@ -74,8 +74,8 @@ async fn seeded_causal_schedules_converge_with_restarts_and_duplicate_delivery()
     for seed in 0usize..24 {
         let root = tempfile::tempdir().unwrap();
         let stores = [
-            ReplicaStore::new(root.path().join("a")),
-            ReplicaStore::new(root.path().join("b")),
+            ReplicaStore::new(root.path().join("a")).unwrap(),
+            ReplicaStore::new(root.path().join("b")).unwrap(),
         ];
         let base =
             Update::snapshot(Version::new("root"), "a\u{1f600}bc").with_merge_type("diamond");
@@ -103,7 +103,8 @@ async fn seeded_causal_schedules_converge_with_restarts_and_duplicate_delivery()
                 for event in &branches[branch] {
                     // A fresh handle forces operation-log decoding between every event.
                     let reopened =
-                        ReplicaStore::new(root.path().join(if replica == 0 { "a" } else { "b" }));
+                        ReplicaStore::new(root.path().join(if replica == 0 { "a" } else { "b" }))
+                            .unwrap();
                     reopened.commit("doc", event, "diamond").await.unwrap();
                     store.commit("doc", event, "diamond").await.unwrap();
                 }

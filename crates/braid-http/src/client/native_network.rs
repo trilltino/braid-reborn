@@ -102,16 +102,16 @@ impl BraidNetwork for NativeNetwork {
                     .and_then(crate::client::parse_retry_after),
             });
         }
-        let heartbeat = response
-            .headers()
+        let headers = crate::protocol::headers_from_http(response.headers())?;
+        let heartbeat = headers
             .get("heartbeats")
-            .and_then(|v| v.to_str().ok())
-            .and_then(crate::client::subscription::HeartbeatConfig::from_header);
-        let merge_type = response
-            .headers()
-            .get("merge-type")
-            .and_then(|v| v.to_str().ok())
-            .map(str::to_owned);
+            .map(|value| {
+                crate::client::subscription::HeartbeatConfig::from_header(value)
+                    .ok_or_else(|| BraidError::HeaderParse("Invalid Heartbeats response".into()))
+            })
+            .transpose()?;
+        let merge_type = headers.get("merge-type").cloned();
+        let repr_type = headers.get("repr-type").cloned();
         let (tx, rx) = async_channel::bounded(100);
         let mut stream = response.bytes_stream();
         tokio::spawn(async move {
@@ -135,6 +135,12 @@ impl BraidNetwork for NativeNetwork {
                                     Ok(mut update) => {
                                         if update.merge_type.is_none() {
                                             update.merge_type = merge_type.clone();
+                                        }
+                                        if let Some(repr) = &repr_type {
+                                            update
+                                                .extra_headers
+                                                .entry("repr-type".into())
+                                                .or_insert_with(|| repr.clone());
                                         }
                                         if tx.send(Ok(update)).await.is_err() {
                                             return;

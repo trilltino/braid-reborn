@@ -47,6 +47,12 @@ pub async fn sync_local_to_remote(
         ));
     }
     let url = url_in.trim_matches('"').trim().to_owned();
+    let active = state.text_sessions.lock().await.get(&url).cloned();
+    if let Some(session) = active {
+        super::file_service::reconcile(&url, &state, &session, true, Some(&new_content)).await?;
+        return wait_for_ack(&session).await;
+    }
+
     let key = if path.is_absolute() {
         path.clone()
     } else {
@@ -278,4 +284,26 @@ pub async fn sync_binary_to_remote(
             Err(BraidError::Http(format!("Binary sync error: {}", e)))
         }
     }
+}
+
+/// Confirmation refers to the durable channel queue, never just a successful GET.
+pub(crate) async fn wait_for_ack(session: &crate::simpleton::SimpletonClient) -> Result<()> {
+    let mut status = session.status();
+    tokio::time::timeout(std::time::Duration::from_secs(30), async {
+        loop {
+            let current = status.borrow_and_update().clone();
+            if let Some(error) = current.error {
+                return Err(BraidError::Protocol(error));
+            }
+            if current.initialized && !current.has_pending_edit && current.outstanding_puts == 0 {
+                return Ok(());
+            }
+            status
+                .changed()
+                .await
+                .map_err(|_| BraidError::SubscriptionClosed)?;
+        }
+    })
+    .await
+    .map_err(|_| BraidError::Timeout)?
 }

@@ -25,9 +25,12 @@ pub async fn get_wiki_page(
         Err(e) => return (StatusCode::BAD_REQUEST, e).into_response(),
     };
     let _guard = braid_http::durable::document_lock(file.clone()).await;
-    let store = braid_core::replica::ReplicaStore::new(
+    let store = match braid_core::replica::ReplicaStore::new(
         state.pages_manager.storage_dir.join(".braid-replicas"),
-    );
+    ) {
+        Ok(store) => store,
+        Err(error) => return braid_core::server::replica_http::error_response(error),
+    };
     if let Err(e) = import_file(&store, &path, &file).await {
         return braid_core::server::replica_http::error_response(e);
     }
@@ -45,9 +48,12 @@ pub async fn put_wiki_page(
         Err(e) => return (StatusCode::BAD_REQUEST, e).into_response(),
     };
     let _guard = braid_http::durable::document_lock(file.clone()).await;
-    let store = braid_core::replica::ReplicaStore::new(
+    let store = match braid_core::replica::ReplicaStore::new(
         state.pages_manager.storage_dir.join(".braid-replicas"),
-    );
+    ) {
+        Ok(store) => store,
+        Err(error) => return braid_core::server::replica_http::error_response(error),
+    };
     if let Err(e) = import_file(&store, &path, &file).await {
         return braid_core::server::replica_http::error_response(e);
     }
@@ -173,7 +179,10 @@ pub async fn get_local_page(
         Err(e) => return (StatusCode::BAD_REQUEST, e).into_response(),
     };
     let _guard = braid_http::durable::document_lock(file.clone()).await;
-    let store = braid_core::replica::ReplicaStore::new(base.join(".braid-replicas"));
+    let store = match braid_core::replica::ReplicaStore::new(base.join(".braid-replicas")) {
+        Ok(store) => store,
+        Err(error) => return braid_core::server::replica_http::error_response(error),
+    };
     if let Err(e) = import_file(&store, &path, &file).await {
         return braid_core::server::replica_http::error_response(e);
     }
@@ -191,7 +200,10 @@ pub async fn put_local_page(
         Err(e) => return (StatusCode::BAD_REQUEST, e).into_response(),
     };
     let _guard = braid_http::durable::document_lock(file.clone()).await;
-    let store = braid_core::replica::ReplicaStore::new(base.join(".braid-replicas"));
+    let store = match braid_core::replica::ReplicaStore::new(base.join(".braid-replicas")) {
+        Ok(store) => store,
+        Err(error) => return braid_core::server::replica_http::error_response(error),
+    };
     if let Err(e) = import_file(&store, &path, &file).await {
         return braid_core::server::replica_http::error_response(e);
     }

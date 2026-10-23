@@ -1,7 +1,7 @@
 use std::collections::{btree_map, BTreeMap, BTreeSet};
 use smallvec::SmallVec;
 use crate::vendor::diamond_types::{CRDTKind, DTRange, Branch, OpLog, LV, LVKey, RegisterInfo, RegisterState, RegisterValue, ROOT_CRDT_ID, Primitive};
-use smartstring::alias::String as SmartString;
+use compact_str::CompactString as SmartString;
 
 pub(crate) fn btree_range_for_crdt<V>(map: &BTreeMap<(LVKey, SmartString), V>, crdt: LVKey) -> btree_map::Range<'_, (LVKey, SmartString), V> {
     let empty_str: SmartString = "".into();

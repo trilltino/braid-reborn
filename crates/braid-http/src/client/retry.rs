@@ -131,7 +131,7 @@ impl RetryState {
     }
 
     fn decide_retry(&mut self, retry_after: Option<Duration>) -> RetryDecision {
-        self.attempts += 1;
+        self.attempts = self.attempts.saturating_add(1);
         if let Some(max) = self.config.max_retries {
             if self.attempts > max {
                 return RetryDecision::DontRetry;
@@ -145,11 +145,11 @@ impl RetryState {
         };
 
         self.current_backoff = std::cmp::min(
-            self.current_backoff + Duration::from_secs(1),
+            self.current_backoff.saturating_add(Duration::from_secs(1)),
             self.config.max_backoff,
         );
 
-        RetryDecision::Retry(wait)
+        RetryDecision::Retry(wait.min(self.config.max_backoff))
     }
 
     pub fn reset(&mut self) {
@@ -162,7 +162,10 @@ pub fn parse_retry_after(value: &str) -> Option<Duration> {
     if let Ok(seconds) = value.parse::<u64>() {
         return Some(Duration::from_secs(seconds));
     }
-    None
+    httpdate::parse_http_date(value).ok().map(|date| {
+        date.duration_since(std::time::SystemTime::now())
+            .unwrap_or_default()
+    })
 }
 
 #[cfg(test)]

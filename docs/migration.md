@@ -31,6 +31,43 @@ is deleted implicitly. A cancelled upload may leave a .upload-* staging file;
 inspect references and stop writers before manual cleanup. No automated GC is
 provided.
 
+Filesystem `versions.json` adds default-empty `materialized` and `deleted` maps;
+existing acknowledged versions and legacy `outbox` edits are retained. Legacy
+outbox requests replay before a shared channel starts. New private per-URL
+journals under `.braidfs/channels/<sha256(url)>.json` contain resource binding,
+frontiers, immutable PUTs and complete Simpleton application state. Keep the
+whole directory with `versions.json`; deleting a journal can destroy the only
+unacknowledged edit. A missing acknowledged text base fails closed for repair.
+
+NFS adds `nfs_sequence` and `nfs_changes` tables plus additive `plan`/`last_error`
+columns. Existing inode IDs survive. Inodes are never reused after unlink. Rename
+and remove preserve private snapshots under `.braidfs/nfs-ops/<id>/`; unlink also
+moves bytes to `.braidfs/nfs-trash/<id>`. No automatic deletion/GC runs. Interrupted
+staging is marked failed before mutation; prepared namespace changes finish on
+NFS startup. Old pending changes without captured content become explicit
+`repair_required` records. Inspect the saved paths/bytes before manual resolution.
+
+For configured text resources, unlink is an empty Simpleton replacement plus a
+local namespace tombstone; rename publishes the destination before emptying the
+source. Neither operation promises an atomic transaction across remote URLs.
+Remote updates to a removed local path remain journaled without recreating it;
+explicit local recreation clears the tombstone through a new durable edit.
+Binary remote changes and ambiguous/cross-origin mappings require explicit
+configuration/repair. NFS local success means the local intention is durable;
+only `remote_confirmed` means all its text requests received ACKs.
+
+Existing encoded URL-segment filenames are preserved. Reverse mapping no longer
+encodes percent signs twice, and deleted paths resolve their existing parent
+prefix (including Windows extended path prefixes). Two enabled URLs mapping to
+one local pathname now fail explicitly; watchers prefer the configured origin
+instead of guessing another scheme. Unrepresentable filenames return an error
+rather than silently uploading to a different URL.
+
+New stores reject a competing writer process. Stop stale instances before
+restarting; kernel locks release on process death and lock files need no manual
+removal. Old binaries do not enforce these leases, so mixed-version concurrent
+writers remain unsupported.
+
 ## Public Rust/configuration changes
 
 - BraidClient construction is fallible: use `BraidClient::new()?`; its panic-prone
@@ -40,6 +77,16 @@ provided.
 - ParserLimits adds header-field and header-value limits; use `..Default::default()`
   in struct literals. BraidError adds ResourceLimit (the enum is non-exhaustive).
 - BraidNfsBackend::new returns Result and fails on corrupt inode metadata.
+  `with_root` supports embedded/test instances without global environment changes.
+- BraidNfsBackend::open accepts just the root, inode DB and blob store; the
+  standalone binary no longer loads/writes daemon configuration or creates dummy
+  sync clients. Existing daemon-aware constructors delegate to this boundary.
+- ReplicaStore::new is now fallible and resolves an absolute path; use `?`.
+- DaemonState adds the shared `text_sessions` registry; initialize it with Default.
+- New SimpletonClient and ReliableChannel APIs retain offline edits durably.
+  Use status/ACK completion to report synchronization, rather than enqueue success.
+- AuthManager no longer relies on a process-local session-validity cache. Friends
+  can use `with_pool` to share its pool; app startup uses that path.
 - Chat import/export and batch merge/sync APIs return Result. AddMessage patches
   include defaulted reply_to/blob_refs. A batch requires valid causal parents and
   matching author; stale conflicting mutations are rejected without publication.

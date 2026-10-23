@@ -15,7 +15,9 @@ Current verification and remaining release work are recorded in the
 ```text
 crates/             Project libraries and applications
 docs/               Workspace guide and protocol audits
-scripts/            Conformance runner and archived tooling
+scripts/            Conformance, dependency inventory and archived tooling
+vendor/             Documented netlink compatibility patch
+tests/fuzz/         Separate locked cargo-fuzz workspace
 .github/workflows/  Native, WASM and conformance CI
 Cargo.toml          Workspace definition
 Cargo.lock          Shared, tracked dependency lockfile
@@ -57,14 +59,14 @@ share the root `target/`.
 | Native snapshots, binary patch framing, 209 subscriptions | Tested with Rust and pinned upstream JS |
 | Durable history, duplicate retries, lost ACK recovery | Tested for the documented single-writer store |
 | Historical-parent Diamond concurrency | Opposite-order delivery, seeded schedules and restarts tested |
-| Simpleton | Coordinated writes; stale writes conflict; full JS convergence open |
+| Simpleton client | Shared durable GET/PUT owner; independent JS convergence suites; Rust server rejects stale writes |
 | Blob streaming, limits, digests and durable references | Tested; historical objects retained; no automatic GC |
 | Chat persistence and authentication | Tested regressions; per-resource ACLs incomplete |
 | Iroh 1.4.1 HTTP/3 | Local GET/PUT/209/revocation tested; relay and anti-entropy open |
 | Browser/WASM | Compile checked; browser behavior remains experimental |
-| NFS | Experimental; complete rename/truncate/tombstone guarantees incomplete |
+| NFS | Persistent namespace recovery, binary offsets/truncate and text rename/delete reconciliation tested; Linux mount CI |
 | Linked JSON, range queries, transport multiplexing | Unsupported/incomplete |
-| Dependency security | Unmaintained findings and inactive lockfile RSA advisory remain |
+| Dependency security | Audit and deny gates; maintained string/macro replacements; pinned compatibility patch |
 
 This is an engineering checkpoint, not completion of every release criterion.
 

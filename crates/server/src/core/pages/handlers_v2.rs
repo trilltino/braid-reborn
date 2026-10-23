@@ -25,7 +25,10 @@ pub async fn get_page_v2(
         return get_page_versions_v2(Path(resource.to_owned()), State(state)).await;
     }
     replica_http::get(
-        ReplicaStore::new(state.pages_manager.storage_dir.clone()),
+        match ReplicaStore::new(state.pages_manager.storage_dir.clone()) {
+            Ok(store) => store,
+            Err(error) => return braid_core::server::replica_http::error_response(error),
+        },
         path,
         headers,
         query.merge_type.as_deref().unwrap_or("simpleton"),
@@ -40,7 +43,10 @@ pub async fn put_page_v2(
     body: Bytes,
 ) -> Response {
     replica_http::put(
-        ReplicaStore::new(state.pages_manager.storage_dir.clone()),
+        match ReplicaStore::new(state.pages_manager.storage_dir.clone()) {
+            Ok(store) => store,
+            Err(error) => return braid_core::server::replica_http::error_response(error),
+        },
         path,
         headers,
         body,
@@ -60,7 +66,7 @@ pub async fn get_page_versions_v2(
     Path(path): Path<String>,
     State(state): State<AppState>,
 ) -> Response {
-    match ReplicaStore::new(state.pages_manager.storage_dir.clone()).load(&path).await {
+    match (match ReplicaStore::new(state.pages_manager.storage_dir.clone()) { Ok(store) => store, Err(error) => return braid_core::server::replica_http::error_response(error) }).load(&path).await {
         Ok(Some(page))=>Json(serde_json::json!({"path":path,"heads":page.heads,"version_graph":page.version_graph,"version_count":page.version_graph.len(),"merge_type":page.merge_type})).into_response(),
         Ok(None)=>axum::http::StatusCode::NOT_FOUND.into_response(),
         Err(e)=>replica_http::error_response(e),

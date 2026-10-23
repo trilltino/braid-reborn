@@ -55,8 +55,8 @@ impl Config {
         for (domain, token) in &config.cookies {
             if token.starts_with("http://") || token.starts_with("https://") {
                 tracing::warn!(
-                    "!!! WARNING: Cookie for domain '{}' looks like a URL: '{}'. It should probably be a token string (e.g. 'ud8zp...').",
-                    domain, token
+                    "Cookie for domain '{}' looks like a URL; expected a token string",
+                    domain
                 );
             }
         }
@@ -121,10 +121,12 @@ pub fn get_root_dir() -> Result<PathBuf> {
     let root_str = std::env::var("BRAID_ROOT").unwrap_or_else(|_| "braid_data".to_string());
 
     let root = PathBuf::from(root_str);
-    if let Ok(abs) = std::fs::canonicalize(&root) {
-        Ok(abs)
-    } else {
-        Ok(std::env::current_dir().map_err(BraidError::Io)?.join(root))
+    match std::fs::canonicalize(&root) {
+        Ok(abs) => Ok(abs),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            Ok(std::path::absolute(root)?)
+        }
+        Err(error) => Err(error.into()),
     }
 }
 

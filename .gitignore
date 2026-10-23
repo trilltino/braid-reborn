@@ -1,9 +1,13 @@
 # Cargo build artifacts and generated audit reports
 target/
 
-# Keep a single, tracked workspace lockfile
+# Keep the workspace lockfile and the isolated fuzz-tooling lockfile
 **/Cargo.lock
 !/Cargo.lock
+!/tests/fuzz/Cargo.lock
+/tests/fuzz/target/
+/tests/fuzz/artifacts/
+/tests/fuzz/corpus/
 
 # Local application data (BRAID_ROOT defaults to braid_data)
 braid_data/

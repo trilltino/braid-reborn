@@ -6,7 +6,7 @@ use serde::de::{MapAccess, SeqAccess, Visitor};
 use serde::ser::SerializeStruct;
 // use serde::de::Visitor;
 use crate::vendor::diamond_types::rev_range::RangeRev;
-use smartstring::alias::String as SmartString;
+use compact_str::CompactString as SmartString;
 use crate::vendor::diamond_types::dtrange::DTRange;
 
 pub(crate) trait FlattenSerializable {

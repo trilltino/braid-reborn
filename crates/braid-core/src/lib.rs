@@ -1,9 +1,14 @@
+#![cfg_attr(
+    not(test),
+    deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
+)]
+#![deny(unsafe_code)]
 //! braid-core: Unified Braid Protocol implementation in Rust.
 //!
 //! This crate consolidates several Braid-related components into a single library:
 //!
 //! - **core**: The core Braid-HTTP protocol implementation (types, parser, client, server).
-//! - **antimatter**: Conflict resolution and state management.
+//! - **replica** and **simpleton**: Causal storage and coordinated text clients.
 //! - **blob**: Braid-Blob storage and synchronization service.
 //! - **fs**: Filesystem synchronization client logic.
 
@@ -11,9 +16,11 @@ pub use smallvec;
 pub mod core;
 #[cfg(feature = "native")]
 pub mod replica;
+#[cfg(feature = "native")]
+pub mod simpleton;
 // Copied algorithms have their own upstream assertions, lints and formatting.
 #[cfg(all(feature = "serde", feature = "smallvec"))]
-#[allow(warnings, clippy::all)]
+#[allow(warnings, clippy::all, unsafe_code, clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 #[rustfmt::skip]
 pub mod vendor;
 

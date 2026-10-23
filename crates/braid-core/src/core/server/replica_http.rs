@@ -52,7 +52,9 @@ pub async fn get(
         } else {
             vec![document.snapshot()]
         };
+        let owner = store.clone();
         let stream = async_stream::stream! {
+            let _owner=owner;
             let _keepalive=keepalive;
             for update in initial {
                 match format_update(&update) {Ok(bytes)=>yield Ok::<Bytes,std::io::Error>(bytes),Err(e)=>{yield Err(std::io::Error::other(e.to_string()));return;}}

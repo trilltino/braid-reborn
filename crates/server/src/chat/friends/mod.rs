@@ -3,6 +3,7 @@
 //! Handles friend requests, contacts, and user relationships.
 //! Stored in the same SQLite database as auth (users.sqlite).
 
+use crate::core::database as sqlx;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -49,7 +50,7 @@ pub struct Contact {
 
 /// Friend manager handles all friend-related operations
 pub struct FriendManager {
-    db_path: std::path::PathBuf,
+    pool: sqlx::SqlitePool,
 }
 
 type FriendRequestRow = (
@@ -66,26 +67,18 @@ type FriendRequestRow = (
 impl FriendManager {
     /// Create new friend manager
     pub async fn new(base_dir: &Path) -> Result<Self> {
-        let db_path = base_dir.join("users.sqlite");
+        Self::with_pool(sqlx::open(&base_dir.join("users.sqlite")).await?).await
+    }
 
-        let manager = Self { db_path };
+    pub async fn with_pool(pool: sqlx::SqlitePool) -> Result<Self> {
+        let manager = Self { pool };
         manager.init_db().await?;
-
         info!("[Friends] Initialized");
         Ok(manager)
     }
 
-    /// Get database connection
     async fn get_pool(&self) -> Result<sqlx::SqlitePool> {
-        use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
-        use std::str::FromStr;
-
-        let options = SqliteConnectOptions::from_str(&format!(
-            "sqlite://{}",
-            self.db_path.to_string_lossy().replace('\\', "/")
-        ))?
-        .create_if_missing(true);
-        Ok(SqlitePoolOptions::new().connect_with(options).await?)
+        Ok(self.pool.clone())
     }
 
     /// Initialize database tables
@@ -129,7 +122,6 @@ impl FriendManager {
         .execute(&pool)
         .await?;
 
-        pool.close().await;
         Ok(())
     }
 
@@ -217,8 +209,6 @@ impl FriendManager {
         .execute(&pool)
         .await?;
 
-        pool.close().await;
-
         info!(
             "[Friends] Request sent: {} -> {}",
             request.from_username, to_email
@@ -245,8 +235,6 @@ impl FriendManager {
         .bind(user_id)
         .fetch_all(&pool)
         .await?;
-
-        pool.close().await;
 
         Ok(rows
             .into_iter()
@@ -336,7 +324,6 @@ impl FriendManager {
             info!("[Friends] Request {} rejected", request_id);
         }
 
-        pool.close().await;
         Ok(())
     }
 
@@ -357,8 +344,6 @@ impl FriendManager {
         .bind(user_id)
         .fetch_all(&pool)
         .await?;
-
-        pool.close().await;
 
         Ok(rows
             .into_iter()
@@ -392,8 +377,6 @@ impl FriendManager {
         .bind(user_id)
         .execute(&pool)
         .await?;
-
-        pool.close().await;
 
         info!(
             "[Friends] Contact removed: {} <-> {}",

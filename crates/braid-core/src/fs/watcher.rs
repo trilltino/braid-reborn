@@ -38,7 +38,12 @@ pub async fn handle_fs_event(event: Event, state: DaemonState) {
             continue;
         }
 
-        match mapping::path_to_url(&path) {
+        let mapped = match mapping::configured_url(&path, &state).await {
+            Ok(Some(url)) => Ok(url),
+            Ok(None) => mapping::path_to_url(&path).map_err(crate::core::BraidError::from),
+            Err(error) => Err(error),
+        };
+        match mapped {
             Ok(url) => {
                 tracing::info!("[BraidFS] File changed: {:?} -> {}", path, url);
 

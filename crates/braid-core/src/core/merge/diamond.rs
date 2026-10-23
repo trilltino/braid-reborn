@@ -67,7 +67,7 @@ use super::merge_type::{MergePatch, MergeResult, MergeType};
 /// The pinned engine limits agent names to 50 UTF-8 bytes. Preserve older short
 /// names and map longer opaque wire identities without truncating their entropy.
 pub(crate) fn bounded_agent_id(name: &str) -> String {
-    if name.len() <= 50 {
+    if name.len() < 50 && name != "ROOT" {
         return name.to_owned();
     }
     use base64::Engine;

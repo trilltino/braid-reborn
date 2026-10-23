@@ -5,7 +5,7 @@
 //! Currently this code only supports lists of unicode characters (text documents). Support for
 //! more data types will be added over time.
 
-use smartstring::alias::String as SmartString;
+use compact_str::CompactString as SmartString;
 
 use crate::vendor::diamond_types::list::operation::ListOpKind;
 use crate::vendor::diamond_types::list::op_metrics::{ListOperationCtx, ListOpMetrics};

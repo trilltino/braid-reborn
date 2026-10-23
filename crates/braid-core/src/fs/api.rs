@@ -189,6 +189,12 @@ async fn handle_push(
         Ok(()) => {
             tracing::info!("Successfully pushed {} to remote", params.url);
 
+            if state.text_sessions.lock().await.contains_key(&params.url) {
+                // Its materializer follows the journal's merged state. Replacing it
+                // with the submitted string here could erase a concurrent remote edit.
+                return Json(serde_json::json!({"status":"ok","url":params.url}));
+            }
+
             // 5. Commit to local disk atomically only after server confirmation
             let temp_folder = path
                 .parent()
@@ -236,7 +242,7 @@ async fn handle_cookie(
     State(state): State<DaemonState>,
     Json(params): Json<CookieParams>,
 ) -> Json<serde_json::Value> {
-    tracing::info!("IPC Command: SetCookie {}={}", params.domain, params.value);
+    tracing::info!(domain = %params.domain,"IPC cookie update");
 
     if let Err(e) = state
         .tx_cmd

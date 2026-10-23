@@ -23,15 +23,16 @@ of drafts, not a claim of complete IETF standard conformance.
 | Persist-before-notify and durable receive/outbox | replica, fs sync | audit_filesystem; engineering_storage; streaming blob faults |
 | Authenticated Iroh GET/PUT/209 and active revocation | protocol policy + RemoteId | braid-iroh/tests/transport.rs, local direct connections |
 | Chat session sender, catch-all and blob authorization | server auth middleware / handlers | engineering_auth through the actual Router |
+| Stable encoded URL/path mapping and collision rejection | fs::mapping / shared session registry | encoded segments round-trip without double-encoding; removed paths keep canonical prefixes; conflicting enabled URLs fail explicitly |
 | Malformed room paths/state fail closed | JsonChatStore | engineering_storage; NFS component name unit test |
 | JS encoder -> Rust and Rust encoder -> JS | tests/interoperability/codec.mjs | checked-in source-pinned protocol-fixtures; run script for both directions |
 | Unknown historical Versions request | no complete cross-adapter implementation | unsupported; do not advertise arbitrary version GET |
-| Coordinated PUT/subscription state machine across transports | current separate native/FS paths | partial; complete Simpleton reference controller/convergence open |
+| Coordinated native PUT/subscription state machine | ReliableChannel + production Simpleton client + filesystem | reliable_channel, audit_shared_channel, independent reliable-updates and Simpleton suites; browser/H3 channel ownership remains separate |
 | Full browser runtime/backpressure/cancellation semantics | wasm_network | compile check only; browser behavioral tests open |
 | Linked JSON, Range Query, multiplex network transport | extension modules | incomplete/unsupported; codec presence does not establish deployment support |
-| NFS rename/truncate/remove and mounted Linux semantics | fs::nfs | experimental; full NFS operation coverage and mount test open |
+| NFS offsets/truncate/rename/remove/restart | fs::nfs adapter/backing + fs::operations | binary/sparse/shell/attribute/inode/cookie unit tests; partitioned rename/restart/lost-ACK/offline-edit/remove integration; privileged mount is a separate CI job |
 | Partition/relay repair, ACL lifecycle, malicious peer isolation | Iroh/gossip | local allow/revoke tested; relay and anti-entropy tests open |
-| Power loss and every durable crash boundary | durable / SQLite / FS | simulated IO/restart regressions only; full process-kill matrix open |
+| Process death and durable replay | ChannelJournal / SQLite / FS | reliable_channel kills an actual writer process and reopens/replays; exhaustive power-loss and cancellation matrix remains open |
 
 Run the actual tests from the repository root:
 
@@ -41,11 +42,13 @@ cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo check -p braid-core --no-default-features --locked
 cargo check -p braid-http --locked --target wasm32-unknown-unknown --no-default-features --features wasm
 cargo build -p braid-http --locked --example fuzz_controller
+cargo build -p braid-core --locked --example simpleton_controller
 node scripts/run-upstream-conformance.mjs
 node tests/interoperability/codec.mjs
 ```
 
-The deterministic mutation smoke test is not continuous coverage-guided fuzzing.
+Coverage-guided wire/text targets and pinned nightly CI live in [tests/fuzz](../tests/fuzz/README.md).
+The deterministic mutation smoke test is separate from these targets.
 The model schedules establish convergence for the enumerated text cases; they
 are not an independent formal correctness proof. Current pass/fail evidence and
 remaining release criteria belong in audit/engineering-status.md.

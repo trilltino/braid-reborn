@@ -1,7 +1,9 @@
 use anyhow::{Context, Result};
 use std::path::Path;
 use std::process::Command;
-use tracing::{info, warn};
+use tracing::info;
+#[cfg(target_os = "windows")]
+use tracing::warn;
 
 /// Mounts the BraidFS NFS share at the specified mount point.
 pub fn mount(port: u16, mount_point: &Path) -> Result<()> {

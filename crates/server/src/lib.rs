@@ -1,3 +1,8 @@
+#![cfg_attr(
+    not(test),
+    deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
+)]
+#![forbid(unsafe_code)]
 //! Braid Server
 //!
 //! Modular architecture separating Core infrastructure, Chat services,
@@ -64,7 +69,7 @@ pub async fn run() -> anyhow::Result<()> {
     let store = Arc::new(JsonChatStore::new(config.clone()).await?);
 
     // 2. Initialize Chat Services
-    let friend_manager = Arc::new(FriendManager::new(&braid_root).await?);
+    let friend_manager = Arc::new(FriendManager::with_pool(auth_manager.pool()).await?);
     let mail_manager = Arc::new(MailManager::new(store.clone()));
 
     let ai_manager = if std::env::var("DISABLE_AI").is_err() {

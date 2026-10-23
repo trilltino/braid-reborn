@@ -34,11 +34,46 @@ publish committed updates through a bounded broadcast. Lag terminates the stream
 for frontier-based repair. Concurrent histories use an authoritative merged
 snapshot rather than replaying positional patches at the wrong base.
 
-The HTTP reliable client records acknowledged frontiers separately from received
-ones. The filesystem adapter retains a durable outbox and materializes files
-before acknowledgement. A single shared persistent GET/PUT channel state machine
-across every adapter is still outstanding; current code must not be described as
-providing that stronger contract.
+The native `braid-http::client::ReliableChannel` actor owns a resource's GET and
+serial PUT queue. A durable journal separates received, optimistic and pending
+state; reconnect starts at the oldest unacknowledged update's parents. A PUT
+failure cancels the GET and vice versa. Retryable network/status failures back
+off together; malformed data, authorization and causal conflicts retain state
+and stop for repair. There are bounded command, receive and outbox queues, a PUT
+timeout, and a kernel writer lease. A queued identity and its exact bytes survive
+an ambiguous ACK. Application state and its queue/cursor commit together.
+
+`braid-core::simpleton` owns scalar text diffs, peer counters, parent checks,
+representation digests and offline pending text, following the pinned upstream
+client. It uses this channel rather than an independent retry loop. Its revision
+comparison guards filesystem decisions against a concurrent receive. The Rust
+server's conservative stale-Simpleton rejection is a separate capability: it
+does not implement the upstream transforming multi-writer server algorithm.
+
+The filesystem registry shares one Simpleton client per URL. The daemon owns
+scanner, replay, subscription and debouncer workers and cancels/drains them at
+shutdown. Debouncing has bounded pending URLs and at most eight workers; the
+scanner has entry/depth/queue limits and a cancellation-safe overlap permit.
+The channel journal holds a complete application recovery record before local
+projection. `file_service` merges the disk and channel changes against the last
+materialized view using declared-base Diamond operations. It queues the result
+with a revision check before atomic file publication. `VersionStore.materialized`
+keeps optimistic bytes separate from server-acknowledged `file_versions`.
+
+A root filesystem lease serializes daemon projections and NFS backing operations
+across cooperating processes, without holding it while waiting for a network ACK.
+A separate daemon lease prevents two independent JSON/config owners. NFS adapter
+calls run on blocking workers under a single permit. Persistent inode IDs are
+monotonic. Rename/remove journal a bounded content snapshot before changing the
+local namespace, then update descendant inode mappings in one SQLite transaction.
+Prepared changes recover on NFS startup; interrupted staging never changes paths.
+The daemon reconciles `remote_pending` operations through the same text channels,
+using persistent monotonic operation identities. Rename publishes destination
+text before an empty source replacement. Local tombstones suppress resurrection;
+removed bytes and operation snapshots remain private for recovery. This is an
+explicit filesystem policy, not a Braid DELETE extension or atomic remote rename.
+Cross-origin destinations require explicit configuration. Unsupported binary
+remote operations retain their snapshot and error rather than claiming sync.
 
 Blob uploads stage and hash with a heap-backed 64 KiB buffer, enforce limits,
 fsync payloads and publish immutable CAS files before an SQLite transaction names
@@ -62,7 +97,15 @@ are owned and cancelled at shutdown. Gossip remains a bounded hint mechanism;
 reliable anti-entropy scheduling and relay/network-partition behavior are not yet
 proven. Callers must authorize application-level remote chat authors separately.
 
-JSON replica/room stores currently assume one writer process per data directory.
-Blob metadata uses SQLite transactions; Iroh identity generation additionally
-uses an OS file lock. These guarantees are distinct. Windows file replacement,
-Linux directory fsync and physical power loss require platform-specific testing.
+JSON replica and room stores hold kernel writer leases for their lifetime.
+Stateless replica handles in one process share ownership and subscription
+broadcasts; another process fails explicitly instead of keeping a stale cache.
+Blob metadata and the NFS intention registry use SQLite transactions. Auth and
+friends share a bounded SQLite pool using WAL, FULL synchronization, foreign
+keys and a busy timeout. Session validation consults the database for every call,
+so logout and account deactivation are visible across manager instances; bcrypt
+runs on a bounded blocking pool.
+
+These locks cover cooperating services, not arbitrary external editors or
+physical power loss. Unix parent directories are synced after atomic replacement;
+Windows directory durability and exhaustive crash points require separate tests.

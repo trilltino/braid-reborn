@@ -44,6 +44,7 @@ pub enum UpdateType {
 
 /// JSON-based chat store with CRDT support
 pub struct JsonChatStore {
+    _writer: std::fs::File,
     config: ChatServerConfig,
     /// Blob store for file attachments
     blob_store: Arc<BlobStore>,
@@ -67,6 +68,8 @@ impl JsonChatStore {
     pub async fn new(config: ChatServerConfig) -> Result<Self> {
         // Ensure directories exist
         config.ensure_dirs().await?;
+        let writer =
+            braid_http::durable::writer_lease(&config.storage_dir.join(".writer.lock")).await?;
 
         // Initialize blob store
         let blob_store = Arc::new(
@@ -76,6 +79,7 @@ impl JsonChatStore {
         );
 
         let store = Self {
+            _writer: writer,
             config,
             blob_store,
             rooms: RwLock::new(HashMap::new()),

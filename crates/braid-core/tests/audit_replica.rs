@@ -8,9 +8,9 @@ use braid_core::{
 async fn committed_history_and_diamond_ops_survive_restart_and_lost_ack() {
     let temp = tempfile::tempdir().unwrap();
     let first = Update::snapshot(Version::new("alice-1"), "a😀b").with_merge_type("simpleton");
-    let store = ReplicaStore::new(temp.path().into());
+    let store = ReplicaStore::new(temp.path().into()).unwrap();
     store.commit("doc", &first, "simpleton").await.unwrap();
-    let store = ReplicaStore::new(temp.path().into());
+    let store = ReplicaStore::new(temp.path().into()).unwrap();
     store.commit("doc", &first, "simpleton").await.unwrap();
     let second = Update::patched(Version::new("alice-2"), vec![Patch::text("[1:2]", "é")])
         .with_parent(Version::new("alice-1"));
@@ -36,7 +36,7 @@ async fn committed_history_and_diamond_ops_survive_restart_and_lost_ack() {
 #[tokio::test]
 async fn failed_multi_patch_and_stale_parent_never_commit() {
     let temp = tempfile::tempdir().unwrap();
-    let store = ReplicaStore::new(temp.path().into());
+    let store = ReplicaStore::new(temp.path().into()).unwrap();
     store
         .commit(
             "doc",
@@ -61,7 +61,7 @@ async fn failed_multi_patch_and_stale_parent_never_commit() {
 #[tokio::test]
 async fn racing_writers_are_serialized_and_one_conflicts() {
     let temp = tempfile::tempdir().unwrap();
-    let store = ReplicaStore::new(temp.path().into());
+    let store = ReplicaStore::new(temp.path().into()).unwrap();
     store
         .commit(
             "doc",
@@ -109,7 +109,7 @@ fn diamond_parents_precede_edits_and_unicode_replacement_is_safe() {
 #[tokio::test]
 async fn corrupt_storage_is_never_recreated_as_an_empty_document() {
     let temp = tempfile::tempdir().unwrap();
-    let store = ReplicaStore::new(temp.path().into());
+    let store = ReplicaStore::new(temp.path().into()).unwrap();
     tokio::fs::write(store.path("doc"), b"{partial")
         .await
         .unwrap();
@@ -176,7 +176,7 @@ async fn blob_events_use_parents_and_idempotency_instead_of_lexical_order() {
 #[tokio::test]
 async fn native_http_put_and_subscription_share_the_durable_codec() {
     let temp = tempfile::tempdir().unwrap();
-    let store = ReplicaStore::new(temp.path().into());
+    let store = ReplicaStore::new(temp.path().into()).unwrap();
     let get_store = store.clone();
     let put_store = store.clone();
     let app = axum::Router::new().route(
@@ -232,7 +232,10 @@ async fn native_http_put_and_subscription_share_the_durable_codec() {
         .unwrap()
         .unwrap()
         .unwrap();
-    assert_eq!(update.body_str(), Some("a😀é"));
+    let applied =
+        braid_http::protocol::text::apply_text_patches("", update.patches.as_ref().unwrap())
+            .unwrap();
+    assert_eq!(applied, store.load("doc").await.unwrap().unwrap().content);
     assert_eq!(update.version, vec![Version::new("event-3")]);
     assert_eq!(store.load("doc").await.unwrap().unwrap().content, "a😀é");
     drop(subscription);

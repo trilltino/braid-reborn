@@ -24,12 +24,14 @@ pub mod blob_handlers;
 pub mod config;
 pub mod debouncer;
 pub mod diff;
+pub(crate) mod file_service;
 pub mod local_server;
 pub mod mapping;
 #[cfg(feature = "nfs")]
 pub mod mount;
 #[cfg(feature = "nfs")]
 pub mod nfs;
+pub mod operations;
 pub mod rate_limiter;
 pub mod scanner;
 pub mod server_handlers;
@@ -132,6 +134,10 @@ impl Default for ActivityTracker {
 }
 
 pub async fn run_daemon(port: u16) -> Result<()> {
+    let _owner =
+        braid_http::durable::writer_lease(&config::get_root_dir()?.join(".braidfs/daemon.lock"))
+            .await?;
+    let mut background = tokio::task::JoinSet::new();
     let mut config = Config::load().await?;
     config.port = port;
 
@@ -235,18 +241,22 @@ pub async fn run_daemon(port: u16) -> Result<()> {
     let scan_state_clone = scan_state.clone();
     let sync_urls_clone = sync_urls_map.clone();
     let tx_fs_clone = tx_fs.clone();
-    tokio::spawn(async move {
+    background.spawn(async move {
         start_scan_loop(
             scan_state_clone,
             sync_urls_clone,
             Duration::from_secs(10), // Scan every 10s for more responsiveness during testing
             move |path| {
-                tracing::info!("Scanner detected change in {:?}, triggering sync", path);
-                // Send a fake event to the FS watcher channel to trigger standard sync logic
-                let mut event =
-                    notify::Event::new(notify::EventKind::Modify(notify::event::ModifyKind::Any));
-                event.paths.push(path);
-                let _ = tx_fs_clone.blocking_send(event);
+                let tx_fs_clone = tx_fs_clone.clone();
+                async move {
+                    tracing::info!("Scanner detected change in {:?}, triggering sync", path);
+                    // Send a fake event to the FS watcher channel to trigger standard sync logic
+                    let mut event = notify::Event::new(notify::EventKind::Modify(
+                        notify::event::ModifyKind::Any,
+                    ));
+                    event.paths.push(path);
+                    let _ = tx_fs_clone.send(event).await;
+                }
             },
         )
         .await;
@@ -255,6 +265,7 @@ pub async fn run_daemon(port: u16) -> Result<()> {
     let braid_client = BraidClient::new()?;
 
     let state = DaemonState {
+        text_sessions: Default::default(),
         config,
         content_cache: content_cache.clone(), // Fix for later access
         version_store: version_store.clone(),
@@ -278,9 +289,11 @@ pub async fn run_daemon(port: u16) -> Result<()> {
     let mut state = state;
     state.debouncer = debouncer;
 
+    background.spawn(operations::run(state.clone()));
+
     // Replay durable requests after restart, including edits whose ACK was lost.
     let replay_state = state.clone();
-    tokio::spawn(async move {
+    background.spawn(async move {
         loop {
             let pending = replay_state.version_store.read().await.outbox.clone();
             for (url, edit) in pending {
@@ -296,9 +309,11 @@ pub async fn run_daemon(port: u16) -> Result<()> {
                     continue;
                 }
                 if let Ok(path) = mapping::url_to_path(&url) {
-                    let current = tokio::fs::read_to_string(&path)
-                        .await
-                        .unwrap_or_else(|_| edit.content.clone());
+                    let current = match super::fs::file_service::read_text(&path).await {
+                        Ok(Some(text)) => text,
+                        Ok(None) => edit.content.clone(), // Replay the immutable request even after unlink.
+                        Err(error) => { tracing::error!(%url,%error,"Cannot read durable edit; retained for repair"); continue; }
+                    };
                     if let Err(e) = sync::sync_local_to_remote(
                         &path,
                         &url,
@@ -319,7 +334,7 @@ pub async fn run_daemon(port: u16) -> Result<()> {
     });
 
     let state_server = state.clone();
-    tokio::spawn(async move {
+    background.spawn(async move {
         if let Err(e) = run_server(port, state_server).await {
             tracing::error!("API Server crashed: {}", e);
         }
@@ -329,7 +344,7 @@ pub async fn run_daemon(port: u16) -> Result<()> {
     // Interactive Console (for Token/Cookie Entry)
     // ---------------------------------------------------------
     let state_console = state.clone();
-    tokio::spawn(async move {
+    background.spawn(async move {
         use tokio::io::{self, AsyncBufReadExt, BufReader};
         let mut reader = BufReader::new(io::stdin()).lines();
 
@@ -394,23 +409,26 @@ pub async fn run_daemon(port: u16) -> Result<()> {
     let mut nfs_handle: Option<tokio::task::JoinHandle<()>> = None;
 
     let mut subscriptions: HashMap<String, tokio::task::JoinHandle<()>> = HashMap::new();
+    let mut resource_refresh = tokio::time::interval(Duration::from_secs(5));
 
-    // Start subscriptions for all enabled sync URLs
-    {
-        let cfg = state.config.read().await;
-        for (url, enabled) in &cfg.sync {
-            if *enabled {
-                tracing::info!("[BraidFS] Starting subscription for {}", url);
-                spawn_subscription(url.clone(), &mut subscriptions, state.clone()).await;
-            }
-        }
+    let enabled_urls: Vec<String> = state
+        .config
+        .read()
+        .await
+        .sync
+        .iter()
+        .filter(|(_, enabled)| **enabled)
+        .map(|(url, _)| url.clone())
+        .collect();
+    for url in enabled_urls {
+        spawn_subscription(url, &mut subscriptions, state.clone()).await;
     }
 
     // Start local HTTP 209 server for IDE subscriptions
     // Note: Polling only happens when there are active subscribers
     {
         let state_clone = state.clone();
-        tokio::spawn(async move {
+        background.spawn(async move {
             let server = local_server::LocalBraidServer::new(state_clone, 5);
             if let Err(e) = server.start(45679).await {
                 tracing::error!("[BraidFS] Local server error: {}", e);
@@ -425,6 +443,16 @@ pub async fn run_daemon(port: u16) -> Result<()> {
     // Main Event Loop
     loop {
         tokio::select! {
+            _ = resource_refresh.tick() => {
+                let enabled = state.config.read().await.sync.clone();
+                *sync_urls_map.write().await = enabled.clone();
+                for (url, enabled) in enabled {
+                    if enabled && !subscriptions.contains_key(&url) {
+                        spawn_subscription(url,&mut subscriptions,state.clone()).await;
+                    }
+                }
+            }
+
             _ = tokio::signal::ctrl_c() => {
                 tracing::info!("Shutdown signal received");
                 #[cfg(feature = "nfs")]
@@ -435,7 +463,16 @@ pub async fn run_daemon(port: u16) -> Result<()> {
                 if let Some(handle) = nfs_handle.take() {
                     handle.abort();
                 }
+                for (_,task) in subscriptions.drain() { task.abort(); }
+                let sessions = std::mem::take(&mut *state.text_sessions.lock().await);
+                for (_,session) in sessions { session.shutdown().await; }
+                state.debouncer.shutdown();
+                background.abort_all();
+                while background.join_next().await.is_some() {}
                 break;
+            }
+            Some(result) = background.join_next(), if !background.is_empty() => {
+                if let Err(error) = result { tracing::error!(%error,"Daemon background task failed"); }
             }
 
             Some(event) = rx_fs.recv() => {
@@ -460,7 +497,7 @@ pub async fn run_daemon(port: u16) -> Result<()> {
                             let url_clone = url.clone();
                             let root = config::get_root_dir()?;
                             let fullpath = root.join(url.trim_start_matches('/'));
-                            tokio::spawn(async move {
+                            background.spawn(async move {
                                 let _ = bsm.init_binary_sync(&url_clone, &fullpath).await;
                             });
                         }
@@ -476,10 +513,12 @@ pub async fn run_daemon(port: u16) -> Result<()> {
                         if let Some(handle) = subscriptions.remove(&url) {
                             handle.abort();
                         }
+                        let session = state.text_sessions.lock().await.remove(&url);
+                        if let Some(session) = session { session.shutdown().await; }
                         sync_urls_map.write().await.remove(&url);
                     }
                     Command::SetCookie { domain, value } => {
-                        tracing::info!("Set Cookie: {} for {}", value, domain);
+                        tracing::info!(%domain,"Cookie updated");
                         let mut cfg = state.config.write().await;
                         cfg.cookies.insert(domain, value);
                         let _ = cfg.save().await;

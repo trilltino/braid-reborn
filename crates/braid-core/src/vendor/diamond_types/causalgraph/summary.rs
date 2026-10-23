@@ -1,5 +1,5 @@
 use smallvec::{SmallVec, smallvec};
-use smartstring::alias::String as SmartString;
+use compact_str::CompactString as SmartString;
 use crate::vendor::diamond_types::{CausalGraph, DTRange, Frontier, LV};
 use crate::vendor::rle::{HasLength, MergeableIterator, SplitableSpanHelpers};
 
@@ -38,7 +38,7 @@ mod serde_encoding {
     use smallvec::SmallVec;
     use crate::vendor::diamond_types::causalgraph::summary::{VersionSummary, VersionSummaryFlat, VSEntry};
     use crate::vendor::diamond_types::DTRange;
-    use smartstring::alias::String as SmartString;
+    use compact_str::CompactString as SmartString;
 
     impl Serialize for VersionSummary {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {

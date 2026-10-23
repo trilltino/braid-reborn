@@ -5,7 +5,7 @@
 use std::cmp::Ordering;
 
 use jumprope::JumpRope;
-use smartstring::alias::String as SmartString;
+use compact_str::CompactString as SmartString;
 
 use crate::vendor::rle::intersect::rle_intersect_rev;
 use crate::vendor::rle::{
@@ -965,7 +965,7 @@ impl<'a> Iterator for TransformedSimpleOpsIter<'a> {
 }
 
 pub fn reverse_str(s: &str) -> SmartString {
-    let mut result = SmartString::new();
+    let mut result = SmartString::default();
     result.extend(s.chars().rev());
     result
 }

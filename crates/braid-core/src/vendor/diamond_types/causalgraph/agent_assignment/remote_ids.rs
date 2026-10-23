@@ -1,7 +1,7 @@
 /// This file contains utilities to convert remote IDs to local version and back.
 
 
-use smartstring::alias::String as SmartString;
+use compact_str::CompactString as SmartString;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;

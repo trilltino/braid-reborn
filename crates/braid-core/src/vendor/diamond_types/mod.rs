@@ -191,7 +191,7 @@ use jumprope::JumpRope;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
-use smartstring::alias::String as SmartString;
+use compact_str::CompactString as SmartString;
 
 use crate::vendor::diamond_types::causalgraph::graph::Graph;
 pub use crate::vendor::diamond_types::frontier::Frontier;

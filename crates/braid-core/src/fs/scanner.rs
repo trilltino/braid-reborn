@@ -13,16 +13,25 @@ use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 
 /// State for file scanning.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ScanState {
     /// Last modification time for each tracked file.
     pub file_mtimes: HashMap<PathBuf, u128>,
     /// Whether a scan is currently running.
-    pub running: bool,
+    scan_gate: Arc<tokio::sync::Semaphore>,
     /// Number of watcher misses detected.
     pub watcher_misses: u32,
 }
 
+impl Default for ScanState {
+    fn default() -> Self {
+        Self {
+            file_mtimes: HashMap::new(),
+            scan_gate: Arc::new(tokio::sync::Semaphore::new(1)),
+            watcher_misses: 0,
+        }
+    }
+}
 impl ScanState {
     pub fn new() -> Self {
         Self::default()
@@ -37,101 +46,67 @@ pub async fn scan_files(
     state: &Arc<RwLock<ScanState>>,
     sync_urls: &HashMap<String, bool>,
 ) -> Result<Vec<PathBuf>> {
-    // Check if already running
-    {
-        let mut s = state.write().await;
-        if s.running {
-            return Ok(Vec::new());
-        }
-        s.running = true;
-    }
-
-    let start_time = std::time::Instant::now();
-    let mut changed_files = Vec::new();
-
-    // Recursively scan directory
-    let result = scan_directory(root_dir, root_dir, state, sync_urls, &mut changed_files).await;
-
-    // Mark as done
-    {
-        let mut s = state.write().await;
-        s.running = false;
-    }
-
-    let elapsed = start_time.elapsed();
-    tracing::trace!(
-        "scan_files completed in {:?}, found {} changes",
-        elapsed,
-        changed_files.len()
-    );
-
-    if let Err(e) = result {
-        tracing::error!("Error during scan: {}", e);
-    }
-
-    Ok(changed_files)
-}
-
-/// Recursively scan a directory.
-async fn scan_directory(
-    dir: &Path,
-    root: &Path,
-    state: &Arc<RwLock<ScanState>>,
-    sync_urls: &HashMap<String, bool>,
-    changed: &mut Vec<PathBuf>,
-) -> Result<()> {
-    let mut entries = tokio::fs::read_dir(dir).await.map_err(BraidError::Io)?;
-
-    while let Some(entry) = entries.next_entry().await.map_err(BraidError::Io)? {
-        let path = entry.path();
-        let rel_path = path.strip_prefix(root).unwrap_or(&path);
-        let rel_str = rel_path.to_string_lossy();
-
-        // Skip ignored files
-        if skip_file(&rel_str) {
-            continue;
-        }
-
-        let metadata = entry.metadata().await.map_err(BraidError::Io)?;
-
-        if metadata.is_dir() {
-            // Recurse into subdirectories
-            Box::pin(scan_directory(&path, root, state, sync_urls, changed)).await?;
-        } else if metadata.is_file() {
-            // Check if this file is being synced
-            if let Ok(url) = mapping::path_to_url(&path) {
+    let gate = state.read().await.scan_gate.clone();
+    let Ok(_permit) = gate.try_acquire() else {
+        return Ok(Vec::new());
+    };
+    let previous = state.read().await.file_mtimes.clone();
+    let mut observed = HashMap::new();
+    let mut changed = Vec::new();
+    let mut directories = vec![(root_dir.to_owned(), 0usize)];
+    let mut entries_seen = 0usize;
+    while let Some((directory, depth)) = directories.pop() {
+        let mut entries = tokio::fs::read_dir(&directory).await?;
+        while let Some(entry) = entries.next_entry().await? {
+            entries_seen += 1;
+            if entries_seen > 100_000 {
+                return Err(BraidError::Fs(
+                    "Directory scan exceeds 100000 entries".into(),
+                ));
+            }
+            let path = entry.path();
+            let relative = path
+                .strip_prefix(root_dir)
+                .map_err(|e| BraidError::Fs(e.to_string()))?;
+            if skip_file(&relative.to_string_lossy()) {
+                continue;
+            }
+            let kind = entry.file_type().await?;
+            if kind.is_symlink() {
+                continue;
+            }
+            if kind.is_dir() {
+                if depth >= 32 || directories.len() >= 4096 {
+                    return Err(BraidError::Fs(
+                        "Directory scan depth/queue limit exceeded".into(),
+                    ));
+                }
+                directories.push((path, depth + 1));
+            } else if kind.is_file() {
+                let Ok(url) = mapping::path_to_url(&path) else {
+                    continue;
+                };
                 if !sync_urls.get(&url).copied().unwrap_or(false) {
                     continue;
                 }
-
-                // Check modification time
-                let mtime = metadata
-                    .modified()
-                    .unwrap_or(SystemTime::UNIX_EPOCH)
+                let mtime = entry
+                    .metadata()
+                    .await?
+                    .modified()?
                     .duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap_or_default()
+                    .map_err(|e| BraidError::Fs(e.to_string()))?
                     .as_nanos();
-
-                let needs_sync = {
-                    let s = state.read().await;
-                    match s.file_mtimes.get(&path) {
-                        Some(&last_mtime) => mtime != last_mtime,
-                        None => true, // New file
-                    }
-                };
-
-                if needs_sync {
+                if previous.get(&path) != Some(&mtime) {
                     changed.push(path.clone());
-
-                    // Update mtime
-                    let mut s = state.write().await;
-                    s.file_mtimes.insert(path, mtime);
                 }
+                observed.insert(path, mtime);
             }
         }
     }
-
-    Ok(())
+    // Publish observations together, only after the complete scan succeeds.
+    // Cancellation releases the permit automatically and never wedges future scans.
+    state.write().await.file_mtimes = observed;
+    Ok(changed)
 }
 
 /// Normalize a URL by removing trailing /index patterns.
@@ -159,11 +134,11 @@ pub fn is_well_formed_absolute_url(url: &str) -> bool {
 }
 
 /// Start the periodic file scanning loop.
-pub async fn start_scan_loop(
+pub async fn start_scan_loop<F: std::future::Future<Output = ()> + Send>(
     state: Arc<RwLock<ScanState>>,
     sync_urls: Arc<RwLock<HashMap<String, bool>>>,
     scan_interval: Duration,
-    on_change: impl Fn(PathBuf) + Send + Sync + 'static,
+    on_change: impl Fn(PathBuf) -> F + Send + Sync + 'static,
 ) {
     let on_change = Arc::new(on_change);
 
@@ -182,7 +157,7 @@ pub async fn start_scan_loop(
         match scan_files(&root_dir, &state, &urls).await {
             Ok(changed) => {
                 for path in changed {
-                    on_change(path);
+                    on_change(path).await;
                 }
             }
             Err(e) => {
@@ -196,7 +171,7 @@ pub async fn start_scan_loop(
 pub async fn on_watcher_miss(state: &Arc<RwLock<ScanState>>, message: &str, trigger_scan: bool) {
     {
         let mut s = state.write().await;
-        s.watcher_misses += 1;
+        s.watcher_misses = s.watcher_misses.saturating_add(1);
         tracing::warn!("watcher miss: {} [total: {}]", message, s.watcher_misses);
     }
 

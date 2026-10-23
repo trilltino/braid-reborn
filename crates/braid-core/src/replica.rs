@@ -253,15 +253,22 @@ impl ReplicaDocument {
 #[derive(Clone)]
 pub struct ReplicaStore {
     base_dir: PathBuf,
+    lease: Arc<tokio::sync::OnceCell<Arc<std::fs::File>>>,
 }
 impl ReplicaStore {
-    pub fn new(base_dir: PathBuf) -> Self {
-        let base_dir = if base_dir.is_absolute() {
-            base_dir
-        } else {
-            std::env::current_dir().unwrap_or_default().join(base_dir)
-        };
-        Self { base_dir }
+    pub fn new(base_dir: PathBuf) -> Result<Self, ReplicaError> {
+        Ok(Self {
+            base_dir: std::path::absolute(base_dir)?,
+            lease: Default::default(),
+        })
+    }
+    async fn ensure_writer(&self) -> Result<(), ReplicaError> {
+        self.lease
+            .get_or_try_init(|| async {
+                braid_http::durable::shared_writer_lease(&self.base_dir.join(".writer.lock")).await
+            })
+            .await?;
+        Ok(())
     }
     pub fn path(&self, resource: &str) -> PathBuf {
         self.base_dir
@@ -285,6 +292,7 @@ impl ReplicaStore {
         }
     }
     pub async fn load(&self, resource: &str) -> Result<Option<ReplicaDocument>, ReplicaError> {
+        self.ensure_writer().await?;
         let path = self.path(resource);
         let data = match tokio::fs::read(&path).await {
             Ok(data) => data,
@@ -323,7 +331,9 @@ impl ReplicaStore {
         if document.apply(update)? {
             document.resource = Some(resource.to_owned());
             atomic_write(&self.path(resource), &serde_json::to_vec(&document)?).await?;
-            let _ = self.channel(resource).send(document.snapshot());
+            let mut broadcast = update.clone();
+            broadcast.current_version = Some(document.heads.iter().map(Version::new).collect());
+            let _ = self.channel(resource).send(broadcast);
         }
         Ok(document)
     }

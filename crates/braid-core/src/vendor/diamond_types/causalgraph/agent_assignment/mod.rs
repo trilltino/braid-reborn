@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use smartstring::alias::String as SmartString;
+use compact_str::CompactString as SmartString;
 use crate::vendor::rle::HasLength;
 use crate::vendor::diamond_types::causalgraph::agent_span::{AgentSpan, AgentVersion};
 use crate::vendor::diamond_types::{AgentId, DTRange, LV};

@@ -1,3 +1,8 @@
+#![cfg_attr(
+    not(test),
+    deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
+)]
+#![forbid(unsafe_code)]
 #[cfg(feature = "native")]
 mod objects;
 pub mod store;

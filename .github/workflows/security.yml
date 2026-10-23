@@ -1,12 +1,22 @@
 name: Dependency security audit
 on:
+  push:
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - tests/interoperability/upstream-harness/**
+      - vendor/**
+      - deny.toml
+      - .github/workflows/security.yml
   workflow_dispatch:
   schedule:
     - cron: '23 7 * * 1'
   pull_request:
     paths:
       - '**/Cargo.toml'
-      - Cargo.lock
+      - '**/Cargo.lock'
+      - tests/interoperability/upstream-harness/**
+      - vendor/**
       - deny.toml
       - .github/workflows/security.yml
 jobs:
@@ -14,12 +24,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - uses: dtolnay/rust-toolchain@1.99.0
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-audit@0.22.0,cargo-deny@0.19.9,cargo-machete@0.9.1
       - run: cargo machete
       - run: cargo deny check bans licenses sources
-      # This gate intentionally reports unresolved advisories; no blanket ignores.
+      # Audit both shipped crates and the isolated fuzz tooling; no blanket ignores.
       - run: cargo audit
+      - run: cargo audit --file tests/fuzz/Cargo.lock
+      - run: npm audit --prefix tests/interoperability/upstream-harness --omit=dev
       - run: cargo deny check advisories

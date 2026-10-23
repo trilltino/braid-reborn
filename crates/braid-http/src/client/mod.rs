@@ -1,6 +1,12 @@
 //! Braid HTTP client implementation.
 
+#[cfg(not(target_arch = "wasm32"))]
+mod channel;
 mod config;
+#[cfg(not(target_arch = "wasm32"))]
+pub use channel::{
+    ChannelCheckpoint, ChannelConfig, ChannelJournal, ChannelState, ChannelStatus, ReliableChannel,
+};
 mod fetch;
 #[cfg(test)]
 mod fuzzer;

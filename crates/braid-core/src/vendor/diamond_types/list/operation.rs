@@ -6,7 +6,7 @@
 
 use std::fmt::{Display, Formatter};
 use std::ops::Range;
-use smartstring::alias::{String as SmartString};
+use compact_str::CompactString as SmartString;
 use crate::vendor::rle::{HasLength, MergableSpan, SplitableSpanHelpers};
 use ListOpKind::*;
 use crate::vendor::diamond_types::unicount::{chars_to_bytes, count_chars};

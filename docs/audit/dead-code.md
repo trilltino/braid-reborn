@@ -51,14 +51,20 @@ evidence rather than the sole removal authority.
 | server | parking_lot | 0 |
 | server | thiserror | 0 |
 
+The standalone NFS binary now constructs the backing service directly from its
+root, inode database and blob store. Its dummy daemon clients/merge/config/cache
+state and now-unused async-channel declaration are removed. Public daemon-aware
+backend constructors remain as compatibility delegates.
+
 ## Retained with known limits
 
 - Multiplex parsing/protocol types remain; native transport negotiation is not
   represented as complete. No apparently redundant module was dropped just
   because it does not participate in the current deployed path.
-- NFS remains experimental. SETATTR now returns NOTSUPP instead of falsely
-  acknowledging truncation/permission changes. Rename and inode/path lifecycle
-  need complete transactional/crash tests before production support.
+- NFS adapter/backing/reconciliation now have separate ownership and regression
+  seams. Supported SETATTR requests perform real staged changes; unsupported
+  ownership/platform changes return NOTSUPP. Mounted Linux CI remains a separate
+  acceptance gate.
 - The copied Diamond engine and compatibility ResourceStateManager/ConflictResolver
   APIs remain. They still require provenance, public API and state-ownership work.
 - AI, mail, drafts, presence and typing features remain. Their lifecycle/ownership,
@@ -69,4 +75,8 @@ evidence rather than the sole removal authority.
 
 The method is lexical, not a proof about downstream consumers outside this
 repository. Public source/API changes are listed in migration.md. A complete
-function-size/dead-public-API audit and udeps/geiger analysis remains open.
+function-size/dead-public-API audit remains open. Udeps found one additional
+unused server dev dependency (tokio-test), now removed. Target-only libc (macOS)
+and gloo/js/wasm dependencies were moved to their owning targets after source
+review. Geiger did not complete within the recorded timeout; no unsafe count
+is claimed from that attempt.

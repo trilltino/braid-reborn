@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use smallvec::smallvec;
 use std::cmp::Ordering;
 use jumprope::JumpRope;
-use smartstring::alias::String as SmartString;
+use compact_str::CompactString as SmartString;
 
 #[cfg(feature = "serde")]
 use serde::{Serialize, Serializer};

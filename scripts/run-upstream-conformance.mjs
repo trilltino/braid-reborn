@@ -1,6 +1,6 @@
 // Run the independent, pinned upstream harness against the Rust library adapter.
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -18,16 +18,28 @@ if (!existsSync(path.join(harness, '.git'))) {
   run('git', ['clone', '--no-checkout', 'https://github.com/braid-org/braid-fuzz.git', harness]);
 }
 run('git', ['-C', harness, 'checkout', revision]);
-// The harness manifest uses ranges. Pin its two protocol implementations too.
+// Keep the independent runner source pinned while locking its full npm graph.
+// The compatible send override fixes the bridge's test-only XSS advisory.
+for (const file of ['package.json', 'package-lock.json']) {
+  copyFileSync(path.join(root, 'tests', 'interoperability', 'upstream-harness', file),
+    path.join(root, harness, file));
+}
 run(process.platform === 'win32' ? 'npm.cmd' : 'npm',
-  ['install', '--ignore-scripts', '--save-exact', 'braid-text@0.5.3', 'braid-http@1.3.125'],
+  ['ci', '--ignore-scripts'],
   { cwd: path.join(root, harness), shell: process.platform === 'win32' });
-const executable = 'target/debug/examples/fuzz_controller' + (process.platform === 'win32' ? '.exe' : '');
-if (!existsSync(executable)) throw new Error('Run cargo build -p braid-http --example fuzz_controller first');
+run(process.platform === 'win32' ? 'npm.cmd' : 'npm',
+  ['audit', '--omit=dev'],
+  { cwd: path.join(root, harness), shell: process.platform === 'win32' });
+const suffix = process.platform === 'win32' ? '.exe' : '';
+const rawExecutable = 'target/debug/examples/fuzz_controller' + suffix;
+const textExecutable = 'target/debug/examples/simpleton_controller' + suffix;
+for (const executable of [rawExecutable, textExecutable]) {
+  if (!existsSync(executable)) throw new Error('Build braid-http --example fuzz_controller and braid-core --example simpleton_controller first');
+}
 let failed = false;
-const suites = ['http', 'subscriptions'];
-if (process.argv.includes('--reliability')) suites.push('reliable-updates');
+const suites = ['http', 'subscriptions', 'reliable-updates', 'simpleton'];
 for (const suite of suites) {
+  const executable = ['http', 'subscriptions'].includes(suite) ? rawExecutable : textExecutable;
   const result = spawnSync(process.execPath,
     [path.join(harness, 'test-runner.js'), '--cmd', executable, suite, '--json'],
     { encoding: 'utf8', cwd: root });

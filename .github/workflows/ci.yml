@@ -3,6 +3,7 @@ on: [push, pull_request]
 jobs:
   native:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
@@ -13,7 +14,7 @@ jobs:
       - run: cargo fmt --all -- --check
       - run: cargo check --workspace --all-targets --all-features --locked
       - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
-      - run: cargo test --workspace --locked
+      - run: cargo test --workspace --all-features --locked
       - run: cargo check -p braid-core --no-default-features --locked
       - run: cargo check -p braid-http --no-default-features --locked
       - run: cargo check -p braid-iroh --no-default-features --locked
@@ -26,6 +27,21 @@ jobs:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - run: cargo check -p braid-http --locked --target wasm32-unknown-unknown --no-default-features --features wasm
+  nfs-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: Swatinem/rust-cache@v2
+      - run: sudo apt-get update && sudo apt-get install -y nfs-common
+      - run: cargo build -p braidfs-nfs --locked
+      - run: bash tests/chaos/nfs-mount.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nfs-linux-log
+          path: target/engineering/nfs/
   upstream:
     runs-on: ubuntu-latest
     steps:
@@ -36,5 +52,33 @@ jobs:
         with:
           node-version: 22
       - run: cargo build -p braid-http --locked --example fuzz_controller
+      - run: cargo build -p braid-core --locked --example simpleton_controller
       - run: node scripts/run-upstream-conformance.mjs
       - run: node tests/interoperability/codec.mjs
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly-2026-10-22
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tests/fuzz
+      - run: cargo install cargo-fuzz --version 0.13.2 --locked
+      - run: cargo metadata --manifest-path tests/fuzz/Cargo.toml --locked --format-version 1 > /dev/null
+      - run: |
+          mkdir -p corpus/wire
+          cp seeds/wire/* corpus/wire/
+        working-directory: tests/fuzz
+      - run: cargo fuzz run --fuzz-dir . wire -- -max_total_time=60 -max_len=65536 -rss_limit_mb=512 -timeout=5
+        working-directory: tests/fuzz
+      - run: cargo fuzz run --fuzz-dir . text -- -max_total_time=60 -max_len=65536 -rss_limit_mb=512 -timeout=5
+        working-directory: tests/fuzz
+      - run: git diff --exit-code -- tests/fuzz/Cargo.lock
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fuzz-corpus-and-artifacts
+          path: |
+            tests/fuzz/artifacts/
+            tests/fuzz/corpus/

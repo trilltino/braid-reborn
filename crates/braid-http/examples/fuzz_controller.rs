@@ -23,7 +23,7 @@ fn update_event(update: Update) {
     }
     emit(json!({"event":"update","data":data}));
 }
-fn parse_request(message: &Value) -> Result<BraidRequest, String> {
+pub(crate) fn parse_request(message: &Value) -> Result<BraidRequest, String> {
     let mut request = BraidRequest::new().with_method(message["method"].as_str().unwrap_or("GET"));
     for (name, target) in [
         ("version", &mut request.version),
@@ -69,6 +69,7 @@ fn parse_request(message: &Value) -> Result<BraidRequest, String> {
     }
     Ok(request)
 }
+#[allow(dead_code)]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = BraidClient::new()?;
@@ -105,34 +106,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
                 let client = client.clone();
-                let task = tokio::spawn(async move {
-                    let result = async {
-                        if subscribe {
-                            let mut subscription = client.subscribe_reliable(&url, request).await?;
-                            while let Some(update) = subscription.next().await {
-                                let update = update?;
-                                update_event(update.clone());
-                                subscription.acknowledge(&update).await?;
-                            }
-                        } else {
-                            let put = request.method == "PUT";
-                            let response = client.fetch(&url, request).await?;
-                            if put {
-                                emit(json!({"event":"ack","data":{"status":response.status}}));
-                            } else {
-                                update_event(WireCodec::decode_entity(
-                                    response.headers,
-                                    response.body,
-                                )?);
-                            }
-                        }
-                        Ok::<(), braid_http::BraidError>(())
-                    }
-                    .await;
-                    if let Err(e) = result {
-                        emit(json!({"event":"error","data":{"message":e.to_string()}}));
-                    }
-                });
+                let task = spawn_request(client, request, url, subscribe);
                 if subscribe {
                     http = Some(task);
                 }
@@ -145,4 +119,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         task.abort();
     }
     Ok(())
+}
+
+pub(crate) fn spawn_request(
+    client: BraidClient,
+    request: BraidRequest,
+    url: String,
+    subscribe: bool,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let result = async {
+            if subscribe {
+                let mut subscription = client.subscribe_reliable(&url, request).await?;
+                while let Some(update) = subscription.next().await {
+                    let update = update?;
+                    update_event(update.clone());
+                    subscription.acknowledge(&update).await?;
+                }
+            } else {
+                let put = request.method == "PUT";
+                let response = client.fetch(&url, request).await?;
+                if put {
+                    emit(json!({"event":"ack","data":{"status":response.status}}));
+                } else {
+                    update_event(WireCodec::decode_entity(response.headers, response.body)?);
+                }
+            }
+            Ok::<(), braid_http::BraidError>(())
+        }
+        .await;
+        if let Err(e) = result {
+            emit(json!({"event":"error","data":{"message":e.to_string()}}));
+        }
+    })
 }

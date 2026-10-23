@@ -12,6 +12,14 @@ pub struct VersionStore {
     /// One durable, immutable request per URL; retain it until its PUT is acknowledged.
     #[serde(default)]
     pub outbox: HashMap<String, PendingEdit>,
+    /// Last projected local bytes, including optimistic edits. These are never
+    /// advertised as a server-acknowledged causal frontier.
+    #[serde(default)]
+    pub materialized: HashMap<String, String>,
+    /// NFS namespace tombstones. A remote update remains in the channel journal
+    /// without recreating an explicitly removed local pathname.
+    #[serde(default)]
+    pub deleted: HashMap<String, u64>,
     #[serde(skip)]
     pub path: PathBuf,
 }
@@ -45,9 +53,8 @@ impl VersionStore {
     pub async fn load_from(path: PathBuf) -> Result<Self> {
         if !path.exists() {
             return Ok(Self {
-                file_versions: HashMap::new(),
-                outbox: HashMap::new(),
                 path,
+                ..Self::default()
             });
         }
 

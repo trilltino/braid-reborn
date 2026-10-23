@@ -1,3 +1,8 @@
+#![cfg_attr(
+    not(test),
+    deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
+)]
+#![forbid(unsafe_code)]
 //! Shared, local storage layout. Set BRAID_ROOT to relocate all server data.
 use std::path::PathBuf;
 

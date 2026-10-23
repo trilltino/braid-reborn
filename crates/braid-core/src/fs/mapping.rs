@@ -71,10 +71,8 @@ pub fn url_to_path(url_str: &str) -> Result<PathBuf> {
 
 pub fn path_to_url(path: &Path) -> Result<String> {
     let root = get_root_dir()?;
-
-    // Canonicalize both paths to ensure matching prefix format (e.g. \\?\ prefix and casing)
-    let root_abs = std::fs::canonicalize(&root).unwrap_or_else(|_| root.clone());
-    let path_abs = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let root_abs = path_key(&root)?;
+    let path_abs = path_key(path)?;
 
     let relative = path_abs.strip_prefix(&root_abs).map_err(|_| {
         anyhow!(
@@ -123,11 +121,61 @@ pub fn path_to_url(path: &Path) -> Result<String> {
         }
     }
 
-    url.path_segments_mut()
-        .map_err(|_| anyhow!("Cannot be base"))?
-        .extend(path_segments);
+    // Existing sync files use encoded URL segments as filenames. Passing these
+    // through path_segments_mut would encode '%' again and name another resource.
+    url.set_path(&format!("/{}", path_segments.join("/")));
+    if path_key(&url_to_path(url.as_str())?)? != path_abs {
+        return Err(anyhow!(
+            "Filename cannot round-trip through the existing URL mapping"
+        ));
+    }
 
     Ok(url.to_string())
+}
+
+/// Resolve the existing prefix even after unlink. This also keeps Windows
+/// extended path prefixes/casing consistent without hiding permission errors.
+pub(crate) fn path_key(path: &Path) -> std::io::Result<PathBuf> {
+    let absolute = std::path::absolute(path)?;
+    let mut existing = absolute.as_path();
+    let mut missing = Vec::new();
+    loop {
+        match std::fs::canonicalize(existing) {
+            Ok(mut path) => {
+                for component in missing.into_iter().rev() {
+                    path.push(component);
+                }
+                return Ok(path);
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                missing.push(existing.file_name().ok_or(error)?.to_os_string());
+                existing = existing
+                    .parent()
+                    .ok_or_else(|| std::io::Error::other("Path has no existing prefix"))?;
+            }
+            Err(error) => return Err(error),
+        }
+    }
+}
+
+pub(crate) async fn configured_url(
+    path: &Path,
+    state: &crate::fs::state::DaemonState,
+) -> crate::core::Result<Option<String>> {
+    let key = path_key(path)?;
+    let config = state.config.read().await;
+    let mut found = None;
+    for (url, enabled) in &config.sync {
+        if *enabled && path_key(&url_to_path(url)?)? == key {
+            if found.is_some() {
+                return Err(crate::core::BraidError::Config(
+                    "Multiple enabled URLs map to the same local path".into(),
+                ));
+            }
+            found = Some(url.clone());
+        }
+    }
+    Ok(found)
 }
 
 pub fn path_join(parent: &str, name: &str) -> String {
@@ -138,57 +186,45 @@ pub fn path_join(parent: &str, name: &str) -> String {
     }
 }
 
-pub fn extract_markdown(content: &str) -> String {
-    let trimmed = content.trim();
-    if trimmed.starts_with("<!DOCTYPE") || trimmed.starts_with("<html") {
-        let mut candidates = Vec::new();
-        let mut current_pos = 0;
-
-        while let Some(start_idx) = trimmed[current_pos..].find("<script type=\"statebus\">") {
-            let actual_start = current_pos + start_idx + "<script type=\"statebus\">".len();
-            if let Some(end_idx) = trimmed[actual_start..].find("</script>") {
-                let script_content = trimmed[actual_start..actual_start + end_idx].trim();
-                candidates.push(script_content.to_string());
-                current_pos = actual_start + end_idx + "</script>".len();
-            } else {
-                break;
-            }
-        }
-
-        if !candidates.is_empty() {
-            // Heuristic: Pick the script content that looks most like Markdown.
-            // Sort by length first (descending)
-            candidates.sort_by_key(|c| std::cmp::Reverse(c.len()));
-            for candidate in &candidates {
-                // If it has markdown-like features, it's likely the one we want
-                if candidate.contains("# ")
-                    || candidate.contains("\n- ")
-                    || candidate.contains("](")
-                    || candidate.contains("\n## ")
-                {
-                    return candidate.clone();
-                }
-            }
-            // Fallback to the longest candidate if no clear markdown indicators found
-            return candidates[0].clone();
-        }
+/// Select the same script for reads and writes, preserving its exact byte view.
+fn markdown_span(content: &str) -> Option<std::ops::Range<usize>> {
+    let trimmed = content.trim_start();
+    if !trimmed.starts_with("<!DOCTYPE") && !trimmed.starts_with("<html") {
+        return None;
     }
-    content.to_string()
+    let marker = "<script type=\"statebus\">";
+    let mut start = 0;
+    let mut spans = Vec::new();
+    while let Some(offset) = content[start..].find(marker) {
+        let body = start + offset + marker.len();
+        let Some(end) = content[body..].find("</script>") else {
+            break;
+        };
+        let span = body..body + end;
+        let text = &content[span.clone()];
+        let markdown = text.contains("# ") || text.contains("\n- ") || text.contains("](");
+        spans.push((markdown, span.len(), span));
+        start = body + end + "</script>".len();
+    }
+    spans
+        .into_iter()
+        .max_by_key(|(markdown, len, _)| (*markdown, *len))
+        .map(|(_, _, span)| span)
 }
-
+pub fn extract_markdown(content: &str) -> String {
+    markdown_span(content).map_or_else(|| content.to_owned(), |span| content[span].to_owned())
+}
 pub fn wrap_markdown(original_content: &str, new_markdown: &str) -> String {
-    let trimmed = original_content.trim();
-    if trimmed.starts_with("<!DOCTYPE") || trimmed.starts_with("<html") {
-        if let Some(start_idx) = trimmed.find("<script type=\"statebus\">") {
-            let prefix = &trimmed[..start_idx + "<script type=\"statebus\">".len()];
-            let after_script = &trimmed[start_idx..];
-            if let Some(end_idx) = after_script.find("</script>") {
-                let suffix = &after_script[end_idx..];
-                return format!("{}\n{}\n{}", prefix, new_markdown, suffix);
-            }
-        }
+    if let Some(span) = markdown_span(original_content) {
+        format!(
+            "{}{}{}",
+            &original_content[..span.start],
+            new_markdown,
+            &original_content[span.end..]
+        )
+    } else {
+        new_markdown.to_owned()
     }
-    new_markdown.to_string()
 }
 
 #[cfg(test)]
@@ -212,7 +248,20 @@ mod tests {
 
     #[test]
     fn test_url_to_path() {
-        // Logic check
+        for url in [
+            "https://example.org/a%20b",
+            "https://example.org/%F0%9F%98%80",
+            "https://example.org/a%23b",
+        ] {
+            let path = url_to_path(url).unwrap();
+            assert_eq!(path_to_url(&path).unwrap(), url);
+        }
+        let root = tempfile::tempdir().unwrap();
+        let removed = root.path().join("absent/file");
+        assert_eq!(
+            path_key(&removed).unwrap(),
+            root.path().canonicalize().unwrap().join("absent/file")
+        );
     }
 
     #[test]

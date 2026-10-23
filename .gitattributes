@@ -1,2 +1,5 @@
 # Markdown uses trailing spaces for explicit line breaks.
 *.md whitespace=-blank-at-eol
+
+# Fuzz seeds are wire bytes, independent of checkout line-ending settings.
+tests/fuzz/seeds/** binary

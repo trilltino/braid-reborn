@@ -8,6 +8,7 @@ pub mod blobs;
 pub mod config;
 pub mod ctx;
 pub mod daemon;
+pub mod database;
 pub mod error;
 pub mod models;
 pub mod pages;
