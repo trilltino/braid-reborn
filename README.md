@@ -1,72 +1,58 @@
 # Braid Reborn
 
-A modular Rust workspace implementing the Braid protocol for decentralized state synchronization. The workspace spans the full stack -- from low-level HTTP protocol types to P2P transport, filesystem synchronization, NFS bridging, and a centralized relay server.
+A Rust workspace for Braid state synchronization over HTTP and Iroh, with
+versioned text storage, blob storage, filesystem synchronization and server
+applications.
 
-## Workspace Crates
+Protocol guarantees, test results and remaining work are recorded in the
+[audit implementation status](docs/audits/AUDIT_IMPLEMENTATION_STATUS.md).
 
-| Crate | Description |
-|---|---|
-| [braid-http](braid-http/) | Pure Rust implementation of the Braid-HTTP protocol (types, parser, client) with WASM support |
-| [braid-core](braid-core/) | Unified Braid engine: CRDT conflict resolution, versioned state, blob storage, and filesystem sync |
-| [braid-common](braid-common/) | Shared utilities, error types, directory management, and constants used across all crates |
-| [braid-blob](braid-blob/) | Binary storage engine with SHA-256 integrity and SQLite metadata |
-| [braid-iroh](braid-iroh/) | Braid-HTTP over Iroh P2P (QUIC transport, gossip subscriptions, HTTP/3 routes) |
-| [braidfs-daemon](braidfs-daemon/) | Background daemon for real-time filesystem replication via Braid-HTTP |
-| [braidfs-nfs](braidfs-nfs/) | NFS bridge that exposes Braid-synchronized state as network-attached storage |
-| [server](server/) | Centralized relay server with auth, WebSocket support, AI integration, and state caching |
+## Repository layout
 
-## Dependency Graph
-
-```
-braid-iroh -----> braid-core -----> braid-http
-                     |                  ^
-                     +-> braid-blob ----+
-                     |
-                     +-> braid-common
-                     |
-braidfs-daemon ------+
-braidfs-nfs ---------+
-server --------------+-----> braid-blob
-                     +-----> braid-common
-                     +-----> braid-http
+```text
+crates/             Project libraries and applications
+references/         Vendored Iroh dependencies used by braid-iroh
+docs/               Workspace guide and protocol audits
+scripts/            Conformance runner and archived tooling
+.github/workflows/  Native, WASM and conformance CI
+Cargo.toml          Workspace definition
+Cargo.lock          Shared, tracked dependency lockfile
+target/             Ignored build output and generated audit reports
 ```
 
-## What is Braid?
+## Packages
 
-Braid extends HTTP with headers and semantics for real-time state synchronization. Every resource has a version history forming a DAG, updates are transmitted as differential patches, and clients subscribe to receive continuous state updates. Combined with CRDT conflict resolution, Braid enables decentralized collaborative editing without a central server.
+| Package | Purpose |
+| --- | --- |
+| [braid-http](crates/braid-http/) | Protocol types, byte codec, HTTP clients and subscriptions |
+| [braid-core](crates/braid-core/) | Versioned replicas, merge engines, HTTP adapters and filesystem synchronization |
+| [braid-blob](crates/braid-blob/) | Content-addressed binary storage with SQLite metadata |
+| [braid-common](crates/braid-common/) | Application data directory helpers used by the server |
+| [braid-iroh](crates/braid-iroh/) | Iroh transport, gossip announcements and HTTP/3 integration |
+| [braidfs-daemon](crates/braidfs-daemon/) | Filesystem synchronization daemon |
+| [braidfs-nfs](crates/braidfs-nfs/) | NFS bridge for Braid filesystem state |
+| [local_link_server](crates/server/) | LocalLink server, page routes, authentication and chat |
 
-## Building
+## Development
 
-```bash
-# Build the entire workspace
-cargo build --workspace
+Run Cargo commands from the repository root using stable Rust:
 
-# Run all tests
-cargo test --workspace
-
-# Build a specific crate
-cargo build -p braid-iroh
+```sh
+cargo check --workspace --locked
+cargo build -p braid-iroh --locked
+cargo run -p local_link_server --locked
 ```
 
-## References
+Plain Cargo commands select the eight project packages. `--workspace` also
+selects the vendored Iroh packages. Build artifacts share the root `target/`.
 
-The [references/](references/) directory contains vendored forks of upstream Iroh libraries used by `braid-iroh`:
-
-- **iroh-gossip**: Gossip protocol for decentralized pub/sub
-- **iroh-h3**: HTTP/3 over Iroh QUIC (server, client, and Axum integration)
-
-These are included as path dependencies and may contain local modifications.
-
-## Technology Stack
-
-- **Language**: Rust (2021 edition)
-- **Async Runtime**: Tokio
-- **P2P Transport**: Iroh (QUIC, NAT traversal, relay)
-- **Web Framework**: Axum + Tower
-- **CRDT**: Diamond Types
-- **Storage**: SQLite (rusqlite/SQLx), native filesystem
-- **Serialization**: Serde, JSON
+See the [workspace guide](docs/workspace.md) for validation commands, local data
+paths and generated-file policy, and the [script guide](scripts/README.md) for
+upstream conformance testing. The
+[original protocol and Rust audit](docs/audits/BRAID_REBORN_PROTOCOL_AND_RUST_AUDIT_2026-10-22.md)
+is preserved alongside its implementation status.
 
 ## License
 
-MIT OR Apache-2.0
+Project packages declare MIT OR Apache-2.0. Vendored dependencies retain their
+own license files and declarations.

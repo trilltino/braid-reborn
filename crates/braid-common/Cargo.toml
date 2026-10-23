@@ -1,0 +1,6 @@
+[package]
+name = "braid-common"
+version = "0.1.0"
+edition = "2021"
+description = "Shared Braid storage directory conventions"
+license = "MIT OR Apache-2.0"

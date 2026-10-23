@@ -1,13 +1,22 @@
-# Build artifacts
-/target
-**/target
+# Cargo build artifacts and generated audit reports
+target/
 
-# Cargo lock (workspace-level lock is kept at root)
-# Sub-crate locks are ignored
+# Keep a single, tracked workspace lockfile
+**/Cargo.lock
+!/Cargo.lock
+
+# Local application data (BRAID_ROOT defaults to braid_data)
+braid_data/
 
 # Environment files
 .env
 .env.*
+!.env.example
+
+# Tool caches
+__pycache__/
+*.py[cod]
+node_modules/
 
 # IDE
 .vscode/

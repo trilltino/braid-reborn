@@ -1,0 +1,36 @@
+name: Rust and Braid conformance
+on: [push, pull_request]
+jobs:
+  native:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --workspace --locked
+      - run: cargo test -p braid-http --locked --lib --test audit_conformance
+      - run: cargo test -p braid-core --locked --test audit_replica --test audit_filesystem --test sync_integrity_tests
+      - run: cargo test -p local_link_server --locked --test audit_routes
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check -p braid-http --locked --target wasm32-unknown-unknown --no-default-features --features wasm
+  upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: cargo build -p braid-http --locked --example fuzz_controller
+      - run: node scripts/run-upstream-conformance.mjs
