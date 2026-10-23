@@ -33,7 +33,7 @@
 //! [`oplog.add_delete_without_content`](list::OpLog::add_delete_without_content):
 //!
 //! ```
-//! use diamond_types::list::*;
+//! use braid_core::vendor::diamond_types::list::{ListOpLog, ListBranch};
 //!
 //! let mut oplog = ListOpLog::new();
 //! let fred = oplog.get_or_create_agent_id("fred");
@@ -48,7 +48,7 @@
 //! To create a branch from an oplog, use [`Branch::new` methods](list::Branch::new_at_tip):
 //!
 //! ```
-//! use diamond_types::list::*;
+//! use braid_core::vendor::diamond_types::list::{ListOpLog, ListBranch};
 //! let mut oplog = ListOpLog::new();
 //! // ...
 //! let mut branch = ListBranch::new_at_tip(&oplog);
@@ -59,7 +59,7 @@
 //! Once a branch has been created, you can merge new changes using [`branch.merge`](list::Branch::merge):
 //!
 //! ```
-//! use diamond_types::list::*;
+//! use braid_core::vendor::diamond_types::list::{ListOpLog, ListBranch};
 //! let mut oplog = ListOpLog::new();
 //! // ...
 //! let mut branch = ListBranch::new_at_tip(&oplog);
@@ -90,7 +90,7 @@
 //! For example,
 //!
 //! ```
-//! use diamond_types::list::*;
+//! use braid_core::vendor::diamond_types::list::{ListOpLog, ListBranch};
 //! let mut oplog = ListOpLog::new();
 //! let fred = oplog.get_or_create_agent_id("fred");
 //! oplog.add_insert(fred, 0, "a");
@@ -101,7 +101,7 @@
 //! Produces an identical oplog to this:
 //!
 //! ```
-//! use diamond_types::list::*;
+//! use braid_core::vendor::diamond_types::list::{ListOpLog, ListBranch};
 //! let mut oplog = ListOpLog::new();
 //! let fred = oplog.get_or_create_agent_id("fred");
 //! oplog.add_insert(fred, 0, "abc");
@@ -236,7 +236,7 @@ mod fuzzer;
 mod list_fuzzer_tools;
 mod oplog;
 mod simple_checkout;
-#[cfg(feature = "storage")]
+#[cfg(all(feature = "storage", unix))]
 mod storage;
 mod textinfo;
 // mod listmerge2;

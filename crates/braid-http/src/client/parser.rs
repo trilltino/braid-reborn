@@ -18,6 +18,8 @@ pub enum ParseState {
 #[derive(Debug, Clone, Copy)]
 pub struct ParserLimits {
     pub max_header_bytes: usize,
+    pub max_header_fields: usize,
+    pub max_header_value_bytes: usize,
     pub max_body_bytes: usize,
     pub max_patches: usize,
     pub max_update_bytes: usize,
@@ -26,6 +28,8 @@ impl Default for ParserLimits {
     fn default() -> Self {
         Self {
             max_header_bytes: 64 * 1024,
+            max_header_fields: 128,
+            max_header_value_bytes: 16 * 1024,
             max_body_bytes: 16 * 1024 * 1024,
             max_patches: 1024,
             max_update_bytes: 32 * 1024 * 1024,
@@ -44,6 +48,7 @@ pub struct MessageParser {
     expected_patches: usize,
     update_bytes: usize,
     limits: ParserLimits,
+    header_scan_from: usize,
 }
 impl Default for MessageParser {
     fn default() -> Self {
@@ -66,6 +71,7 @@ impl MessageParser {
             expected_patches: 0,
             update_bytes: 0,
             limits,
+            header_scan_from: 0,
         }
     }
     /// Decode a finite HTTP entity with already parsed outer headers.
@@ -106,26 +112,28 @@ impl MessageParser {
                 ParseState::WaitingForHeaders | ParseState::WaitingForPatchHeaders => {
                     while matches!(self.buffer.first(), Some(b'\r' | b'\n')) {
                         self.buffer.advance(1);
+                        self.header_scan_from = 0;
                     }
-                    let end = self
-                        .buffer
+                    let scan = &self.buffer[self.header_scan_from.min(self.buffer.len())..];
+                    let end = scan
                         .windows(4)
                         .position(|w| w == b"\r\n\r\n")
                         .map(|p| p + 4)
-                        .or_else(|| {
-                            self.buffer
-                                .windows(2)
-                                .position(|w| w == b"\n\n")
-                                .map(|p| p + 2)
-                        });
+                        .into_iter()
+                        .chain(scan.windows(2).position(|w| w == b"\n\n").map(|p| p + 2))
+                        .min()
+                        .map(|p| p + self.header_scan_from);
                     if end.unwrap_or(self.buffer.len()) > self.limits.max_header_bytes {
                         return Err(BraidError::Protocol("Header limit exceeded".into()));
                     }
                     let Some(end) = end else {
+                        self.header_scan_from = self.buffer.len().saturating_sub(3);
                         break;
                     };
+                    self.header_scan_from = 0;
                     self.account(end)?;
-                    let headers = Self::parse_headers(&self.buffer.split_to(end))?;
+                    let header_bytes = self.buffer.split_to(end);
+                    let headers = self.parse_headers(&header_bytes)?;
                     if self.state == ParseState::WaitingForHeaders {
                         self.headers = headers;
                         self.start_body()?;
@@ -173,6 +181,7 @@ impl MessageParser {
                     });
                     self.expected_patches = 0;
                     self.update_bytes = 0;
+                    self.header_scan_from = 0;
                     self.state = ParseState::WaitingForHeaders;
                 }
                 _ => break,
@@ -180,13 +189,18 @@ impl MessageParser {
         }
         Ok(())
     }
-    fn parse_headers(data: &[u8]) -> Result<BTreeMap<String, String>> {
+    fn parse_headers(&self, data: &[u8]) -> Result<BTreeMap<String, String>> {
         let text = std::str::from_utf8(data)
             .map_err(|_| BraidError::Protocol("Invalid header UTF-8".into()))?;
         let mut headers = BTreeMap::new();
         for (index, line) in text.lines().enumerate() {
             if line.is_empty() {
                 continue;
+            }
+            if index >= self.limits.max_header_fields {
+                return Err(BraidError::Protocol(
+                    "Header field count limit exceeded".into(),
+                ));
             }
             if index == 0 {
                 if let Some(status) = parse_status_line(line) {
@@ -205,6 +219,13 @@ impl MessageParser {
                 return Err(BraidError::Protocol("Invalid header name".into()));
             }
             let key = key.to_ascii_lowercase();
+            if value.len() > self.limits.max_header_value_bytes
+                || value.bytes().any(|b| b < 0x20 && b != b'\t' || b == 0x7f)
+            {
+                return Err(BraidError::Protocol(
+                    "Invalid or oversized header value".into(),
+                ));
+            }
             if let Some(existing) = headers.get_mut(&key) {
                 if matches!(key.as_str(), "version" | "parents" | "current-version") {
                     existing.push_str(", ");

@@ -27,3 +27,5 @@ use tokio::sync::broadcast;
 /// Broadcast channel for sending updates to multiple subscribers.
 pub type UpdateBroadcast = broadcast::Sender<Arc<Update>>;
 pub use send_update::BraidUpdate;
+
+pub(crate) use send_update::response_error;

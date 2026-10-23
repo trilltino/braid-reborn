@@ -29,8 +29,6 @@
 pub mod merge_type;
 pub mod simpleton;
 
-
-
 #[cfg(not(target_arch = "wasm32"))]
 pub mod diamond;
 
@@ -40,5 +38,3 @@ pub use simpleton::SimpletonMergeType;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use diamond::{DiamondCRDT, DiamondMergeType};
-
-

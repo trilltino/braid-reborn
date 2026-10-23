@@ -160,7 +160,7 @@ impl BraidLayer {
                         "1.0",
                     )
                     .body(body)
-                    .unwrap();
+                    .unwrap_or_else(crate::core::server::response_error);
             }
         }
 
@@ -261,7 +261,9 @@ impl BraidLayer {
                     if let Some(headers) = builder.headers_mut() {
                         headers.extend(cors_headers);
                     }
-                    return builder.body(axum::body::Body::empty()).unwrap();
+                    return builder
+                        .body(axum::body::Body::empty())
+                        .unwrap_or_else(crate::core::server::response_error);
                 }
             }
         }

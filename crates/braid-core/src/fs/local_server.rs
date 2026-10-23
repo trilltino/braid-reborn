@@ -264,27 +264,22 @@ async fn subscribe_handler(
                 return Response::builder()
                     .status(500)
                     .body(Body::from("Failed to create subscription"))
-                    .unwrap();
+                    .unwrap_or_else(crate::core::server::response_error);
             }
         }
     };
 
-    // Create streaming response
+    // A lagged receiver closes the stream so the peer repairs from its frontier.
     let stream = async_stream::stream! {
-        loop {
-            match rx.recv().await {
-                Ok(update) => {
-                    let versions=braid_http::protocol::parse_version_header(&update.version).unwrap_or_default();
-                    let update=braid_http::types::Update{version:versions,body:Some(update.content.into()),..Default::default()};
-                    match braid_http::protocol::format_update(&update) {
-                        Ok(bytes)=>yield Ok::<_,std::io::Error>(bytes),
-                        Err(e)=>{yield Err(std::io::Error::other(e.to_string()));break;}
-                    }
-                }
-                Err(_) => {
-                    // Channel closed or lagged
-                    break;
-                }
+        while let Ok(update) = rx.recv().await {
+            let versions = match braid_http::protocol::parse_version_header(&update.version) {
+                Ok(versions) => versions,
+                Err(error) => { yield Err(std::io::Error::other(error.to_string())); break; }
+            };
+            let update = braid_http::types::Update { version: versions, body: Some(update.content.into()), ..Default::default() };
+            match braid_http::protocol::format_update(&update) {
+                Ok(bytes) => yield Ok::<_, std::io::Error>(bytes),
+                Err(error) => { yield Err(std::io::Error::other(error.to_string())); break; }
             }
         }
     };
@@ -296,5 +291,5 @@ async fn subscribe_handler(
         .header("Subscribe", "true")
         .header("Merge-Type", "simpleton")
         .body(Body::from_stream(stream))
-        .unwrap()
+        .unwrap_or_else(crate::core::server::response_error)
 }

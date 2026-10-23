@@ -12,8 +12,8 @@ use tokio::sync::RwLock;
 use tracing::{info, warn};
 
 /// In-memory typing indicators store
-static TYPING: RwLock<Option<Arc<RwLock<HashMap<String, TypingIndicator>>>>> =
-    RwLock::const_new(None);
+type SharedTypingIndicator = Arc<RwLock<HashMap<String, TypingIndicator>>>;
+static TYPING: RwLock<Option<SharedTypingIndicator>> = RwLock::const_new(None);
 
 async fn get_typing_store() -> Arc<RwLock<HashMap<String, TypingIndicator>>> {
     let guard = TYPING.read().await;

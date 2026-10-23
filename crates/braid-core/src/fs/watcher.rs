@@ -23,7 +23,11 @@ pub async fn handle_fs_event(event: Event, state: DaemonState) {
         // Skip if this is a dotfile or inside a hidden directory (like .braidfs) or a .tmp file
         if path.components().any(|c| {
             let s = c.as_os_str().to_string_lossy();
-            s.starts_with('.') || s.ends_with(".tmp") || s.ends_with(".sqlite") || s.ends_with("-journal") || s.ends_with(".db")
+            s.starts_with('.')
+                || s.ends_with(".tmp")
+                || s.ends_with(".sqlite")
+                || s.ends_with("-journal")
+                || s.ends_with(".db")
         }) {
             continue;
         }

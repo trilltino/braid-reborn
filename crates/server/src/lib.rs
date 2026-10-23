@@ -117,30 +117,7 @@ pub async fn run() -> anyhow::Result<()> {
         local_org_manager,
     };
 
-    // Build the Modular Router
-
-    // Services routers
-    let core_router = core::router();
-    let chat_router = chat::router().route_layer(middleware::from_fn_with_state(
-        app_state.clone(),
-        mw_require_auth,
-    ));
-    let pages_router = core::pages::router();
-
-    // Main App Router
-    let app = Router::new()
-        // Protocol-Driven Dispatcher (the entrance)
-        .route("/{*path}", get(dispatch_get).put(dispatch_put))
-        // Merge service routers
-        .merge(core_router)
-        .merge(chat_router)
-        .merge(pages_router)
-        // Global routes
-        .route("/health", get(health_check))
-        // State and Layers
-        .with_state(app_state)
-        .layer(tower_http::cors::CorsLayer::permissive())
-        .layer(tower_http::trace::TraceLayer::new_for_http());
+    let app = router(app_state);
 
     // Start server
     let port = std::env::var("PORT")
@@ -155,6 +132,32 @@ pub async fn run() -> anyhow::Result<()> {
     axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+/// Build the production routes with supplied application state.
+pub fn router(app_state: AppState) -> Router {
+    // Services routers
+    let core_router = core::router();
+    let chat_router = chat::router().route_layer(middleware::from_fn_with_state(
+        app_state.clone(),
+        mw_require_auth,
+    ));
+    let pages_router = core::pages::router();
+
+    // Main App Router
+    Router::new()
+        // Protocol-Driven Dispatcher (the entrance)
+        .route("/{*path}", get(dispatch_get).put(dispatch_put))
+        // Merge service routers
+        .merge(core_router)
+        .merge(chat_router)
+        .merge(pages_router)
+        // Global routes
+        .route("/health", get(health_check))
+        // State and Layers
+        .with_state(app_state)
+        .layer(tower_http::cors::CorsLayer::permissive())
+        .layer(tower_http::trace::TraceLayer::new_for_http())
 }
 
 async fn health_check() -> &'static str {
@@ -186,6 +189,9 @@ async fn dispatch_get(
     } else if is_simpleton || has_extension {
         crate::core::pages::handlers::get_wiki_page(Path(path), State(state), headers).await
     } else {
+        if let Err(error) = ax_auth::authenticate_headers(&state.auth, &headers).await {
+            return error.into_response();
+        }
         crate::chat::handlers::braid_subscribe::braid_subscribe(Path(path), State(state), headers)
             .await
             .into_response()
@@ -234,12 +240,17 @@ async fn dispatch_put(
     }
 
     // Default: Chat
+    let ctx = match ax_auth::authenticate_headers(&state.auth, &parts.headers).await {
+        Ok(ctx) => ctx,
+        Err(error) => return error.into_response(),
+    };
     match serde_json::from_slice::<crate::core::models::CreateMessageInput>(&bytes) {
         Ok(json) => {
             match crate::chat::handlers::chat::put_message(
                 Path(path),
                 parts.headers,
                 State(state),
+                ctx,
                 axum::Json(json),
             )
             .await

@@ -1,14 +1,10 @@
 //! Braid Protocol Implementation
-//! 
+//!
 //! This module re-exports Braid protocol types from the braid-http crate
 //! and provides chat-specific protocol extensions.
 
-pub use braid_http::protocol::{
-    constants::{headers},
-    parse_version_header,
-    format_version_header,
-};
-pub use braid_http::types::{Version};
+pub use braid_http::protocol::{constants::headers, format_version_header, parse_version_header};
+pub use braid_http::types::Version;
 
 use axum::http::HeaderMap;
 

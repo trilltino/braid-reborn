@@ -13,7 +13,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 /// State for a binary sync operation.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BinarySyncState {
     /// The URL being synced.
     pub url: String,
@@ -50,7 +50,7 @@ pub struct BinarySyncManager {
     /// Rate limiter for reconnections.
     rate_limiter: Arc<ReconnectRateLimiter>,
     /// Blob store for persistence.
-    blob_store: Option<Arc<BlobStore>>,
+    blob_store: Arc<BlobStore>,
     /// Temp folder for atomic writes.
     temp_folder: PathBuf,
     /// Meta folder for sync metadata.
@@ -69,7 +69,7 @@ impl BinarySyncManager {
         Ok(Self {
             syncs: Arc::new(RwLock::new(HashMap::new())),
             rate_limiter,
-            blob_store: Some(blob_store),
+            blob_store,
             temp_folder: braidfs_dir.join("temp"),
             meta_folder: braidfs_dir.join("braid-blob-meta"),
         })
@@ -84,8 +84,9 @@ impl BinarySyncManager {
 
         // Try to load existing metadata
         let meta_path = self.get_meta_path(url);
-        if let Ok(content) = tokio::fs::read_to_string(&meta_path).await {
-            if let Ok(meta) = serde_json::from_str::<serde_json::Value>(&content) {
+        match tokio::fs::read_to_string(&meta_path).await {
+            Ok(content) => {
+                let meta = serde_json::from_str::<serde_json::Value>(&content)?;
                 if let Some(peer) = meta.get("peer").and_then(|v| v.as_str()) {
                     state.peer = peer.to_string();
                 }
@@ -93,22 +94,23 @@ impl BinarySyncManager {
                     state.file_mtime_ns_str = Some(mtime.to_string());
                 }
             }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
         }
 
         // Save metadata
         self.save_meta(url, &state).await?;
 
-        // Signal initial file read
-        self.signal_file_needs_reading(url, fullpath).await?;
-
         // Store state
         self.syncs.write().await.insert(url.to_string(), state);
+        self.signal_file_needs_reading(url, fullpath).await?;
 
         Ok(())
     }
 
     /// Signal that a file needs reading and potentially uploading.
     pub async fn signal_file_needs_reading(&self, url: &str, fullpath: &Path) -> Result<()> {
+        let _guard = braid_http::durable::document_lock(self.get_meta_path(url)).await;
         // Check if file exists
         let metadata = match tokio::fs::metadata(fullpath).await {
             Ok(m) => m,
@@ -136,11 +138,11 @@ impl BinarySyncManager {
         };
 
         if needs_upload {
-            // Read file content
-            let data = tokio::fs::read(fullpath).await?;
+            let file = tokio::fs::File::open(fullpath).await?;
 
             // Upload to blob store (if configured)
-            if let Some(store) = &self.blob_store {
+            {
+                let store = &self.blob_store;
                 let parents = store
                     .get_meta(url)
                     .await
@@ -152,18 +154,23 @@ impl BinarySyncManager {
                     uuid::Uuid::new_v4()
                 ))];
                 store
-                    .put(url, data.into(), version, parents, None)
+                    .put_stream(
+                        url,
+                        file,
+                        braid_blob::BlobUpload::new(version, parents, None),
+                    )
                     .await
                     .map_err(crate::core::BraidError::Client)?;
             }
 
             // Update mtime
-            let mut syncs = self.syncs.write().await;
-            if let Some(state) = syncs.get_mut(url) {
+            let state = self.syncs.read().await.get(url).cloned();
+            if let Some(mut state) = state {
                 state.file_mtime_ns_str = Some(mtime_str);
-                drop(syncs); // Release lock before save
-                self.save_meta(url, &self.syncs.read().await.get(url).unwrap())
-                    .await?;
+                self.save_meta(url, &state).await?;
+                if let Some(current) = self.syncs.write().await.get_mut(url) {
+                    current.file_mtime_ns_str = state.file_mtime_ns_str;
+                }
             }
         }
 
@@ -204,6 +211,7 @@ impl BinarySyncManager {
         if let Some(state) = syncs.get_mut(url) {
             state.aborted = true;
         }
+        drop(syncs);
         self.rate_limiter.on_diss(url).await;
     }
 
@@ -215,9 +223,7 @@ impl BinarySyncManager {
     }
 
     pub fn blob_store(&self) -> Arc<BlobStore> {
-        self.blob_store
-            .clone()
-            .expect("BlobStore must be initialized")
+        self.blob_store.clone()
     }
 }
 

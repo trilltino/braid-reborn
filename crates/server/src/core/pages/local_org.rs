@@ -89,7 +89,7 @@ impl LocalOrgManager {
 
         while let Ok(Some(entry)) = entries.next_entry().await {
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "md") {
+            if path.extension().is_some_and(|ext| ext == "md") {
                 let relative = path
                     .file_name()
                     .map(|s| s.to_string_lossy().to_string())
@@ -109,8 +109,8 @@ impl LocalOrgManager {
     async fn extract_title(&self, path: &PathBuf) -> String {
         if let Ok(content) = fs::read_to_string(path).await {
             for line in content.lines() {
-                if line.starts_with("# ") {
-                    return line[2..].trim().to_string();
+                if let Some(title) = line.strip_prefix("# ") {
+                    return title.trim().to_string();
                 }
             }
         }
@@ -172,7 +172,7 @@ impl LocalOrgManager {
         // Apply patches (simpleton-style: character range replacement)
         // Sort by range start descending so later patches don't invalidate earlier offsets
         let mut sorted_patches = patches.clone();
-        sorted_patches.sort_by(|a, b| b.range.0.cmp(&a.range.0));
+        sorted_patches.sort_by_key(|a| std::cmp::Reverse(a.range.0));
 
         for patch in &sorted_patches {
             let start = patch.range.0.min(content.len());

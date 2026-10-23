@@ -5,12 +5,32 @@ use braid_http::traits::BraidStorage;
 use nfsserve::nfs::{fattr3, ftype3, nfsstat3, nfsstring, nfstime3, sattr3, specdata3};
 use nfsserve::vfs::{DirEntry, NFSFileSystem, ReadDirResult, VFSCapabilities};
 use parking_lot::RwLock as PRwLock;
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use tracing::info;
 use url::Url;
+
+fn valid_name(bytes: &[u8]) -> Result<&str, nfsstat3> {
+    let name = std::str::from_utf8(bytes).map_err(|_| nfsstat3::NFS3ERR_INVAL)?;
+    let stem = name.split('.').next().unwrap_or("").to_ascii_lowercase();
+    let reserved = matches!(stem.as_str(), "con" | "prn" | "aux" | "nul")
+        || (stem.len() == 4
+            && (stem.starts_with("com") || stem.starts_with("lpt"))
+            && matches!(stem.as_bytes().last(), Some(b'1'..=b'9')));
+    if name.is_empty()
+        || matches!(name, "." | "..")
+        || name.ends_with(['.', ' '])
+        || reserved
+        || name
+            .chars()
+            .any(|c| c.is_control() || "/\\:<>\"|?*".contains(c))
+    {
+        return Err(nfsstat3::NFS3ERR_INVAL);
+    }
+    Ok(name)
+}
 
 /// Braid NFS backend implementation.
 pub struct BraidNfsBackend {
@@ -18,84 +38,101 @@ pub struct BraidNfsBackend {
     blob_store: Arc<braid_blob::BlobStore>,
     id_to_path: Arc<PRwLock<HashMap<u64, String>>>,
     path_to_id: Arc<PRwLock<HashMap<String, u64>>>,
-    next_id: Arc<PRwLock<u64>>,
 }
 
 impl BraidNfsBackend {
-    pub fn new(state: DaemonState, blob_store: Arc<braid_blob::BlobStore>) -> Self {
+    pub fn new(
+        state: DaemonState,
+        blob_store: Arc<braid_blob::BlobStore>,
+    ) -> crate::core::Result<Self> {
         let mut id_to_path = HashMap::new();
         let mut path_to_id = HashMap::new();
-        let mut max_id = 1;
-
-        // Warm cache from database
         {
             let conn = state.inode_db.lock();
-            let mut stmt = conn.prepare("SELECT id, path FROM inodes").unwrap();
+            let mut stmt = conn
+                .prepare("SELECT id, path FROM inodes")
+                .map_err(|e| crate::core::BraidError::Fs(e.to_string()))?;
             let rows = stmt
                 .query_map([], |row| {
                     Ok((row.get::<_, u64>(0)?, row.get::<_, String>(1)?))
                 })
-                .unwrap();
-
+                .map_err(|e| crate::core::BraidError::Fs(e.to_string()))?;
             for row in rows {
-                if let Ok((id, path)) = row {
-                    id_to_path.insert(id, path.clone());
-                    path_to_id.insert(path, id);
-                    if id > max_id {
-                        max_id = id;
-                    }
+                let (id, path) = row.map_err(|e| crate::core::BraidError::Fs(e.to_string()))?;
+                id_to_path.insert(id, path.clone());
+                path_to_id.insert(path, id);
+            }
+            if let Some(path) = id_to_path.get(&1) {
+                if path != "/" {
+                    return Err(crate::core::BraidError::Fs(
+                        "Invalid persisted root inode".into(),
+                    ));
                 }
+            } else {
+                conn.execute("INSERT INTO inodes (id,path) VALUES (1,'/')", [])
+                    .map_err(|e| crate::core::BraidError::Fs(e.to_string()))?;
+                id_to_path.insert(1, "/".into());
+                path_to_id.insert("/".into(), 1);
             }
         }
-
-        // Ensure Root is ID 1
-        if !id_to_path.contains_key(&1) {
-            id_to_path.insert(1, "/".to_string());
-            path_to_id.insert("/".to_string(), 1);
-            let conn = state.inode_db.lock();
-            let _ = conn.execute(
-                "INSERT OR IGNORE INTO inodes (id, path) VALUES (1, '/')",
-                [],
-            );
-        }
-
-        Self {
+        Ok(Self {
             state,
             blob_store,
             id_to_path: Arc::new(PRwLock::new(id_to_path)),
             path_to_id: Arc::new(PRwLock::new(path_to_id)),
-            next_id: Arc::new(PRwLock::new(max_id + 1)),
+        })
+    }
+
+    fn local_path(&self, virtual_path: &str) -> Result<std::path::PathBuf, nfsstat3> {
+        let root = crate::fs::config::get_root_dir().map_err(|_| nfsstat3::NFS3ERR_IO)?;
+        let relative = std::path::Path::new(virtual_path.trim_start_matches('/'));
+        for component in relative.components() {
+            let std::path::Component::Normal(name) = component else {
+                return Err(nfsstat3::NFS3ERR_INVAL);
+            };
+            valid_name(name.to_str().ok_or(nfsstat3::NFS3ERR_INVAL)?.as_bytes())?;
         }
+        let path = root.join(relative);
+        for ancestor in path.ancestors() {
+            if std::fs::symlink_metadata(ancestor).is_ok_and(|m| m.file_type().is_symlink()) {
+                return Err(nfsstat3::NFS3ERR_ACCES);
+            }
+            if ancestor == root {
+                break;
+            }
+        }
+        Ok(path)
     }
 
     fn get_path(&self, id: u64) -> Option<String> {
         self.id_to_path.read().get(&id).cloned()
     }
 
-    fn get_or_create_id(&self, path: &str) -> u64 {
+    fn get_or_create_id(&self, path: &str) -> Result<u64, nfsstat3> {
         let path = if path.is_empty() { "/" } else { path };
+        self.local_path(path)?;
         if let Some(id) = self.path_to_id.read().get(path) {
-            return *id;
+            return Ok(*id);
         }
-
-        let mut next_id_lock = self.next_id.write();
-        let id = *next_id_lock;
-        *next_id_lock += 1;
-
-        // Persist to DB
-        {
+        let id = {
             let conn = self.state.inode_db.lock();
-            if let Err(e) = conn.execute(
-                "INSERT INTO inodes (id, path) VALUES (?, ?)",
-                params![id, path],
-            ) {
-                tracing::error!("Failed to persist inode mapping: {}", e);
+            let existing: Option<u64> = conn
+                .query_row("SELECT id FROM inodes WHERE path=?", params![path], |row| {
+                    row.get(0)
+                })
+                .optional()
+                .map_err(|_| nfsstat3::NFS3ERR_IO)?;
+            if let Some(id) = existing {
+                id
+            } else {
+                conn.execute("INSERT INTO inodes(path) VALUES(?)", params![path])
+                    .map_err(|_| nfsstat3::NFS3ERR_IO)?;
+                u64::try_from(conn.last_insert_rowid()).map_err(|_| nfsstat3::NFS3ERR_IO)?
             }
-        }
-
-        self.path_to_id.write().insert(path.to_string(), id);
-        self.id_to_path.write().insert(id, path.to_string());
-        id
+        };
+        self.path_to_id.write().insert(path.to_owned(), id);
+        self.id_to_path.write().insert(id, path.to_owned());
+        Ok(id)
     }
 
     fn get_attr(&self, id: u64, ftype: ftype3, size: u64) -> fattr3 {
@@ -167,16 +204,16 @@ impl NFSFileSystem for BraidNfsBackend {
 
     async fn lookup(&self, parent_id: u64, name: &nfsstring) -> std::result::Result<u64, nfsstat3> {
         let parent_path = self.get_path(parent_id).ok_or(nfsstat3::NFS3ERR_STALE)?;
-        let name_str = String::from_utf8_lossy(&name.0);
+        let name_str = valid_name(&name.0)?;
 
         // Handle virtual /blobs/ path
         let full_path = if parent_path == "/" && name_str == "blobs" {
             "/blobs".to_string()
         } else {
-            mapping::path_join(&parent_path, &name_str)
+            mapping::path_join(&parent_path, name_str)
         };
 
-        Ok(self.get_or_create_id(&full_path))
+        self.get_or_create_id(&full_path)
     }
 
     async fn getattr(&self, id: u64) -> std::result::Result<fattr3, nfsstat3> {
@@ -188,16 +225,13 @@ impl NFSFileSystem for BraidNfsBackend {
         }
 
         // Special Case: Files inside /blobs/
-        if vpath.starts_with("/blobs/") {
-            let key = &vpath["/blobs/".len()..];
+        if let Some(key) = vpath.strip_prefix("/blobs/") {
             if let Ok(Some(meta)) = self.blob_store.get_meta(key).await {
                 return Ok(self.get_attr(id, ftype3::NF3REG, meta.size.unwrap_or(0)));
             }
             // Fallback to checking disk or return error
         }
-
-        let root = crate::fs::config::get_root_dir().map_err(|_| nfsstat3::NFS3ERR_IO)?;
-        let path = root.join(vpath.trim_start_matches('/'));
+        let path = self.local_path(&vpath)?;
 
         let metadata = tokio::fs::metadata(&path).await.ok();
         let (ftype, size) = if let Some(meta) = metadata {
@@ -232,8 +266,9 @@ impl NFSFileSystem for BraidNfsBackend {
         Ok(self.get_attr(id, ftype, size))
     }
 
-    async fn setattr(&self, id: u64, _attr: sattr3) -> std::result::Result<fattr3, nfsstat3> {
-        self.getattr(id).await
+    async fn setattr(&self, _id: u64, _attr: sattr3) -> std::result::Result<fattr3, nfsstat3> {
+        // A successful no-op would falsely acknowledge truncation/permission changes.
+        Err(nfsstat3::NFS3ERR_NOTSUPP)
     }
 
     async fn read(
@@ -243,25 +278,36 @@ impl NFSFileSystem for BraidNfsBackend {
         count: u32,
     ) -> std::result::Result<(Vec<u8>, bool), nfsstat3> {
         let vpath = self.get_path(id).ok_or(nfsstat3::NFS3ERR_STALE)?;
-
-        // Special Case: Read from BlobStore
-        if vpath.starts_with("/blobs/") {
-            let key = &vpath["/blobs/".len()..];
-            if let Ok(Some((data, _meta))) = self.blob_store.get(key).await {
-                let start = offset as usize;
-                if start >= data.len() {
-                    return Ok((vec![], true));
-                }
-                let end = std::cmp::min(start + count as usize, data.len());
-                let slice = &data[start..end];
-                let eof = end == data.len();
-                return Ok((slice.to_vec(), eof));
-            }
-            return Err(nfsstat3::NFS3ERR_NOENT);
+        if count > 1024 * 1024 {
+            return Err(nfsstat3::NFS3ERR_INVAL);
         }
 
-        let root = crate::fs::config::get_root_dir().map_err(|_| nfsstat3::NFS3ERR_IO)?;
-        let path = root.join(vpath.trim_start_matches('/'));
+        // Special Case: Read from BlobStore
+        if let Some(key) = vpath.strip_prefix("/blobs/") {
+            use tokio::io::AsyncReadExt;
+            let (mut file, _) = self
+                .blob_store
+                .open(key)
+                .await
+                .map_err(|_| nfsstat3::NFS3ERR_IO)?
+                .ok_or(nfsstat3::NFS3ERR_NOENT)?;
+            let size = file
+                .metadata()
+                .await
+                .map_err(|_| nfsstat3::NFS3ERR_IO)?
+                .len();
+            file.seek(std::io::SeekFrom::Start(offset))
+                .await
+                .map_err(|_| nfsstat3::NFS3ERR_IO)?;
+            let mut buffer = vec![0; count as usize];
+            let read = file
+                .read(&mut buffer)
+                .await
+                .map_err(|_| nfsstat3::NFS3ERR_IO)?;
+            buffer.truncate(read);
+            return Ok((buffer, offset.saturating_add(read as u64) >= size));
+        }
+        let path = self.local_path(&vpath)?;
 
         if !path.exists() {
             return Err(nfsstat3::NFS3ERR_NOENT);
@@ -273,11 +319,13 @@ impl NFSFileSystem for BraidNfsBackend {
             let cache = self.state.content_cache.read().await;
             if let Some(content) = cache.get(&url_str) {
                 let filtered = extract_markdown(content).into_bytes();
-                let start = offset as usize;
+                let Ok(start) = usize::try_from(offset) else {
+                    return Ok((vec![], true));
+                };
                 if start >= filtered.len() {
                     return Ok((vec![], true));
                 }
-                let end = std::cmp::min(start + count as usize, filtered.len());
+                let end = std::cmp::min(start.saturating_add(count as usize), filtered.len());
                 let slice = &filtered[start..end];
                 let eof = end == filtered.len();
                 return Ok((slice.to_vec(), eof));
@@ -297,11 +345,13 @@ impl NFSFileSystem for BraidNfsBackend {
             // Smaller than 1MB, try to treat as Wiki page
             if let Ok(content) = tokio::fs::read_to_string(&path).await {
                 let filtered = extract_markdown(&content).into_bytes();
-                let start = offset as usize;
+                let Ok(start) = usize::try_from(offset) else {
+                    return Ok((vec![], true));
+                };
                 if start >= filtered.len() {
                     return Ok((vec![], true));
                 }
-                let end = std::cmp::min(start + count as usize, filtered.len());
+                let end = std::cmp::min(start.saturating_add(count as usize), filtered.len());
                 let slice = &filtered[start..end];
                 let eof = end == filtered.len();
                 return Ok((slice.to_vec(), eof));
@@ -319,7 +369,7 @@ impl NFSFileSystem for BraidNfsBackend {
             .await
             .map_err(|_| nfsstat3::NFS3ERR_IO)?;
         buffer.truncate(n);
-        let eof = offset + n as u64 >= metadata.len();
+        let eof = offset.saturating_add(n as u64) >= metadata.len();
         Ok((buffer, eof))
     }
 
@@ -330,13 +380,20 @@ impl NFSFileSystem for BraidNfsBackend {
         data: &[u8],
     ) -> std::result::Result<fattr3, nfsstat3> {
         let vpath = self.get_path(id).ok_or(nfsstat3::NFS3ERR_STALE)?;
-        let root = crate::fs::config::get_root_dir().map_err(|_| nfsstat3::NFS3ERR_IO)?;
-        let path = root.join(vpath.trim_start_matches('/'));
+        if vpath.starts_with("/blobs/") {
+            return Err(nfsstat3::NFS3ERR_ROFS);
+        }
+        if data.len() > 1024 * 1024 || offset.checked_add(data.len() as u64).is_none() {
+            return Err(nfsstat3::NFS3ERR_INVAL);
+        }
+        let path = self.local_path(&vpath)?;
 
         // Logic for re-wrapping Braid shells:
         // If it's a write to the start of the file (offset 0), we can check if it was a shell.
-        if offset == 0 && data.len() < 1024 * 1024 {
-            let new_content_str = String::from_utf8_lossy(data).to_string();
+        if let (true, Ok(new_content_str)) = (
+            offset == 0 && data.len() < 1024 * 1024,
+            std::str::from_utf8(data),
+        ) {
             let url = mapping::path_to_url(&path).ok();
 
             let mut wrapped_content = None;
@@ -345,7 +402,7 @@ impl NFSFileSystem for BraidNfsBackend {
             if let Some(url_str) = &url {
                 let cache = self.state.content_cache.read().await;
                 if let Some(old_content) = cache.get(url_str) {
-                    let wrapped = mapping::wrap_markdown(old_content, &new_content_str);
+                    let wrapped = mapping::wrap_markdown(old_content, new_content_str);
                     if wrapped != new_content_str {
                         wrapped_content = Some(wrapped);
                     }
@@ -355,7 +412,7 @@ impl NFSFileSystem for BraidNfsBackend {
             // If not in cache, check disk (only for smaller files)
             if wrapped_content.is_none() {
                 if let Ok(old_content) = tokio::fs::read_to_string(&path).await {
-                    let wrapped = mapping::wrap_markdown(&old_content, &new_content_str);
+                    let wrapped = mapping::wrap_markdown(&old_content, new_content_str);
                     if wrapped != new_content_str {
                         wrapped_content = Some(wrapped);
                     }
@@ -392,6 +449,7 @@ impl NFSFileSystem for BraidNfsBackend {
         let mut file = tokio::fs::OpenOptions::new()
             .write(true)
             .create(true)
+            .truncate(false)
             .open(&path)
             .await
             .map_err(|_| nfsstat3::NFS3ERR_IO)?;
@@ -403,6 +461,7 @@ impl NFSFileSystem for BraidNfsBackend {
             .await
             .map_err(|_| nfsstat3::NFS3ERR_IO)?;
 
+        file.sync_all().await.map_err(|_| nfsstat3::NFS3ERR_IO)?;
         let metadata = tokio::fs::metadata(&path)
             .await
             .map_err(|_| nfsstat3::NFS3ERR_IO)?;
@@ -416,10 +475,9 @@ impl NFSFileSystem for BraidNfsBackend {
         _attr: sattr3,
     ) -> std::result::Result<(u64, fattr3), nfsstat3> {
         let dir_path = self.get_path(dir_id).ok_or(nfsstat3::NFS3ERR_STALE)?;
-        let name_str = String::from_utf8_lossy(&name.0).to_string();
+        let name_str = valid_name(&name.0)?.to_owned();
         let full_path = mapping::path_join(&dir_path, &name_str);
-        let root = crate::fs::config::get_root_dir().map_err(|_| nfsstat3::NFS3ERR_IO)?;
-        let path = root.join(full_path.trim_start_matches('/'));
+        let path = self.local_path(&full_path)?;
 
         info!("NFS Create: {} (vpath={})", path.display(), full_path);
 
@@ -429,11 +487,20 @@ impl NFSFileSystem for BraidNfsBackend {
                 .map_err(|_| nfsstat3::NFS3ERR_IO)?;
         }
 
-        tokio::fs::File::create(&path)
+        tokio::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
             .await
-            .map_err(|_| nfsstat3::NFS3ERR_IO)?;
+            .map_err(|error| {
+                if error.kind() == std::io::ErrorKind::AlreadyExists {
+                    nfsstat3::NFS3ERR_EXIST
+                } else {
+                    nfsstat3::NFS3ERR_IO
+                }
+            })?;
 
-        let id = self.get_or_create_id(&full_path);
+        let id = self.get_or_create_id(&full_path)?;
         let attr = self.get_attr(id, ftype3::NF3REG, 0);
         Ok((id, attr))
     }
@@ -452,10 +519,9 @@ impl NFSFileSystem for BraidNfsBackend {
         name: &nfsstring,
     ) -> std::result::Result<(u64, fattr3), nfsstat3> {
         let dir_path = self.get_path(dir_id).ok_or(nfsstat3::NFS3ERR_STALE)?;
-        let name_str = String::from_utf8_lossy(&name.0).to_string();
+        let name_str = valid_name(&name.0)?.to_owned();
         let full_path = mapping::path_join(&dir_path, &name_str);
-        let root = crate::fs::config::get_root_dir().map_err(|_| nfsstat3::NFS3ERR_IO)?;
-        let path = root.join(full_path.trim_start_matches('/'));
+        let path = self.local_path(&full_path)?;
 
         info!("NFS Mkdir: {} (vpath={})", path.display(), full_path);
 
@@ -463,17 +529,16 @@ impl NFSFileSystem for BraidNfsBackend {
             .await
             .map_err(|_| nfsstat3::NFS3ERR_IO)?;
 
-        let id = self.get_or_create_id(&full_path);
+        let id = self.get_or_create_id(&full_path)?;
         let attr = self.get_attr(id, ftype3::NF3DIR, 4096);
         Ok((id, attr))
     }
 
     async fn remove(&self, dir_id: u64, name: &nfsstring) -> std::result::Result<(), nfsstat3> {
         let dir_path = self.get_path(dir_id).ok_or(nfsstat3::NFS3ERR_STALE)?;
-        let name_str = String::from_utf8_lossy(&name.0).to_string();
+        let name_str = valid_name(&name.0)?.to_owned();
         let full_path = mapping::path_join(&dir_path, &name_str);
-        let root = crate::fs::config::get_root_dir().map_err(|_| nfsstat3::NFS3ERR_IO)?;
-        let path = root.join(full_path.trim_start_matches('/'));
+        let path = self.local_path(&full_path)?;
 
         info!("NFS Remove: {} (vpath={})", path.display(), full_path);
 
@@ -491,16 +556,14 @@ impl NFSFileSystem for BraidNfsBackend {
         new_name: &nfsstring,
     ) -> std::result::Result<(), nfsstat3> {
         let old_dir_path = self.get_path(old_dir).ok_or(nfsstat3::NFS3ERR_STALE)?;
-        let old_name_str = String::from_utf8_lossy(&old_name.0).to_string();
+        let old_name_str = valid_name(&old_name.0)?.to_owned();
         let old_full_path = mapping::path_join(&old_dir_path, &old_name_str);
 
         let new_dir_path = self.get_path(new_dir).ok_or(nfsstat3::NFS3ERR_STALE)?;
-        let new_name_str = String::from_utf8_lossy(&new_name.0).to_string();
+        let new_name_str = valid_name(&new_name.0)?.to_owned();
         let new_full_path = mapping::path_join(&new_dir_path, &new_name_str);
-
-        let root = crate::fs::config::get_root_dir().map_err(|_| nfsstat3::NFS3ERR_IO)?;
-        let old_path = root.join(old_full_path.trim_start_matches('/'));
-        let new_path = root.join(new_full_path.trim_start_matches('/'));
+        let old_path = self.local_path(&old_full_path)?;
+        let new_path = self.local_path(&new_full_path)?;
 
         info!("NFS Rename: {:?} -> {:?}", old_path, new_path);
 
@@ -532,7 +595,7 @@ impl NFSFileSystem for BraidNfsBackend {
 
         if dir_path == "/" {
             // Add virtual /blobs entry
-            let blob_id = self.get_or_create_id("/blobs");
+            let blob_id = self.get_or_create_id("/blobs")?;
             entries.push(DirEntry {
                 fileid: blob_id,
                 name: nfsstring("blobs".as_bytes().to_vec()),
@@ -545,7 +608,7 @@ impl NFSFileSystem for BraidNfsBackend {
             if let Ok(keys) = self.blob_store.list_keys().await {
                 for key in keys {
                     let full_path = format!("/blobs/{}", key);
-                    let id = self.get_or_create_id(&full_path);
+                    let id = self.get_or_create_id(&full_path)?;
                     let size = self
                         .blob_store
                         .get_meta(&key)
@@ -574,15 +637,16 @@ impl NFSFileSystem for BraidNfsBackend {
             let conn = self.state.inode_db.lock();
             let mut stmt = conn
                 .prepare("SELECT id, path FROM inodes WHERE path LIKE ? AND path != ?")
-                .unwrap();
+                .map_err(|_| nfsstat3::NFS3ERR_IO)?;
             let rows = stmt
                 .query_map(params![format!("{}%", prefix), dir_path], |row| {
                     Ok((row.get::<_, u64>(0)?, row.get::<_, String>(1)?))
                 })
-                .unwrap();
+                .map_err(|_| nfsstat3::NFS3ERR_IO)?;
 
             for row in rows {
-                if let Ok((id, path)) = row {
+                let (id, path) = row.map_err(|_| nfsstat3::NFS3ERR_IO)?;
+                {
                     let relative = if dir_path == "/" {
                         &path[1..]
                     } else {
@@ -591,9 +655,7 @@ impl NFSFileSystem for BraidNfsBackend {
 
                     // Only immediate children (no more slashes)
                     if !relative.is_empty() && !relative.contains('/') {
-                        let root =
-                            crate::fs::config::get_root_dir().map_err(|_| nfsstat3::NFS3ERR_IO)?;
-                        let abs_path = root.join(path.trim_start_matches('/'));
+                        let abs_path = self.local_path(&path)?;
 
                         let (ftype, size) = if abs_path.is_file() {
                             (
@@ -638,5 +700,32 @@ impl NFSFileSystem for BraidNfsBackend {
 
     async fn readlink(&self, _id: u64) -> std::result::Result<nfsstring, nfsstat3> {
         Err(nfsstat3::NFS3ERR_NOTSUPP)
+    }
+}
+
+#[cfg(test)]
+mod engineering_tests {
+    use super::valid_name;
+    #[test]
+    fn rejects_ambiguous_and_platform_specific_path_names() {
+        for name in [
+            b"..".as_slice(),
+            b"../outside",
+            b"a/b",
+            b"a\\b",
+            b"CON",
+            b"LPT1.txt",
+            b"x.",
+            b"x ",
+            b"C:drive",
+            b"\xff",
+            b"a\0b",
+        ] {
+            assert!(valid_name(name).is_err(), "{name:?}");
+        }
+        assert_eq!(
+            valid_name("hello-\u{1f600}.txt".as_bytes()).unwrap(),
+            "hello-\u{1f600}.txt"
+        );
     }
 }

@@ -5,6 +5,7 @@ use std::str::FromStr;
 
 /// Content-Range specification for patches.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct ContentRange {
     /// The addressing unit type (e.g., "json", "bytes").
     pub unit: String,

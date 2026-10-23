@@ -5,4 +5,4 @@
 
 pub mod json_store;
 
-pub use json_store::{JsonChatStore, UpdateChannel, RoomUpdate, UpdateType, RoomData};
+pub use json_store::{JsonChatStore, RoomData, RoomUpdate, UpdateChannel, UpdateType};

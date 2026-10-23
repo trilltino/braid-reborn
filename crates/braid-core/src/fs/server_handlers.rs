@@ -59,19 +59,54 @@ pub async fn handle_get_file(
                         if let Some(p) = file_path.parent() {
                             let _ = tokio::fs::create_dir_all(p).await;
                         }
-                        let _ = tokio::fs::write(&file_path, &body).await;
+                        match tokio::fs::read(&file_path).await {
+                            Ok(existing) if existing.as_slice() != body.as_bytes() => {
+                                return (
+                                    StatusCode::CONFLICT,
+                                    "Untracked local edits require reconciliation",
+                                )
+                                    .into_response()
+                            }
+                            Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
+                                return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
+                                    .into_response()
+                            }
+                            _ => {}
+                        }
+                        if let Err(error) =
+                            braid_http::durable::atomic_write(&file_path, body.as_bytes()).await
+                        {
+                            return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
+                                .into_response();
+                        }
 
                         // Initialize merge state if not exists
                         let peer_id = crate::fs::PEER_ID.read().await.clone();
                         let mut merges = state.active_merges.write().await;
-                        let _merge = merges.entry(path.clone()).or_insert_with(|| {
-                            let mut m = state
-                                .merge_registry
-                                .create("simpleton", &peer_id)
-                                .expect("Failed to create simpleton merge");
-                            m.initialize(&body);
-                            m
-                        });
+                        if !merges.contains_key(&path) {
+                            let mut merge = match state.merge_registry.create("simpleton", &peer_id)
+                            {
+                                Some(merge) => merge,
+                                None => {
+                                    return (
+                                        StatusCode::INTERNAL_SERVER_ERROR,
+                                        "Simpleton merge type is not registered",
+                                    )
+                                        .into_response()
+                                }
+                            };
+                            let initialized = merge.initialize(&body);
+                            if !initialized.success {
+                                return (
+                                    StatusCode::INTERNAL_SERVER_ERROR,
+                                    initialized
+                                        .error
+                                        .unwrap_or_else(|| "Merge initialization failed".into()),
+                                )
+                                    .into_response();
+                            }
+                            merges.insert(path.clone(), merge);
+                        }
 
                         body
                     }

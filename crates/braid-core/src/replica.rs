@@ -1,9 +1,11 @@
 //! Durable text replica shared by HTTP and Iroh adapters.
 //!
-//! Positional edits require the current frontier. Concurrent/stale edits receive
-//! an explicit conflict rather than being applied to the wrong base.
+//! Diamond edits are interpreted at their declared causal parents. Simpleton
+//! retains its coordinated-client rule and rejects stale positional mutations.
 use crate::core::merge::diamond::DiamondCRDT;
-pub use braid_http::durable::document_lock as storage_lock;
+pub use braid_http::durable::{
+    atomic_write as atomic_write_private, document_lock as storage_lock,
+};
 use braid_http::{
     durable::{atomic_write, document_lock},
     types::{Update, Version},
@@ -53,7 +55,8 @@ fn now() -> u64 {
         .as_secs()
 }
 pub fn same_frontier(a: &[String], b: &[String]) -> bool {
-    a.len() == b.len() && a.iter().all(|v| b.contains(v))
+    a.iter().collect::<std::collections::HashSet<_>>()
+        == b.iter().collect::<std::collections::HashSet<_>>()
 }
 impl ReplicaDocument {
     pub fn empty(merge_type: &str) -> Self {
@@ -151,20 +154,37 @@ impl ReplicaDocument {
                 return Err(ReplicaError::Conflict(format!("Unknown parent: {parent}")));
             }
         }
-        if !same_frontier(&self.heads, &parents) {
+        if self.merge_type == "simpleton" && !same_frontier(&self.heads, &parents) {
             return Err(ReplicaError::Conflict(
-                "Stale or concurrent positional update; fetch a snapshot and resolve the conflict"
-                    .into(),
+                "Stale Simpleton positional update requires explicit reconciliation".into(),
             ));
         }
+        let mut crdt = if self.merge_state.is_null() {
+            // Snapshot-only migration has one known base; historical missing
+            // checkpoints stay unavailable instead of being fabricated as root.
+            let mut crdt = DiamondCRDT::new(format!(
+                "legacy-{:x}",
+                Sha256::digest(self.content.as_bytes())
+            ));
+            if !self.content.is_empty() {
+                crdt.add_insert(0, &self.content);
+            }
+            for head in &self.heads {
+                crdt.register_version_mapping(head.clone(), crdt.get_local_frontier());
+            }
+            crdt
+        } else {
+            DiamondCRDT::restore_checkpoint(&self.merge_state).map_err(ReplicaError::Invalid)?
+        };
+        let base = crdt
+            .content_at_parents(&update.parents)
+            .map_err(ReplicaError::Conflict)?;
         let content = match (&update.body, &update.patches) {
             (Some(body), None) => std::str::from_utf8(body)
                 .map_err(|e| ReplicaError::Invalid(e.to_string()))?
                 .to_owned(),
-            (None, Some(patches)) => {
-                braid_http::protocol::text::apply_text_patches(&self.content, patches)
-                    .map_err(|e| ReplicaError::Invalid(e.to_string()))?
-            }
+            (None, Some(patches)) => braid_http::protocol::text::apply_text_patches(&base, patches)
+                .map_err(|e| ReplicaError::Invalid(e.to_string()))?,
             _ => return Err(ReplicaError::Invalid("Expected snapshot or patches".into())),
         };
         if let Some(digest) = update.extra_headers.get("repr-digest") {
@@ -177,29 +197,16 @@ impl ReplicaDocument {
                 ));
             }
         }
-        let mut crdt = if self.merge_state.is_null() {
-            // Explicit migration of snapshot-only state: retain the old graph and seed a checkpoint.
-            let mut crdt = DiamondCRDT::new(format!("replica-{}", uuid::Uuid::new_v4()));
-            if !self.content.is_empty() {
-                crdt.add_insert(0, &self.content);
-            }
-            crdt
-        } else {
-            DiamondCRDT::restore_checkpoint(&self.merge_state).map_err(ReplicaError::Invalid)?
-        };
-        let len = crdt.content().chars().count();
-        if len > 0 {
-            crdt.add_delete(0..len);
-        }
-        if !content.is_empty() {
-            crdt.add_insert(0, &content);
-        }
-        crdt.register_version_mapping(id.clone(), crdt.get_local_frontier());
+        crdt.apply_wire_event(update)
+            .map_err(ReplicaError::Invalid)?;
         let checkpoint = crdt.durable_checkpoint().map_err(ReplicaError::Invalid)?;
-        self.content = content;
+        self.content = crdt.content();
         self.merge_state = checkpoint;
+        self.heads.retain(|head| !parents.contains(head));
+        self.heads.push(id.clone());
+        self.heads.sort();
+        self.heads.dedup();
         self.version_graph.insert(id.clone(), parents);
-        self.heads = vec![id.clone()];
         self.fingerprints.insert(id, fingerprint);
         self.history.push(update.clone());
         self.modified_at = now();
@@ -223,7 +230,20 @@ impl ReplicaDocument {
                 .iter()
                 .position(|u| u.version.iter().any(|v| v.to_string() == frontier[0]))
             {
-                return Ok(self.history[i + 1..].to_vec());
+                let tail = &self.history[i + 1..];
+                let mut cursor = frontier.to_vec();
+                for update in tail {
+                    let parents = update
+                        .parents
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>();
+                    if !same_frontier(&parents, &cursor) {
+                        return Ok(vec![self.snapshot()]);
+                    }
+                    cursor = update.version.iter().map(ToString::to_string).collect();
+                }
+                return Ok(tail.to_vec());
             }
         }
         Ok(vec![self.snapshot()])

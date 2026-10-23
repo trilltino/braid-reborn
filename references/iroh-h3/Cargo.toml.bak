@@ -1,8 +1,0 @@
-edition = "2024"
-license = "MIT"
-repository = "https://github.com/Le-Maz/iroh-h3"
-homepage = "https://github.com/Le-Maz/iroh-h3"
-readme = "README.md"
-keywords = ["quic", "h3", "http3", "iroh", "p2p"]
-categories = ["network-programming", "asynchronous", "web-programming"]
-authors = ["Lech Mazur <mazurlech@proton.me>"]

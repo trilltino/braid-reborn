@@ -11,6 +11,10 @@ pub use smallvec;
 pub mod core;
 #[cfg(feature = "native")]
 pub mod replica;
+// Copied algorithms have their own upstream assertions, lints and formatting.
+#[cfg(all(feature = "serde", feature = "smallvec"))]
+#[allow(warnings, clippy::all)]
+#[rustfmt::skip]
 pub mod vendor;
 
 // Antimatter module removed in favor of Diamond Types
@@ -36,7 +40,7 @@ pub use crate::core::server;
 #[cfg(feature = "server")]
 pub use crate::core::server::{BraidLayer, BraidState, ConflictResolver, ServerConfig};
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(feature = "serde", feature = "smallvec", not(target_arch = "wasm32")))]
 pub use crate::core::merge;
 
 #[cfg(feature = "blob")]

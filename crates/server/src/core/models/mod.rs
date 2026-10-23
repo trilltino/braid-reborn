@@ -1,7 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use uuid::Uuid;
 
 /// A chat room with CRDT state
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -37,6 +36,8 @@ impl ChatRoom {
 /// CRDT state for a chat room
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrdtState {
+    #[serde(default)]
+    pub events: Vec<ChatUpdate>,
     /// Node ID for this CRDT instance
     pub node_id: String,
     /// Next sequence number for version generation
@@ -52,6 +53,7 @@ pub struct CrdtState {
 impl CrdtState {
     pub fn new(node_id: impl Into<String>) -> Self {
         Self {
+            events: Vec::new(),
             node_id: node_id.into(),
             next_seq: 0,
             current_version: Vec::new(),
@@ -93,7 +95,7 @@ impl CrdtState {
     pub fn get_messages_sorted(&self) -> Vec<&Message> {
         let mut versions: Vec<_> = self.messages.iter().collect();
         // Sort by timestamp for now (could be improved with topological sort)
-        versions.sort_by(|a, b| a.1.created_at.cmp(&b.1.created_at));
+        versions.sort_by_key(|a| a.1.created_at);
         versions.into_iter().map(|(_, msg)| msg).collect()
     }
 }
@@ -170,9 +172,18 @@ impl Message {
     }
 
     /// Add an edit to the history
-    pub fn add_edit(&mut self, version: String, content: String, parents: Vec<braid_http::types::Version>) {
+    pub fn add_edit(
+        &mut self,
+        version: String,
+        content: String,
+        parents: Vec<braid_http::types::Version>,
+    ) {
         // Save current content to history before updating
-        if self.edit_history.is_empty() {
+        if self
+            .edit_history
+            .last()
+            .is_none_or(|e| e.version != self.version)
+        {
             // First edit - save original
             self.edit_history.push(EditRecord {
                 version: self.version.clone(),
@@ -181,7 +192,7 @@ impl Message {
                 parents: self.parents.clone(),
             });
         }
-        
+
         // Update to new content
         self.content = content;
         self.version = version;
@@ -202,7 +213,9 @@ impl Message {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "type", content = "data")]
+#[derive(Default)]
 pub enum MessageType {
+    #[default]
     Text,
     Image {
         width: Option<u32>,
@@ -215,12 +228,6 @@ pub enum MessageType {
     System {
         action: String,
     },
-}
-
-impl Default for MessageType {
-    fn default() -> Self {
-        MessageType::Text
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -286,7 +293,9 @@ pub struct CreateMessageInput {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "type", content = "data")]
+#[derive(Default)]
 pub enum MessageTypeInput {
+    #[default]
     Text,
     Image {
         width: Option<u32>,
@@ -296,12 +305,6 @@ pub enum MessageTypeInput {
         filename: String,
         size: u64,
     },
-}
-
-impl Default for MessageTypeInput {
-    fn default() -> Self {
-        MessageTypeInput::Text
-    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -335,6 +338,10 @@ pub enum ChatPatch {
         sender: String,
         #[serde(rename = "type")]
         message_type: MessageType,
+        #[serde(default)]
+        reply_to: Option<String>,
+        #[serde(default)]
+        blob_refs: Vec<BlobRef>,
     },
     EditMessage {
         id: String,

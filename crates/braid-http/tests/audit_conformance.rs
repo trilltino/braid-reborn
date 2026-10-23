@@ -75,6 +75,7 @@ fn limits_reject_declarations_before_allocating_payloads() {
         max_body_bytes: 8,
         max_patches: 2,
         max_update_bytes: 128,
+        ..Default::default()
     };
     for frame in [
         "Content-Length: 9\r\n\r\n",

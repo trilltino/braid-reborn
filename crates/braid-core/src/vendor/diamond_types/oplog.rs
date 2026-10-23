@@ -394,6 +394,16 @@ impl OpLog {
         result
     }
 
+    // Local adapter patch: expose the existing historical text transformation,
+    // without using the unfinished generic checkout_at_version implementation.
+    pub fn checkout_text_at(&self, crdt: LVKey, frontier: &[LV]) -> Option<JumpRope> {
+        let info = self.texts.get(&crdt)?;
+        if frontier.iter().any(|version| *version >= self.cg.len()) { return None; }
+        let mut result = JumpRope::new();
+        info.merge_into(&mut result, &self.cg, &[], frontier);
+        Some(result)
+    }
+
     pub fn checkout_map(&self, crdt: LVKey) -> BTreeMap<SmartString, Box<DTValue>> {
         let empty_str: SmartString = "".into();
         // dbg!((crdt, empty_str.clone())..(crdt, empty_str));

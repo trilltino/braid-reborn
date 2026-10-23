@@ -51,7 +51,7 @@ impl ConflictResolver {
     /// # Examples
     ///
     /// ```ignore
-    /// use crate::core::server::{ConflictResolver, ResourceStateManager};
+    /// use braid_core::core::server::{ConflictResolver, ResourceStateManager};
     ///
     /// let manager = ResourceStateManager::new();
     /// let resolver = ConflictResolver::new(manager);
@@ -91,9 +91,8 @@ impl ConflictResolver {
         agent_id: &str,
     ) -> Result<Update, String> {
         match &update.merge_type {
-            Some(merge_type) if merge_type == "simpleton" || merge_type == "braid-text" || merge_type == "diamond" => {
-                self.resolve_text_merge(resource_id, update, agent_id)
-                    .await
+            Some(merge_type) if merge_type == "diamond" => {
+                self.resolve_text_merge(resource_id, update, agent_id).await
             }
             _ => Ok(update.clone()),
         }
@@ -126,7 +125,7 @@ impl ConflictResolver {
             if body_str.starts_with('{') && body_str.ends_with('}') {
                 if let Ok(json_data) = serde_json::from_str::<Value>(&body_str) {
                     if json_data.is_object() {
-                        let version_id = update.version.get(0).map(|v| v.to_string());
+                        let version_id = update.version.first().map(|v| v.to_string());
                         let parents_vec: Vec<String> =
                             update.parents.iter().map(|v| v.to_string()).collect();
                         let parents = if parents_vec.is_empty() {
@@ -147,7 +146,7 @@ impl ConflictResolver {
                 }
             }
 
-            let version_id = update.version.get(0).map(|v| v.to_string());
+            let version_id = update.version.first().map(|v| v.to_string());
             let version_ref = version_id.as_deref();
 
             let _ = self.resource_manager.apply_update(
@@ -162,9 +161,12 @@ impl ConflictResolver {
         let update = self.build_merged_response(resource_id, agent_id).await?;
 
         // Register the new version mapping
-        if let Some(v) = update.version.get(0) {
+        if let Some(v) = update.version.first() {
             let frontier = {
-                let resource = self.resource_manager.get_resource(resource_id).unwrap();
+                let resource = self
+                    .resource_manager
+                    .get_resource(resource_id)
+                    .ok_or_else(|| "Resource disappeared during merge".to_owned())?;
                 let state = resource.lock();
                 state.crdt.get_local_frontier()
             };
@@ -230,7 +232,7 @@ impl ConflictResolver {
     ) -> Result<Update, String> {
         let parent_strs: Option<Vec<&str>> =
             parents.map(|p| p.iter().map(|s| s.as_str()).collect());
-        let parent_refs = parent_strs.as_ref().map(|v| v.as_slice());
+        let parent_refs = parent_strs.as_deref();
 
         self.apply_insert_operations(resource_id, json_data, agent_id, version_id, parent_refs);
         self.apply_delete_operations(resource_id, json_data, agent_id, version_id, parent_refs);

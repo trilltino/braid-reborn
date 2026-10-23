@@ -558,9 +558,10 @@ mod test {
 
     #[test]
     fn foo() {
-        drop(std::fs::remove_file("test.cg"));
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("test.cg");
 
-        let (mut cg, mut cgs) = CGStorage::open("test.cg").unwrap();
+        let (mut cg, mut cgs) = CGStorage::open(&path).unwrap();
         // dbg!(&cgs, &cg);
 
         let seph = cg.get_or_create_agent_id("seph");
@@ -574,7 +575,7 @@ mod test {
         // dbg!(&cgs);
 
         drop(cgs);
-        let (cg2, _) = CGStorage::open("test.cg").unwrap();
+        let (cg2, _) = CGStorage::open(&path).unwrap();
         // dbg!((cg, cg2));
         assert_eq!(cg, cg2);
         cg2.dbg_check(true);

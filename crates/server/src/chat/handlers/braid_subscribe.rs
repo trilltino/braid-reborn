@@ -38,7 +38,7 @@ use axum::{
     body::Body,
     extract::{Path, State},
     http::{header, HeaderMap, StatusCode},
-    response::{IntoResponse, Response},
+    response::Response,
 };
 use braid_http::protocol::{
     constants::headers,
@@ -264,7 +264,7 @@ pub async fn braid_subscribe(
 
     // Build HTTP 209 response with Braid headers (xfmail-style)
     let response = Response::builder()
-        .status(StatusCode::from_u16(209).unwrap()) // HTTP 209 Subscription
+        .status(209) // HTTP 209 Subscription
         .header(header::CONTENT_TYPE, "application/json")
         .header(headers::SUBSCRIBE.as_str(), "true")
         .header("Merge-Type", "diamond")

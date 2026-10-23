@@ -3,22 +3,25 @@
 //! Handles binary object storage using the braid-blob crate.
 //! Used for chat attachments and wiki media.
 
+use crate::core::models::BlobRef;
+use crate::core::AppState;
 use axum::{
-    extract::{Path, State, Multipart},
+    extract::{Multipart, Path, State},
     http::{HeaderMap, StatusCode},
     response::Json,
 };
-use crate::core::AppState;
-use crate::core::models::BlobRef;
-use tracing::{info, error};
+use tracing::{error, info};
 
 /// POST /blobs
 pub async fn upload_blob(
     State(state): State<AppState>,
+    headers: HeaderMap,
     mut multipart: Multipart,
 ) -> std::result::Result<Json<BlobRef>, StatusCode> {
-    use bytes::Bytes;
     use sha2::{Digest, Sha256};
+    crate::core::auth::middleware::authenticate_headers(&state.auth, &headers)
+        .await
+        .map_err(|_| StatusCode::UNAUTHORIZED)?;
 
     info!("POST /blobs - uploading blob");
 
@@ -31,7 +34,7 @@ pub async fn upload_blob(
         StatusCode::BAD_REQUEST
     })? {
         let name = field.name().unwrap_or("").to_string();
-        
+
         if name == "file" {
             filename = field.file_name().map(|s| s.to_string());
             content_type = field.content_type().map(|s| s.to_string());
@@ -54,8 +57,10 @@ pub async fn upload_blob(
     let parents = vec![];
 
     let data_len = data.len();
-    state.store.blob_store()
-        .put(&hash, Bytes::from(data), version, parents, Some(content_type.clone()))
+    state
+        .store
+        .blob_store()
+        .put(&hash, data, version, parents, Some(content_type.clone()))
         .await
         .map_err(|e| {
             error!("Failed to store blob: {}", e);
@@ -77,10 +82,16 @@ pub async fn upload_blob(
 pub async fn get_blob(
     Path(hash): Path<String>,
     State(state): State<AppState>,
+    request_headers: HeaderMap,
 ) -> std::result::Result<(HeaderMap, axum::body::Bytes), StatusCode> {
+    crate::core::auth::middleware::authenticate_headers(&state.auth, &request_headers)
+        .await
+        .map_err(|_| StatusCode::UNAUTHORIZED)?;
     info!("GET /blobs/{}", hash);
 
-    let (data, meta) = state.store.blob_store()
+    let (data, meta) = state
+        .store
+        .blob_store()
         .get(&hash)
         .await
         .map_err(|e| {
@@ -92,9 +103,10 @@ pub async fn get_blob(
     let mut headers = HeaderMap::new();
     headers.insert(
         axum::http::header::CONTENT_TYPE,
-        meta.content_type.unwrap_or_else(|| "application/octet-stream".to_string())
+        meta.content_type
+            .unwrap_or_else(|| "application/octet-stream".to_string())
             .parse()
-            .unwrap(),
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
     );
 
     Ok((headers, data))

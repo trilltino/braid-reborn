@@ -11,11 +11,11 @@ use crate::core::models::{Message, MessageType};
 use crate::core::store::json_store::JsonChatStore;
 use anyhow::Result;
 use notify::{Event, RecursiveMode, Watcher};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 // GenAI imports
 use genai::chat::{ChatMessage, ChatRequest};
@@ -51,20 +51,13 @@ pub struct AiChatManager {
     _store: Arc<JsonChatStore>,
     ai_chats_dir: PathBuf,
     /// Track which rooms are AI chats
-    ai_rooms: Arc<RwLock<HashMap<String, AiRoomState>>>,
+    ai_rooms: Arc<RwLock<HashSet<String>>>,
     /// GenAI client for API calls
     genai_client: GenAIClient,
     /// Track pending AI responses (room_id -> thinking_message_id)
     _pending_responses: Arc<RwLock<HashMap<String, String>>>,
     /// System context directory
     context_dir: PathBuf,
-}
-
-#[derive(Clone, Debug)]
-struct AiRoomState {
-    room_id: String,
-    last_processed_version: Option<String>,
-    pending_mentions: Vec<String>,
 }
 
 impl AiChatManager {
@@ -93,7 +86,7 @@ impl AiChatManager {
             config,
             _store: store,
             ai_chats_dir,
-            ai_rooms: Arc::new(RwLock::new(HashMap::new())),
+            ai_rooms: Arc::new(RwLock::new(HashSet::new())),
             genai_client,
             _pending_responses: Arc::new(RwLock::new(HashMap::new())),
             context_dir,
@@ -102,16 +95,7 @@ impl AiChatManager {
 
     /// Register a room as an AI chat
     pub async fn register_ai_room(&self, room_id: &str) -> Result<()> {
-        let state = AiRoomState {
-            room_id: room_id.to_string(),
-            last_processed_version: None,
-            pending_mentions: Vec::new(),
-        };
-
-        self.ai_rooms
-            .write()
-            .await
-            .insert(room_id.to_string(), state);
+        self.ai_rooms.write().await.insert(room_id.to_owned());
 
         info!("[@BraidBot] Registered AI room: {}", room_id);
 
@@ -142,7 +126,7 @@ impl AiChatManager {
         message: &Message,
     ) -> Result<Option<Message>> {
         // Check if this is an AI room
-        let is_ai_room = self.ai_rooms.read().await.contains_key(room_id);
+        let is_ai_room = self.ai_rooms.read().await.contains(room_id);
 
         if !is_ai_room {
             return Ok(None);
@@ -236,7 +220,7 @@ impl AiChatManager {
                 Err(e) => {
                     // Edit thinking message to show error
                     let error_msg =
-                        format!("❌ *Error: Could not generate response. Please try again.*");
+                        "❌ *Error: Could not generate response. Please try again.*".to_string();
                     if let Err(e2) = _store
                         .edit_message(&room_id_owned, &thinking_id, &error_msg)
                         .await
@@ -291,7 +275,7 @@ impl AiChatManager {
                         match tokio::fs::read_to_string(&context_path).await {
                             Ok(content) => {
                                 info!("[@BraidBot] Successfully read context from {}", filename);
-                                chat_messages.push(ChatMessage::system(&format!(
+                                chat_messages.push(ChatMessage::system(format!(
                                     "DOCKER CONTEXT FILE ({}):\n\n{}",
                                     filename, content
                                 )));
@@ -315,7 +299,7 @@ impl AiChatManager {
             if msg.sender == "@BraidBot" {
                 chat_messages.push(ChatMessage::assistant(&msg.content));
             } else {
-                chat_messages.push(ChatMessage::user(&format!(
+                chat_messages.push(ChatMessage::user(format!(
                     "{}: {}",
                     msg.sender, msg.content
                 )));
@@ -324,7 +308,7 @@ impl AiChatManager {
 
         // Add the current trigger message if not already in history
         if !history.iter().any(|m| m.id == trigger_message.id) {
-            chat_messages.push(ChatMessage::user(&format!(
+            chat_messages.push(ChatMessage::user(format!(
                 "{}: {}",
                 trigger_message.sender, trigger_message.content
             )));
@@ -350,7 +334,7 @@ impl AiChatManager {
 
     /// Static helper for markdown append in spawned task
     async fn append_to_markdown_static(
-        ai_chats_dir: &PathBuf,
+        ai_chats_dir: &std::path::Path,
         room_id: &str,
         user_msg: &Message,
         bot_msg: &Message,
@@ -410,37 +394,6 @@ impl AiChatManager {
         Ok(context)
     }
 
-    /// Append messages to markdown file
-    async fn append_to_markdown(
-        &self,
-        room_id: &str,
-        user_msg: &Message,
-        bot_msg: &Message,
-    ) -> Result<()> {
-        let path = self.ai_chats_dir.join(format!("{}.md", room_id));
-
-        let append = format!(
-            "\n**{}** ({})\n{}\n\n**@BraidBot** ({})\n{}\n",
-            user_msg.sender,
-            user_msg.created_at.format("%Y-%m-%d %H:%M"),
-            user_msg.content,
-            bot_msg.created_at.format("%Y-%m-%d %H:%M"),
-            bot_msg.content
-        );
-
-        // Append to file
-        use tokio::io::AsyncWriteExt;
-        let mut file = tokio::fs::OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(&path)
-            .await?;
-
-        file.write_all(append.as_bytes()).await?;
-
-        Ok(())
-    }
-
     /// Start watching AI chat files for external changes
     pub async fn start_watching(&self) -> Result<()> {
         let (tx, mut rx) = mpsc::channel(100);
@@ -465,7 +418,7 @@ impl AiChatManager {
                             if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                                 // Check if this is a known AI room
                                 let rooms = ai_rooms.read().await;
-                                if rooms.contains_key(stem) {
+                                if rooms.contains(stem) {
                                     debug!("AI chat file changed externally: {:?}", path);
                                     // Could trigger re-sync here
                                 }
@@ -495,7 +448,7 @@ impl AiChatManager {
 
     /// List all AI chat rooms
     pub async fn list_ai_rooms(&self) -> Vec<String> {
-        self.ai_rooms.read().await.keys().cloned().collect()
+        self.ai_rooms.read().await.iter().cloned().collect()
     }
 }
 

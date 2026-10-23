@@ -27,8 +27,8 @@
 //! # Examples
 //!
 //! ```
-//! use crate::protocol;
-//! use crate::protocol::constants::{headers, merge_types};
+//! use braid_http::protocol;
+//! use braid_http::protocol::constants::{headers, merge_types};
 //!
 //! // Use top-level constants
 //! let status = 209u16;
@@ -72,7 +72,7 @@
 /// # Example
 ///
 /// ```
-/// use crate::protocol::STATUS_SUBSCRIPTION;
+/// use braid_http::protocol::STATUS_SUBSCRIPTION;
 ///
 /// assert_eq!(STATUS_SUBSCRIPTION, 209);
 /// ```
@@ -87,7 +87,7 @@ pub const STATUS_SUBSCRIPTION: u16 = 209;
 /// # Example
 ///
 /// ```
-/// use crate::protocol::STATUS_MERGE_CONFLICT;
+/// use braid_http::protocol::STATUS_MERGE_CONFLICT;
 ///
 /// assert_eq!(STATUS_MERGE_CONFLICT, 293);
 /// ```
@@ -115,7 +115,7 @@ pub const STATUS_RANGE_NOT_SATISFIABLE: u16 = 416;
 /// # Example
 ///
 /// ```
-/// use crate::protocol::status;
+/// use braid_http::protocol::status;
 ///
 /// assert_eq!(status::OK, 200);
 /// assert_eq!(status::SUBSCRIPTION, 209);
@@ -152,7 +152,7 @@ pub mod status {
 /// # Example
 ///
 /// ```
-/// use crate::protocol::constants::headers;
+/// use braid_http::protocol::constants::headers;
 ///
 /// assert_eq!(headers::VERSION, "version");
 /// assert_eq!(headers::SUBSCRIBE, "subscribe");
@@ -212,7 +212,7 @@ pub mod headers {
 /// # Example
 ///
 /// ```
-/// use crate::protocol::merge_types;
+/// use braid_http::protocol::merge_types;
 ///
 /// assert_eq!(merge_types::DIAMOND, "diamond");
 /// ```

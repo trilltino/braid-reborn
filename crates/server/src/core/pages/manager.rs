@@ -8,8 +8,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs;
-use tokio::sync::{broadcast, Mutex};
 use tokio::sync::RwLock;
+use tokio::sync::{broadcast, Mutex};
 use tracing::{info, warn};
 
 use braid_core::core::merge::merge_type::MergePatch;
@@ -76,7 +76,7 @@ impl PagesManager {
 
         while let Ok(Some(entry)) = entries.next_entry().await {
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "md") {
+            if path.extension().is_some_and(|ext| ext == "md") {
                 if let Ok(meta) = entry.metadata().await {
                     let relative_path = path
                         .strip_prefix(&self.storage_dir)
@@ -105,8 +105,8 @@ impl PagesManager {
     async fn extract_title(&self, path: &Path) -> String {
         if let Ok(content) = fs::read_to_string(path).await {
             for line in content.lines() {
-                if line.starts_with("# ") {
-                    return line[2..].trim().to_string();
+                if let Some(title) = line.strip_prefix("# ") {
+                    return title.trim().to_string();
                 }
             }
         }
@@ -144,15 +144,21 @@ impl PagesManager {
     }
 
     /// Get a subscription channel for a page
-    pub async fn subscribe(&self, path: &str) -> (broadcast::Receiver<PagesUpdate>, Option<PagesUpdate>) {
+    pub async fn subscribe(
+        &self,
+        path: &str,
+    ) -> (broadcast::Receiver<PagesUpdate>, Option<PagesUpdate>) {
         let mut channels = self.channels.write().await;
-        
+
         if let Some(state) = channels.get(path) {
             let rx = state.tx.subscribe();
             // Get the last update for initial state
             let last_update = state.last_update.lock().await.clone();
-            info!("[PagesManager] Subscribed to existing channel for path: {} (receivers: {})", 
-                  path, state.tx.receiver_count());
+            info!(
+                "[PagesManager] Subscribed to existing channel for path: {} (receivers: {})",
+                path,
+                state.tx.receiver_count()
+            );
             (rx, last_update)
         } else {
             // Create new channel with keepalive
@@ -185,26 +191,32 @@ impl PagesManager {
             patches,
             content,
         };
-        
+
         let channels = self.channels.read().await;
-        
+
         if let Some(state) = channels.get(path) {
             // Store update for future subscribers
             *state.last_update.lock().await = Some(update.clone());
-            
+
             // Broadcast to all current subscribers
             match state.tx.send(update) {
                 Ok(count) => {
-                    info!("[PagesManager] Broadcast sent to {} receivers for path: {}", count, path);
+                    info!(
+                        "[PagesManager] Broadcast sent to {} receivers for path: {}",
+                        count, path
+                    );
                 }
                 Err(e) => {
-                    warn!("[PagesManager] Failed to broadcast update for path {}: {:?}", path, e);
+                    warn!(
+                        "[PagesManager] Failed to broadcast update for path {}: {:?}",
+                        path, e
+                    );
                 }
             }
         } else {
             // No channel exists yet - create one and store the update
             drop(channels); // Release read lock
-            
+
             let mut channels = self.channels.write().await;
             let (tx, keepalive_rx) = broadcast::channel(100);
             let state = ChannelState {
@@ -213,13 +225,19 @@ impl PagesManager {
                 _keepalive: keepalive_rx,
             };
             channels.insert(path.to_string(), state);
-            info!("[PagesManager] Created channel with initial update for path: {}", path);
+            info!(
+                "[PagesManager] Created channel with initial update for path: {}",
+                path
+            );
         }
     }
-    
+
     /// Get subscriber count for a path (for debugging)
     pub async fn subscriber_count(&self, path: &str) -> usize {
         let channels = self.channels.read().await;
-        channels.get(path).map(|state| state.tx.receiver_count()).unwrap_or(0)
+        channels
+            .get(path)
+            .map(|state| state.tx.receiver_count())
+            .unwrap_or(0)
     }
 }

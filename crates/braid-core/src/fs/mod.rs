@@ -10,10 +10,11 @@ use crate::fs::rate_limiter::ReconnectRateLimiter;
 use crate::fs::scanner::{start_scan_loop, ScanState};
 use crate::fs::versions::VersionStore;
 use notify::{Event, RecursiveMode, Watcher};
+use parking_lot::Mutex;
 use rusqlite::Connection;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
 
@@ -66,18 +67,15 @@ impl PendingWrites {
     pub fn add(&self, path: PathBuf) {
         // Ignore events for this path for 100ms
         let expiry = std::time::Instant::now() + Duration::from_millis(100);
-        self.paths
-            .lock()
-            .unwrap()
-            .insert(Self::normalize(&path), expiry);
+        self.paths.lock().insert(Self::normalize(&path), expiry);
     }
 
-    pub fn remove(&self, path: &PathBuf) {
-        self.paths.lock().unwrap().remove(&Self::normalize(path));
+    pub fn remove(&self, path: &std::path::Path) {
+        self.paths.lock().remove(&Self::normalize(path));
     }
 
-    pub fn should_ignore(&self, path: &PathBuf) -> bool {
-        let mut paths = self.paths.lock().unwrap();
+    pub fn should_ignore(&self, path: &std::path::Path) -> bool {
+        let mut paths = self.paths.lock();
         let key = Self::normalize(path);
 
         if let Some(&expiry) = paths.get(&key) {
@@ -89,6 +87,12 @@ impl PendingWrites {
             }
         }
         false
+    }
+}
+
+impl Default for PendingWrites {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -106,18 +110,24 @@ impl ActivityTracker {
     }
 
     pub fn mark(&self, url: &str) {
-        let mut activity = self.activity.lock().unwrap();
+        let mut activity = self.activity.lock();
         activity.insert(url.to_string(), std::time::Instant::now());
     }
 
     pub fn is_active(&self, url: &str) -> bool {
         // Log is active if there was activity in the last 10 minutes
-        let activity = self.activity.lock().unwrap();
+        let activity = self.activity.lock();
         if let Some(&last_time) = activity.get(url) {
             std::time::Instant::now().duration_since(last_time) < Duration::from_secs(600)
         } else {
             false
         }
+    }
+}
+
+impl Default for ActivityTracker {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -157,7 +167,7 @@ pub async fn run_daemon(port: u16) -> Result<()> {
         config::get_root_dir().map_err(|e| crate::core::BraidError::Fs(e.to_string()))?;
     tokio::fs::create_dir_all(&root_dir)
         .await
-        .map_err(|e| crate::core::BraidError::Io(e))?;
+        .map_err(crate::core::BraidError::Io)?;
 
     tracing::info!("BraidFS root: {:?}", root_dir);
 
@@ -487,7 +497,10 @@ pub async fn run_daemon(port: u16) -> Result<()> {
                         } else {
                             let state_nfs = state.clone();
                             let handle = tokio::spawn(async move {
-                                let backend = nfs::BraidNfsBackend::new(state_nfs.clone(), state_nfs.binary_sync.blob_store());
+                                let backend = match nfs::BraidNfsBackend::new(state_nfs.clone(), state_nfs.binary_sync.blob_store()) {
+                                    Ok(backend) => backend,
+                                    Err(error) => { tracing::error!(%error, "NFS inode recovery failed"); return; }
+                                };
                                 tracing::info!("Starting NFS server on port {}", port);
                                  match nfsserve::tcp::NFSTcpListener::bind(&format!("127.0.0.1:{}", port), backend).await {
                                      Ok(listener) => {

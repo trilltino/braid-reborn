@@ -4,11 +4,12 @@
 //! shared across endpoints on the same machine). In production you'd
 //! swap this for iroh's DNS + Pkarr discovery.
 
+use parking_lot::RwLock;
 use std::collections::BTreeMap;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use iroh::address_lookup::{
-    AddressLookup, EndpointData, EndpointInfo, Error, IntoAddressLookup, Item,
+    AddressLookup, AddressLookupBuilder, EndpointData, EndpointInfo, Error, Item,
 };
 use iroh::{Endpoint, EndpointAddr, EndpointId};
 use n0_future::boxed::BoxStream;
@@ -59,15 +60,15 @@ impl MockDiscoveryMap {
     /// Add a node's address information to the mock discovery map.
     /// Useful for manually registering peers if needed.
     pub fn add_node(&self, id: EndpointId, data: EndpointData) {
-        self.peers.write().unwrap().insert(id, Arc::new(data));
+        self.peers.write().insert(id, Arc::new(data));
     }
 }
 
-impl IntoAddressLookup for MockDiscoveryMap {
+impl AddressLookupBuilder for MockDiscoveryMap {
     fn into_address_lookup(
         self,
         endpoint: &Endpoint,
-    ) -> Result<impl AddressLookup, iroh::address_lookup::IntoAddressLookupError> {
+    ) -> Result<impl AddressLookup, iroh::address_lookup::AddressLookupBuilderError> {
         Ok(MockDiscoveryInstance {
             id: endpoint.id(),
             map: self,
@@ -88,12 +89,11 @@ impl AddressLookup for MockDiscoveryInstance {
         self.map
             .peers
             .write()
-            .unwrap()
             .insert(self.id, Arc::new(data.clone()));
     }
 
     fn resolve(&self, endpoint_id: EndpointId) -> Option<BoxStream<Result<Item, Error>>> {
-        let data = self.map.peers.read().unwrap().get(&endpoint_id).cloned()?;
+        let data = self.map.peers.read().get(&endpoint_id).cloned()?;
         let info = EndpointInfo::from_parts(endpoint_id, data.as_ref().clone());
         let item = Item::new(info, "mock-braid", None);
         Some(n0_future::stream::once(Ok(item)).boxed())
@@ -107,13 +107,13 @@ mod tests {
     #[test]
     fn test_mock_discovery_map_new() {
         let map = MockDiscoveryMap::new();
-        assert!(map.peers.read().unwrap().is_empty());
+        assert!(map.peers.read().is_empty());
     }
 
     #[test]
     fn test_mock_discovery_default() {
         let map: MockDiscoveryMap = Default::default();
-        assert!(map.peers.read().unwrap().is_empty());
+        assert!(map.peers.read().is_empty());
     }
 
     #[test]
@@ -135,13 +135,13 @@ mod tests {
     #[test]
     fn test_mock_discovery_map_add_node() {
         let map = MockDiscoveryMap::new();
-        let id = EndpointId::from_bytes(&[1u8; 32]).expect("valid test key");
+        let id = iroh::SecretKey::from_bytes(&[1u8; 32]).public();
         let data = EndpointData::default();
 
         map.add_node(id, data);
 
-        assert_eq!(map.peers.read().unwrap().len(), 1);
-        assert!(map.peers.read().unwrap().contains_key(&id));
+        assert_eq!(map.peers.read().len(), 1);
+        assert!(map.peers.read().contains_key(&id));
     }
 
     #[test]
@@ -149,11 +149,11 @@ mod tests {
         let map = MockDiscoveryMap::new();
 
         for i in 0..5 {
-            let id = EndpointId::from_bytes(&[i as u8; 32]).expect("valid test key");
+            let id = iroh::SecretKey::from_bytes(&[i as u8; 32]).public();
             let data = EndpointData::default();
             map.add_node(id, data);
         }
 
-        assert_eq!(map.peers.read().unwrap().len(), 5);
+        assert_eq!(map.peers.read().len(), 5);
     }
 }

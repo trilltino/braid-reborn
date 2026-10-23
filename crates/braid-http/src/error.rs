@@ -10,6 +10,8 @@ pub type Result<T> = std::result::Result<T, BraidError>;
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum BraidError {
+    #[error("{resource} exceeds the configured limit of {limit} bytes")]
+    ResourceLimit { resource: &'static str, limit: u64 },
     #[error("HTTP error: {0}")]
     Http(String),
 

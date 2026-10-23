@@ -42,7 +42,12 @@ impl MergePatch {
     }
 
     /// Create with version info.
-    pub fn with_version(range: &str, content: Value, version: braid_http::types::Version, parents: Vec<braid_http::types::Version>) -> Self {
+    pub fn with_version(
+        range: &str,
+        content: Value,
+        version: braid_http::types::Version,
+        parents: Vec<braid_http::types::Version>,
+    ) -> Self {
         Self {
             range: range.to_string(),
             content,
@@ -67,7 +72,10 @@ pub struct MergeResult {
 
 impl MergeResult {
     /// Create a successful merge result.
-    pub fn success(version: Option<braid_http::types::Version>, rebased_patches: Vec<MergePatch>) -> Self {
+    pub fn success(
+        version: Option<braid_http::types::Version>,
+        rebased_patches: Vec<MergePatch>,
+    ) -> Self {
         Self {
             success: true,
             rebased_patches,
@@ -146,8 +154,11 @@ impl Clone for Box<dyn MergeType> {
 }
 
 /// Registry for available merge types.
+type MergeFactory = Box<dyn Fn(&str) -> Box<dyn MergeType> + Send + Sync>;
+
+#[derive(Default)]
 pub struct MergeTypeRegistry {
-    factories: HashMap<String, Box<dyn Fn(&str) -> Box<dyn MergeType> + Send + Sync>>,
+    factories: HashMap<String, MergeFactory>,
 }
 
 impl std::fmt::Debug for MergeTypeRegistry {
@@ -158,14 +169,6 @@ impl std::fmt::Debug for MergeTypeRegistry {
                 &self.factories.keys().collect::<Vec<_>>(),
             )
             .finish()
-    }
-}
-
-impl Default for MergeTypeRegistry {
-    fn default() -> Self {
-        Self {
-            factories: HashMap::new(),
-        }
     }
 }
 
@@ -208,7 +211,4 @@ impl MergeTypeRegistry {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-}
+mod tests {}

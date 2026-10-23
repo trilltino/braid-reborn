@@ -4,6 +4,7 @@ use std::hash::Hash;
 
 /// A version identifier in the Braid protocol.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum Version {
     /// String-based version ID.

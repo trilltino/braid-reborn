@@ -70,9 +70,9 @@ impl DebouncedSyncManager {
 
                 // Live sync: minimal debounce for real-time collaboration
                 let deadline = if !p.contains_key(&req.url) {
-                    now + Duration::from_millis(10)  // First keystroke: 10ms
+                    now + Duration::from_millis(10) // First keystroke: 10ms
                 } else {
-                    now + debounce_duration  // Subsequent: from config (default 10ms)
+                    now + debounce_duration // Subsequent: from config (default 10ms)
                 };
 
                 info!(

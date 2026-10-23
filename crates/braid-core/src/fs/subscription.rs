@@ -210,7 +210,7 @@ pub async fn materialize_update(
         let mut store = state.version_store.write().await;
         let old = store.file_versions.get(url).cloned();
         store.update_with_hash(
-            &url,
+            url,
             update.version.clone(),
             update.parents.clone(),
             Some(crate::fs::sync::content_hash(&data)),
@@ -230,7 +230,7 @@ pub async fn materialize_update(
             return Err(e);
         }
     }
-    state.tracker.mark(&url);
+    state.tracker.mark(url);
     if let Ok(text) = std::str::from_utf8(&data) {
         state
             .content_cache

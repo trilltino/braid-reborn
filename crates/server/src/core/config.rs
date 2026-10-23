@@ -8,8 +8,8 @@ use crate::chat::friends::FriendManager;
 use crate::chat::mail::MailManager;
 use crate::core::auth::AuthManager;
 use crate::core::daemon::DaemonIntegration;
-use crate::core::store::JsonChatStore;
 use crate::core::pages::{LocalOrgManager, PagesManager};
+use crate::core::store::JsonChatStore;
 
 /// Configuration for the Braid Chat Server
 #[derive(Clone, Debug)]
@@ -48,10 +48,7 @@ impl Default for ChatServerConfig {
             enable_offline: true,
             max_blob_size: 50,
             inline_threshold: 10240, // 10KB
-            node_id: format!(
-                "server-{}",
-                uuid::Uuid::new_v4().to_string()[..8].to_string()
-            ),
+            node_id: format!("server-{}", &uuid::Uuid::new_v4().to_string()[..8]),
         }
     }
 }

@@ -1,7 +1,7 @@
 use crate::core::auth::UserInfo;
 use crate::core::config::AppState;
 use crate::core::ctx::Ctx;
-use crate::core::error::{Error, Result};
+use crate::core::error::Result;
 use axum::extract::State;
 use axum::Json;
 

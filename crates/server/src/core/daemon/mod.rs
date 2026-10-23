@@ -126,20 +126,7 @@ impl DaemonIntegration {
 
                         let is_relevant = if let Some(first_comp) = relative.components().next() {
                             let s = first_comp.as_os_str().to_string_lossy();
-                            // Allow "ai" folder
-                            if s == "ai" {
-                                true
-                            }
-                            // Allow "local" folder (User Profile content)
-                            else if s == "local" {
-                                true
-                            }
-                            // Allow root files (metadata)
-                            else if relative.components().count() == 1 {
-                                true
-                            } else {
-                                false
-                            }
+                            s == "ai" || s == "local" || relative.components().count() == 1
                         } else {
                             false
                         };

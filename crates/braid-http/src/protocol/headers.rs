@@ -9,24 +9,30 @@ pub fn headers_from_http(
 ) -> Result<std::collections::BTreeMap<String, String>> {
     let mut result = std::collections::BTreeMap::new();
     for key in headers.keys() {
-        if matches!(key.as_str(), "version" | "parents" | "current-version") {
-            let values = headers
-                .get_all(key)
-                .iter()
-                .map(|v| {
-                    v.to_str()
-                        .map_err(|e| BraidError::HeaderParse(e.to_string()))
-                })
-                .collect::<Result<Vec<_>>>()?;
-            result.insert(key.as_str().to_owned(), values.join(", "));
-        } else if let Some(value) = headers
+        let values = headers
             .get_all(key)
             .iter()
-            .filter_map(|v| v.to_str().ok())
-            .last()
+            .map(|v| {
+                v.to_str()
+                    .map_err(|e| BraidError::HeaderParse(e.to_string()))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        if values.len() > 1
+            && matches!(
+                key.as_str(),
+                "content-length"
+                    | "content-range"
+                    | "patches"
+                    | "merge-type"
+                    | "subscribe"
+                    | "heartbeats"
+                    | "repr-digest"
+                    | "repr-type"
+            )
         {
-            result.insert(key.as_str().to_owned(), value.to_owned());
+            return Err(BraidError::HeaderParse(format!("Duplicate header: {key}")));
         }
+        result.insert(key.as_str().to_owned(), values.join(", "));
     }
     Ok(result)
 }
@@ -37,12 +43,6 @@ pub fn parse_version_header(value: &str) -> Result<Vec<Version>> {
     if value.is_empty() {
         return Ok(vec![]);
     }
-    // Explicit compatibility for older JSON-array frontiers; never selected by hostname.
-    if value.starts_with('[') {
-        let versions = serde_json::from_str::<Vec<String>>(value)
-            .map_err(|e| BraidError::HeaderParse(e.to_string()))?;
-        return Ok(versions.into_iter().map(Version::String).collect());
-    }
     use sfv::{BareItem, List, ListEntry, Parser};
     let list = Parser::new(value)
         .parse::<List>()
@@ -50,28 +50,41 @@ pub fn parse_version_header(value: &str) -> Result<Vec<Version>> {
     let mut versions = vec![];
     for entry in list {
         let version = match entry {
-            ListEntry::Item(item) => match item.bare_item {
+            ListEntry::Item(item) if item.params.is_empty() => match item.bare_item {
                 BareItem::String(s) => Version::String(s.into()),
-                BareItem::Integer(i) => Version::Integer(i.into()),
-                BareItem::Token(t) => Version::String(t.into()),
+                BareItem::DisplayString(s) => Version::String(s),
                 _ => return Err(BraidError::HeaderParse("Invalid version type".into())),
             },
             _ => return Err(BraidError::HeaderParse("Nested version frontier".into())),
         };
+        if version.to_string().is_empty() || version.to_string().chars().any(char::is_control) {
+            return Err(BraidError::HeaderParse(
+                "Empty or control-containing event ID".into(),
+            ));
+        }
         if !versions.contains(&version) {
             versions.push(version);
         }
     }
+    versions.sort_by_key(ToString::to_string);
     Ok(versions)
 }
 
 /// Format version header value.
 pub fn format_version_header(versions: &[Version]) -> String {
-    versions
+    let mut identifiers: Vec<String> = versions.iter().map(ToString::to_string).collect();
+    identifiers.sort();
+    identifiers.dedup();
+    identifiers
         .iter()
-        .map(|v| match v {
-            Version::String(s) => format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\"")),
-            Version::Integer(i) => i.to_string(),
+        .map(|s| {
+            if s.bytes().all(|b| (0x20..=0x7e).contains(&b)) {
+                format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
+            } else {
+                sfv::ItemSerializer::new()
+                    .bare_item(sfv::RefBareItem::DisplayString(s))
+                    .finish()
+            }
         })
         .collect::<Vec<_>>()
         .join(", ")
@@ -81,9 +94,16 @@ pub fn format_version_header_json(versions: &[Version]) -> String {
     // Braid.org expects JSON array of STRINGS.
     // Ensure all versions (even Integers) are serialized as strings.
     let strings: Vec<String> = versions.iter().map(|v| v.to_string()).collect();
-    let json = serde_json::to_string(&strings).unwrap_or_else(|_| "[]".to_string());
-    tracing::info!("[Protocol] Formatted headers as JSON: {}", json);
-    json
+    serde_json::Value::from(strings).to_string()
+}
+
+/// The drafts use a Structured Fields boolean; `true`/`false` are retained for JS peers.
+pub fn parse_subscribe(value: &str) -> Result<bool> {
+    match value.trim() {
+        "?1" | "true" => Ok(true),
+        "?0" | "false" => Ok(false),
+        _ => Err(BraidError::HeaderParse("Invalid Subscribe boolean".into())),
+    }
 }
 
 pub fn parse_current_version_header(value: &str) -> Result<Vec<Version>> {

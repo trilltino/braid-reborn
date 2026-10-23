@@ -108,9 +108,7 @@ pub mod bridge {
             .map_err(|e| format!("Failed to read request body: {}", e))?;
 
         // Build the request using IrohH3Client
-        let mut builder = state
-            .client
-            .request(parts.method.clone(), &target_url);
+        let mut builder = state.client.request(parts.method.clone(), &target_url);
 
         // Copy headers from the original request, skipping hop-by-hop headers
         for (key, value) in &parts.headers {
@@ -136,9 +134,13 @@ pub mod bridge {
         // Set the body and build the request
         // Use the .bytes() method on RequestBuilder to set body with octet-stream content-type
         let client_req = if body_bytes.is_empty() {
-            builder.build().map_err(|e| format!("Failed to build request: {}", e))?
+            builder
+                .build()
+                .map_err(|e| format!("Failed to build request: {}", e))?
         } else {
-            builder.bytes(body_bytes).map_err(|e| format!("Failed to build request: {}", e))?
+            builder
+                .bytes(body_bytes)
+                .map_err(|e| format!("Failed to build request: {}", e))?
         };
 
         let resp = client_req
@@ -175,10 +177,7 @@ pub mod bridge {
             // Skip hop-by-hop headers in response
             if matches!(
                 key_str.as_str(),
-                "connection"
-                    | "keep-alive"
-                    | "transfer-encoding"
-                    | "upgrade"
+                "connection" | "keep-alive" | "transfer-encoding" | "upgrade"
             ) {
                 continue;
             }

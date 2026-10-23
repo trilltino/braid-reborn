@@ -22,18 +22,26 @@ pub async fn get(
     headers: HeaderMap,
     merge_type: &str,
 ) -> Response {
-    if headers.get("subscribe").is_some_and(|v| v == "true") {
+    let fields = match braid_http::protocol::headers_from_http(&headers) {
+        Ok(fields) => fields,
+        Err(error) => return (StatusCode::BAD_REQUEST, error.to_string()).into_response(),
+    };
+    let subscribe = match fields
+        .get("subscribe")
+        .map(|s| braid_http::protocol::parse_subscribe(s))
+        .transpose()
+    {
+        Ok(value) => value.unwrap_or(false),
+        Err(error) => return (StatusCode::BAD_REQUEST, error.to_string()).into_response(),
+    };
+    if subscribe {
         let (document, mut receiver, keepalive) = match store.subscribe(&resource, merge_type).await
         {
             Ok(subscription) => subscription,
             Err(e) => return error_response(e),
         };
-        let initial = if let Some(parents) = headers.get("parents") {
-            let frontier = match parents
-                .to_str()
-                .ok()
-                .and_then(|v| braid_http::protocol::parse_version_header(v).ok())
-            {
+        let initial = if let Some(parents) = fields.get("parents") {
+            let frontier = match braid_http::protocol::parse_version_header(parents).ok() {
                 Some(v) => v.into_iter().map(|v| v.to_string()).collect::<Vec<_>>(),
                 None => return (StatusCode::BAD_REQUEST, "Invalid Parents").into_response(),
             };
@@ -71,7 +79,7 @@ pub async fn get(
             .header("merge-type", document.merge_type)
             .header("cache-control", "no-cache")
             .body(Body::from_stream(stream))
-            .unwrap();
+            .unwrap_or_else(crate::core::server::response_error);
     }
     match store.load(&resource).await {
         Ok(Some(document)) => super::BraidUpdate(document.snapshot()).into_response(),
@@ -106,7 +114,7 @@ pub async fn put(
                     braid_http::protocol::format_version_header(&document.snapshot().version),
                 )
                 .body(Body::empty())
-                .unwrap()
+                .unwrap_or_else(crate::core::server::response_error)
         }
         Err(e) => error_response(e),
     }

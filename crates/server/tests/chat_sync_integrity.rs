@@ -1,6 +1,6 @@
-use server::config::ChatServerConfig;
-use server::models::MessageType;
-use server::store::JsonChatStore;
+use local_link_server::core::config::ChatServerConfig;
+use local_link_server::core::models::MessageType;
+use local_link_server::core::store::json_store::JsonChatStore;
 use std::fs;
 use tempfile::tempdir;
 
@@ -28,7 +28,7 @@ async fn test_chat_room_storage_integrity() {
         // store is dropped here
     }
 
-    let room_path = dir.path().join("chats").join(format!("{}.json", room_id));
+    let room_path = config.storage_dir.join(format!("{}.json", room_id));
     assert!(room_path.exists(), "Room JSON file should exist");
 
     // 2. Verify we can load it back correctly (Force reload by creating a new store instance)
@@ -75,10 +75,12 @@ async fn test_chat_server_blob_integrity() {
     assert_eq!(retrieved, blob_data);
 
     // 3. Corrupt it
+    let metadata = store.blob_store().get_meta(&hash).await.unwrap().unwrap();
     let blob_file_path = dir
         .path()
         .join("blobs")
-        .join(braid_core::blob::encode_filename(&hash));
+        .join("objects")
+        .join(metadata.content_hash.unwrap());
     fs::write(&blob_file_path, "corrupted blob").unwrap();
 
     // 4. Verify checksum failure (using the feature we just added to braid-blob)

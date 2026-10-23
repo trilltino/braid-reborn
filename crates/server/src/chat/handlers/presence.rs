@@ -12,7 +12,8 @@ use tokio::sync::RwLock;
 use tracing::{info, warn};
 
 /// In-memory presence store (could be moved to JsonChatStore later)
-static PRESENCE: RwLock<Option<Arc<RwLock<HashMap<String, Presence>>>>> = RwLock::const_new(None);
+type SharedPresence = Arc<RwLock<HashMap<String, Presence>>>;
+static PRESENCE: RwLock<Option<SharedPresence>> = RwLock::const_new(None);
 
 async fn get_presence_store() -> Arc<RwLock<HashMap<String, Presence>>> {
     let guard = PRESENCE.read().await;

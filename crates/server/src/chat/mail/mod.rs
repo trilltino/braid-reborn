@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use std::convert::Infallible;
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, warn};
 
 /// Mail feed item with Braid protocol metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -359,7 +359,7 @@ impl MailManager {
                         }
                     }
                     // Sort by date descending
-                    feed_guard.sort_by(|a, b| b.date.unwrap_or(0).cmp(&a.date.unwrap_or(0)));
+                    feed_guard.sort_by_key(|a| std::cmp::Reverse(a.date.unwrap_or(0)));
                     drop(feed_guard);
 
                     // Update last version
@@ -407,7 +407,7 @@ impl MailManager {
         let mut last_version = None;
 
         // Process first batch of updates
-        while let Some(update_result) = subscription.next().await {
+        if let Some(update_result) = subscription.next().await {
             match update_result {
                 Ok(update) => {
                     // Get version from extra_headers if available
@@ -419,12 +419,10 @@ impl MailManager {
                         items.extend(parsed_items);
                     }
 
-                    // Only process first update for now
-                    break;
+                    // Only the first subscription update is requested here.
                 }
                 Err(e) => {
-                    warn!("[MailManager] Subscription error: {}", e);
-                    break;
+                    return Err(e.into());
                 }
             }
         }
@@ -438,17 +436,16 @@ impl MailManager {
         if let Ok(links) = serde_json::from_str::<Vec<Option<serde_json::Value>>>(body) {
             return links
                 .into_iter()
-                .filter_map(|item| item) // Skip null entries like braidmail does
+                .flatten() // Skip null entries like braidmail does
                 .filter_map(|item| {
                     // Handle both string links and {link: "..."} objects
                     let link = if let Some(s) = item.as_str() {
                         s.to_string()
-                    } else if let Some(obj) = item.as_object() {
+                    } else {
+                        let obj = item.as_object()?;
                         obj.get("link")
                             .and_then(|l| l.as_str())
                             .map(|s| s.to_string())?
-                    } else {
-                        return None;
                     };
 
                     Some(MailFeedItem {
@@ -585,13 +582,12 @@ impl MailManager {
         post.url = url.clone();
 
         // Get user email for 'from' field if not set
-        let from =
-            if post.from.is_none() || post.from.as_ref().map(|f| f.is_empty()).unwrap_or(true) {
-                let email = self.user_email.read().await.clone();
-                vec![email.unwrap_or_else(|| "anonymous".to_string())]
-            } else {
-                post.from.clone().unwrap()
-            };
+        let from = if let Some(from) = post.from.as_ref().filter(|from| !from.is_empty()) {
+            from.clone()
+        } else {
+            let email = self.user_email.read().await.clone();
+            vec![email.unwrap_or_else(|| "anonymous".to_string())]
+        };
         post.from = Some(from.clone());
 
         // Build the post body matching xfmail's BraidPostRequest format
@@ -657,7 +653,11 @@ impl MailManager {
                 } else {
                     let body = String::from_utf8_lossy(&resp.body);
                     tracing::error!("[Mail] Send failed with status {}: {}", resp.status, body);
-                    Err(anyhow::anyhow!("Server returned status {}: {}", resp.status, body).into())
+                    Err(anyhow::anyhow!(
+                        "Server returned status {}: {}",
+                        resp.status,
+                        body
+                    ))
                 }
             }
             Err(e) => {
@@ -739,7 +739,7 @@ pub async fn get_mail_feed(
         };
 
         return Response::builder()
-            .status(StatusCode::from_u16(209).unwrap())
+            .status(209)
             .header(header::CONTENT_TYPE, "application/json")
             .header(headers::SUBSCRIBE.as_str(), "true")
             .header("Merge-Type", "simpleton")
@@ -752,13 +752,16 @@ pub async fn get_mail_feed(
 
     // Standard JSON response
     let items = state.mail_manager.get_feed_items().await;
-    Ok(Response::builder()
+    Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, "application/json")
         .body(Body::from(
             serde_json::to_string(&items).unwrap_or_default(),
         ))
-        .unwrap())
+        .map_err(|error| {
+            tracing::error!(%error, "Mail response construction failed");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })
 }
 
 /// API: Get a specific mail post

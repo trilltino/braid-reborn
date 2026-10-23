@@ -14,11 +14,11 @@ pub async fn atomic_write(path: &Path, data: &[u8]) -> std::io::Result<()> {
     tokio::fs::create_dir_all(parent).await?;
     let tmp = parent.join(format!(".braid-{}.tmp", uuid::Uuid::new_v4()));
     let result = async {
-        let mut file = tokio::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&tmp)
-            .await?;
+        let mut options = tokio::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        options.mode(0o600);
+        let mut file = options.open(&tmp).await?;
         file.write_all(data).await?;
         file.sync_all().await?;
         drop(file);

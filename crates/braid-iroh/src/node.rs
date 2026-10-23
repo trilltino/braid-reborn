@@ -23,6 +23,10 @@ pub const BRAID_H3_ALPN: &[u8] = b"braid-h3/0";
 /// Configuration for spawning a BraidIrohNode.
 #[derive(Clone)]
 pub struct BraidIrohConfig {
+    /// Override the replica root without changing process environment.
+    pub storage_dir: Option<std::path::PathBuf>,
+    /// Empty by default: authorize peers explicitly, or choose Public deliberately.
+    pub access: crate::protocol::AccessPolicy,
     /// Discovery configuration.
     pub discovery: DiscoveryConfig,
 
@@ -46,6 +50,8 @@ pub struct ProxyConfig {
 impl Default for BraidIrohConfig {
     fn default() -> Self {
         Self {
+            storage_dir: None,
+            access: Default::default(),
             discovery: DiscoveryConfig::Mock(MockDiscoveryMap::new()),
             secret_key: None,
             proxy_config: None,
@@ -56,6 +62,9 @@ impl Default for BraidIrohConfig {
 /// A Braid-capable P2P peer. Holds the iroh endpoint, gossip, and
 /// subscription state. Create one per peer identity.
 pub struct BraidIrohNode {
+    access: Arc<parking_lot::RwLock<crate::protocol::AccessPolicy>>,
+    policy_changed: tokio::sync::watch::Sender<u64>,
+    proxy_task: Option<tokio::task::JoinHandle<()>>,
     endpoint: Endpoint,
     #[allow(dead_code)]
     router: Router,
@@ -71,7 +80,11 @@ impl BraidIrohNode {
     /// accepting incoming connections.
     pub async fn spawn(config: BraidIrohConfig) -> anyhow::Result<Self> {
         // 1. Build the iroh endpoint with discovery + Braid ALPN
-        let mut builder = Endpoint::builder().alpns(vec![
+        let mut builder = match &config.discovery {
+            DiscoveryConfig::Mock(_) => Endpoint::builder(iroh::endpoint::presets::Minimal),
+            DiscoveryConfig::Real => Endpoint::builder(iroh::endpoint::presets::N0),
+        }
+        .alpns(vec![
             BRAID_H3_ALPN.to_vec(),
             iroh_gossip::net::GOSSIP_ALPN.to_vec(),
         ]);
@@ -97,34 +110,40 @@ impl BraidIrohNode {
         tracing::info!(id = %endpoint.id(), "iroh endpoint bound");
 
         // 2. Start the gossip protocol on this endpoint
-        // In iroh 0.96, spawning gossip is synchronous and returns the Gossip handle directly
+        // Gossip is owned by the router and stops during router shutdown.
         let gossip = Gossip::builder().spawn(endpoint.clone());
 
         // 3. Build shared state
-        let root = std::env::var_os("BRAID_ROOT")
-            .map(std::path::PathBuf::from)
+        let root = config
+            .storage_dir
+            .or_else(|| std::env::var_os("BRAID_ROOT").map(std::path::PathBuf::from))
             .unwrap_or_else(|| "braid_data".into());
         let replica = braid_http_rs::replica::ReplicaStore::new(
             root.join("iroh").join(endpoint.id().to_string()),
         );
         let subscription_mgr = Arc::new(SubscriptionManager::new(gossip.clone()));
+        let access = Arc::new(parking_lot::RwLock::new(config.access));
+        let (policy_changed, _) = tokio::sync::watch::channel(0);
         let app_state = BraidAppState {
+            policy_changed: policy_changed.clone(),
             replica: replica.clone(),
+            access: access.clone(),
         };
 
         // 4. Mount the Braid protocol handler on the iroh router
         let braid_handler = protocol::build_protocol_handler(app_state);
 
         let router = Router::builder(endpoint.clone())
-            .accept(BRAID_H3_ALPN.to_vec(), braid_handler)
-            .accept(iroh_gossip::net::GOSSIP_ALPN.to_vec(), gossip.clone())
+            .accept(BRAID_H3_ALPN, braid_handler)
+            .accept(iroh_gossip::net::GOSSIP_ALPN, gossip.clone())
             .spawn();
 
         // 5. Start TCP Proxy if configured (Phase 4)
+        let mut proxy_task = None;
         #[cfg(feature = "proxy")]
         if let Some(proxy_conf) = config.proxy_config {
             let endpoint_clone = endpoint.clone();
-            tokio::spawn(async move {
+            proxy_task = Some(tokio::spawn(async move {
                 if let Err(e) = crate::proxy::bridge::start_proxy(
                     &endpoint_clone,
                     proxy_conf.listen_addr,
@@ -134,10 +153,13 @@ impl BraidIrohNode {
                 {
                     tracing::error!("TCP Proxy failed: {}", e);
                 }
-            });
+            }));
         }
 
         Ok(Self {
+            policy_changed,
+            proxy_task,
+            access,
             endpoint,
             router,
             subscription_mgr,
@@ -187,8 +209,10 @@ impl BraidIrohNode {
             )
             .await?;
         // Gossip failure never rolls back an already durable commit. Peers catch up via HTTP.
-        if let Err(e) = self.subscription_mgr.broadcast(&normalized, &update).await {
-            tracing::warn!(%e,"Gossip announcement failed after commit");
+        if matches!(*self.access.read(), crate::protocol::AccessPolicy::Public) {
+            if let Err(e) = self.subscription_mgr.broadcast(&normalized, &update).await {
+                tracing::warn!(%e,"Gossip announcement failed after commit");
+            }
         }
         Ok(())
     }
@@ -246,6 +270,10 @@ impl BraidIrohNode {
     /// Shut down the node gracefully.
     #[allow(dead_code)]
     pub async fn shutdown(self) -> anyhow::Result<()> {
+        if let Some(task) = self.proxy_task {
+            task.abort();
+            let _ = task.await;
+        }
         self.router.shutdown().await?;
         Ok(())
     }
@@ -259,6 +287,20 @@ impl BraidIrohNode {
     /// Access the iroh endpoint (for advanced usage).
     pub fn endpoint(&self) -> &Endpoint {
         &self.endpoint
+    }
+
+    pub fn allow_peer(&self, peer: EndpointId) {
+        if let crate::protocol::AccessPolicy::Peers(peers) = &mut *self.access.write() {
+            peers.insert(peer);
+        }
+    }
+
+    pub fn revoke_peer(&self, peer: EndpointId) {
+        if let crate::protocol::AccessPolicy::Peers(peers) = &mut *self.access.write() {
+            peers.remove(&peer);
+        }
+        self.policy_changed
+            .send_modify(|generation| *generation = generation.wrapping_add(1));
     }
 
     /// Join additional peers to an existing gossip topic.

@@ -30,20 +30,30 @@ pub async fn spawn_node(
         get_or_create_secret_key(name).await?
     };
 
-    let proxy_port = port.unwrap_or(8080);
-
-    tracing::info!("[INIT] Spawning Node: {} | Port: {}", name, proxy_port);
-
     #[cfg(feature = "proxy")]
-    let proxy_config = Some(crate::node::ProxyConfig {
-        listen_addr: format!("127.0.0.1:{}", proxy_port).parse().unwrap(),
-        default_peer: iroh::EndpointId::from_bytes(&[0u8; 32]).expect("Invalid placeholder key"),
-    });
-
+    let proxy_config = match port {
+        Some(port) => {
+            let peer = std::env::var("BRAID_PROXY_PEER").map_err(|_| {
+                anyhow::anyhow!(
+                    "A proxy port requires BRAID_PROXY_PEER; or set ProxyConfig explicitly"
+                )
+            })?;
+            Some(crate::node::ProxyConfig {
+                listen_addr: std::net::SocketAddr::from(([127, 0, 0, 1], port)),
+                default_peer: peer.parse()?,
+            })
+        }
+        None => None,
+    };
     #[cfg(not(feature = "proxy"))]
-    let proxy_config = None;
+    let proxy_config = {
+        anyhow::ensure!(port.is_none(), "Proxy feature is disabled");
+        None
+    };
 
     let peer = BraidIrohNode::spawn(BraidIrohConfig {
+        storage_dir: None,
+        access: Default::default(),
         discovery,
         secret_key: Some(secret_key),
         proxy_config,
@@ -72,7 +82,6 @@ pub async fn spawn_node(
 
 /// Persist a random endpoint identity. Names select a key file, never key material.
 pub async fn get_or_create_secret_key(name: &str) -> anyhow::Result<iroh::SecretKey> {
-    use tokio::io::AsyncWriteExt;
     let root = std::env::var_os("BRAID_ROOT")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| "braid_data".into());
@@ -80,6 +89,26 @@ pub async fn get_or_create_secret_key(name: &str) -> anyhow::Result<iroh::Secret
         .join("keys")
         .join(format!("{}.key", blake3::hash(name.as_bytes()).to_hex()));
     let _guard = braid_http_rs::replica::storage_lock(path.clone()).await;
+    let keys = path
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("Invalid identity path"))?;
+    tokio::fs::create_dir_all(keys).await?;
+    let lock_path = path.with_extension("lock");
+    // The kernel releases this lock on process death. Waiting never blocks an
+    // async executor thread, and the handle remains owned until publication.
+    let _process_lock = tokio::task::spawn_blocking(move || -> std::io::Result<std::fs::File> {
+        let mut options = std::fs::OpenOptions::new();
+        options.create(true).truncate(false).read(true).write(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let file = options.open(lock_path)?;
+        file.lock()?;
+        Ok(file)
+    })
+    .await??;
     match tokio::fs::read(&path).await {
         Ok(bytes) => {
             let key: [u8; 32] = bytes
@@ -90,18 +119,14 @@ pub async fn get_or_create_secret_key(name: &str) -> anyhow::Result<iroh::Secret
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
         Err(e) => return Err(e.into()),
     }
-    tokio::fs::create_dir_all(path.parent().unwrap()).await?;
-    let mut options = tokio::fs::OpenOptions::new();
-    options.write(true).create_new(true);
     #[cfg(unix)]
     {
-        options.mode(0o600);
+        use std::os::unix::fs::PermissionsExt;
+        tokio::fs::set_permissions(keys, std::fs::Permissions::from_mode(0o700)).await?;
     }
-    let mut file = options.open(&path).await?;
     let mut bytes = [0u8; 32];
-    use rand::RngCore;
+    use rand::Rng;
     rand::rng().fill_bytes(&mut bytes);
-    file.write_all(&bytes).await?;
-    file.sync_all().await?;
+    braid_http_rs::replica::atomic_write_private(&path, &bytes).await?;
     Ok(iroh::SecretKey::from_bytes(&bytes))
 }

@@ -42,7 +42,7 @@ impl Config {
 
         let content = fs::read_to_string(&config_path)
             .await
-            .map_err(|e| BraidError::Io(e))?;
+            .map_err(BraidError::Io)?;
 
         let mut config: Config = serde_json::from_str(&content).map_err(BraidError::Json)?;
 
@@ -68,15 +68,13 @@ impl Config {
         let config_path = get_config_path()?;
 
         if let Some(parent) = config_path.parent() {
-            fs::create_dir_all(parent)
-                .await
-                .map_err(|e| BraidError::Io(e))?;
+            fs::create_dir_all(parent).await.map_err(BraidError::Io)?;
         }
 
-        let content = serde_json::to_string_pretty(self).map_err(|e| BraidError::Json(e))?;
+        let content = serde_json::to_string_pretty(self).map_err(BraidError::Json)?;
         braid_http::durable::atomic_write(&config_path, content.as_bytes())
             .await
-            .map_err(|e| BraidError::Io(e))?;
+            .map_err(BraidError::Io)?;
 
         Ok(())
     }
@@ -126,9 +124,7 @@ pub fn get_root_dir() -> Result<PathBuf> {
     if let Ok(abs) = std::fs::canonicalize(&root) {
         Ok(abs)
     } else {
-        Ok(std::env::current_dir()
-            .map_err(|e| BraidError::Io(e))?
-            .join(root))
+        Ok(std::env::current_dir().map_err(BraidError::Io)?.join(root))
     }
 }
 

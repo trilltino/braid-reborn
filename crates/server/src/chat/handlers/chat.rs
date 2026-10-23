@@ -11,7 +11,7 @@ use crate::core::{
     },
 };
 use axum::{
-    extract::{Multipart, Path, State},
+    extract::{Path, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Json, Response},
 };
@@ -25,6 +25,7 @@ use tracing::{error, info, warn};
 ///
 /// Braid protocol endpoint for fetching chat room state.
 /// Returns current messages as JSON with Braid version headers.
+#[allow(clippy::result_large_err)] // Axum Response is the public rejection type.
 pub async fn get_chat_room(
     Path(room_id): Path<String>,
     headers: HeaderMap,
@@ -55,10 +56,8 @@ pub async fn get_chat_room(
         (room.room.clone(), room.crdt.get_frontier())
     };
 
-    let current_version = frontier
-        .first()
-        .cloned()
-        .unwrap_or_else(|| braid_http::types::Version::String("0@server".to_string()));
+    let version_header = http::HeaderValue::from_str(&format_version_header(&frontier))
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())?;
 
     // Get messages (optionally since a specific version) - NO LOCK HELD
     let messages = state
@@ -75,27 +74,19 @@ pub async fn get_chat_room(
 
     response_headers.insert(
         http::header::CONTENT_TYPE,
-        "application/json".parse().unwrap(),
+        http::HeaderValue::from_static("application/json"),
     );
-    response_headers.insert(
-        headers::VERSION.clone(),
-        format_version_header(&[current_version.clone()])
-            .parse()
-            .unwrap(),
-    );
-    response_headers.insert(
-        headers::CURRENT_VERSION.clone(),
-        format_version_header(&[current_version]).parse().unwrap(),
-    );
+    response_headers.insert(headers::VERSION.clone(), version_header.clone());
+    response_headers.insert(headers::CURRENT_VERSION.clone(), version_header);
 
     // Add Braid protocol support headers
     response_headers.insert(
         http::HeaderName::from_static("range-request-allow-methods"),
-        "PATCH, PUT".parse().unwrap(),
+        http::HeaderValue::from_static("PATCH, PUT"),
     );
     response_headers.insert(
         http::HeaderName::from_static("range-request-allow-units"),
-        "json".parse().unwrap(),
+        http::HeaderValue::from_static("json"),
     );
 
     let snapshot = ChatSnapshot {
@@ -112,18 +103,14 @@ pub async fn get_chat_room(
 /// Uses antimatter merge type for CRDT consistency.
 pub async fn put_message(
     Path(room_id): Path<String>,
-    headers: HeaderMap,
+    _headers: HeaderMap,
     State(state): State<AppState>,
+    ctx: crate::core::Ctx,
     Json(input): Json<CreateMessageInput>,
 ) -> std::result::Result<(HeaderMap, StatusCode), StatusCode> {
     info!("PUT /chat/{}", room_id);
 
-    // Extract sender from header (in real app, use auth)
-    let sender = headers
-        .get("x-user")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("anonymous")
-        .to_string();
+    let sender = ctx.user_id().to_owned();
 
     // Convert message type
     let msg_type = match input.message_type {
@@ -195,9 +182,10 @@ pub async fn put_message(
     let mut response_headers = HeaderMap::new();
     response_headers.insert(
         headers::VERSION.clone(),
-        format_version_header(&[braid_http::types::Version::String(message.version.clone())])
-            .parse()
-            .unwrap(),
+        http::HeaderValue::from_str(&format_version_header(&[braid_http::types::Version::new(
+            &message.version,
+        )]))
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
     );
 
     Ok((response_headers, StatusCode::OK))

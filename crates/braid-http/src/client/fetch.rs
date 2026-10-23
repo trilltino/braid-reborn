@@ -377,12 +377,6 @@ impl BraidClient {
     }
 }
 
-impl Default for BraidClient {
-    fn default() -> Self {
-        Self::new().expect("Default HTTP client configuration")
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

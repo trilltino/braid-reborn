@@ -366,11 +366,7 @@ async fn handle_set_version(
             let my_id = crate::fs::PEER_ID.read().await.clone();
 
             // Generate a new version ID
-            let version_id = format!(
-                "{}-{}",
-                my_id,
-                uuid::Uuid::new_v4().to_string()[..8].to_string()
-            );
+            let version_id = format!("{}-{}", my_id, &uuid::Uuid::new_v4().to_string()[..8]);
 
             store.update(
                 &url,

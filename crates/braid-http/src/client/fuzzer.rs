@@ -98,7 +98,7 @@ fn test_parser_fuzz_mutated_once() {
 #[test]
 #[ignore]
 fn test_parser_fuzz_forever() {
-    for seed in 0.. {
+    for seed in 0..=u64::MAX {
         if seed % 1000 == 0 {
             println!("Fuzzing seed {}", seed);
         }

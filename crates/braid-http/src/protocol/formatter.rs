@@ -148,6 +148,9 @@ fn encode_parts(update: &Update) -> Result<(BTreeMap<String, String>, Bytes)> {
         headers.insert(name, v.clone());
     }
     if !update.version.is_empty() {
+        crate::protocol::parse_version_header(&crate::protocol::format_version_header(
+            &update.version,
+        ))?;
         headers.insert(
             "version".into(),
             crate::protocol::format_version_header(&update.version),
@@ -157,6 +160,7 @@ fn encode_parts(update: &Update) -> Result<(BTreeMap<String, String>, Bytes)> {
         "parents".into(),
         crate::protocol::format_version_header(&update.parents),
     );
+    crate::protocol::parse_version_header(&headers["parents"])?;
     if let Some(current) = &update.current_version {
         headers.insert(
             "current-version".into(),
@@ -171,6 +175,13 @@ fn encode_parts(update: &Update) -> Result<(BTreeMap<String, String>, Bytes)> {
     }
     let body = if let Some(patches) = &update.patches {
         headers.insert("patches".into(), patches.len().to_string());
+        if let Some(representation_type) = &update.content_type {
+            headers.insert("repr-type".into(), representation_type.clone());
+        }
+        headers.insert(
+            "content-type".into(),
+            format!("application/http-patches; count={}", patches.len()),
+        );
         let mut body = BytesMut::new();
         for patch in patches {
             write_header(

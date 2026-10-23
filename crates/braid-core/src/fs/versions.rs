@@ -60,15 +60,13 @@ impl VersionStore {
     pub async fn save(&self) -> Result<()> {
         tracing::info!("[VersionStore] Saving to: {:?}", self.path);
         if let Some(parent) = self.path.parent() {
-            fs::create_dir_all(parent)
-                .await
-                .map_err(|e| BraidError::Io(e))?;
+            fs::create_dir_all(parent).await.map_err(BraidError::Io)?;
         }
-        let content = serde_json::to_string_pretty(self).map_err(|e| BraidError::Json(e))?;
+        let content = serde_json::to_string_pretty(self).map_err(BraidError::Json)?;
         tracing::info!("[VersionStore] Writing {} bytes", content.len());
         braid_http::durable::atomic_write(&self.path, content.as_bytes())
             .await
-            .map_err(|e| BraidError::Io(e))?;
+            .map_err(BraidError::Io)?;
         tracing::info!("[VersionStore] Save successful");
         Ok(())
     }

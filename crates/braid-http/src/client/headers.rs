@@ -176,11 +176,8 @@ impl BraidHeaders {
     /// Parse from HTTP HeaderMap.
     pub fn from_header_map(headers: &HeaderMap) -> Result<Self> {
         let mut braid_headers = BraidHeaders::new();
-        for (name, value) in headers.iter() {
-            let name_lower = name.as_str().to_lowercase();
-            let value_str = value
-                .to_str()
-                .map_err(|_| BraidError::HeaderParse("Invalid header value".to_string()))?;
+        for (name_lower, value) in protocol::headers_from_http(headers)? {
+            let value_str = value.as_str();
 
             match name_lower.as_str() {
                 "version" => {
@@ -194,7 +191,7 @@ impl BraidHeaders {
                         Some(protocol::parse_version_header(value_str)?);
                 }
                 "subscribe" => {
-                    braid_headers.subscribe = value_str.to_lowercase() == "true";
+                    braid_headers.subscribe = protocol::headers::parse_subscribe(value_str)?;
                 }
                 "peer" => {
                     braid_headers.peer = Some(value_str.to_string());
@@ -206,7 +203,13 @@ impl BraidHeaders {
                     braid_headers.merge_type = Some(value_str.to_string());
                 }
                 "patches" => {
-                    braid_headers.patches_count = value_str.parse().ok();
+                    if value_str.is_empty() || !value_str.bytes().all(|b| b.is_ascii_digit()) {
+                        return Err(BraidError::HeaderParse("Invalid Patches count".into()));
+                    }
+                    braid_headers.patches_count =
+                        Some(value_str.parse().map_err(|_| {
+                            BraidError::HeaderParse("Patches count overflow".into())
+                        })?);
                 }
                 "content-range" => {
                     braid_headers.content_range = Some(value_str.to_string());

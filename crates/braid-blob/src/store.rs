@@ -29,146 +29,133 @@ pub struct BlobMetadata {
     pub size: Option<u64>,
 }
 
+/// Upload policy and immutable event identity. Limits are checked while streaming.
 #[derive(Clone, Debug)]
 #[cfg(feature = "native")]
-pub struct BlobStore {
-    db_path: PathBuf,
-    _meta_db_path: PathBuf,
-    meta_conn: Arc<Mutex<Connection>>,
+pub struct BlobUpload {
+    pub version: Vec<Version>,
+    pub parents: Vec<Version>,
+    pub content_type: Option<String>,
+    pub expected_hash: Option<String>,
+    pub max_bytes: u64,
 }
 
 #[cfg(feature = "native")]
-struct BlobTransaction {
-    conn: tokio::sync::OwnedMutexGuard<Connection>,
-    committed: bool,
-}
-#[cfg(feature = "native")]
-impl Drop for BlobTransaction {
-    fn drop(&mut self) {
-        if !self.committed {
-            let _ = self.conn.execute_batch("ROLLBACK");
+impl BlobUpload {
+    pub fn new(version: Vec<Version>, parents: Vec<Version>, content_type: Option<String>) -> Self {
+        Self {
+            version,
+            parents,
+            content_type,
+            expected_hash: None,
+            max_bytes: crate::objects::DEFAULT_BUFFER_LIMIT,
         }
     }
+}
+
+#[derive(Clone, Debug)]
+#[cfg(feature = "native")]
+pub struct BlobStore {
+    objects: crate::objects::Objects,
+    meta_conn: Arc<Mutex<Connection>>,
 }
 
 #[cfg(feature = "native")]
 impl BlobStore {
     pub async fn new(db_path: PathBuf, meta_db_path: PathBuf) -> Result<Self> {
-        let db_path = if db_path.is_absolute() {
-            db_path
-        } else {
-            std::env::current_dir()?.join(db_path)
-        };
-        let meta_db_path = if meta_db_path.is_absolute() {
-            meta_db_path
-        } else {
-            std::env::current_dir()?.join(meta_db_path)
-        };
-        fs::create_dir_all(&db_path)
-            .await
-            .map_err(|e| BraidError::Io(e))?;
+        let base = std::env::current_dir()?;
+        let db_path = base.join(db_path);
+        let meta_db_path = base.join(meta_db_path);
+        fs::create_dir_all(&db_path).await?;
         if let Some(parent) = meta_db_path.parent() {
-            fs::create_dir_all(parent)
-                .await
-                .map_err(|e| BraidError::Io(e))?;
+            fs::create_dir_all(parent).await?;
         }
-        let conn = Connection::open(&meta_db_path).map_err(|e| BraidError::Fs(e.to_string()))?;
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS meta (
-                key TEXT PRIMARY KEY,
-                value JSON
-            )",
-            [],
-        )
-        .map_err(|e| BraidError::Fs(e.to_string()))?;
-
-        conn.busy_timeout(std::time::Duration::from_secs(5))
-            .map_err(|e| BraidError::Fs(e.to_string()))?;
-        conn.execute_batch("PRAGMA synchronous=FULL; CREATE TABLE IF NOT EXISTS events (key TEXT NOT NULL, version TEXT NOT NULL, fingerprint TEXT NOT NULL, PRIMARY KEY(key,version));").map_err(|e|BraidError::Fs(e.to_string()))?;
+        let conn = tokio::task::spawn_blocking(move || -> Result<Connection> {
+            let conn = Connection::open(meta_db_path).map_err(db_error)?;
+            conn.busy_timeout(std::time::Duration::from_secs(5))
+                .map_err(db_error)?;
+            conn.execute_batch(
+                "PRAGMA synchronous=FULL;
+                CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value JSON);
+                CREATE TABLE IF NOT EXISTS events (key TEXT NOT NULL, version TEXT NOT NULL,
+                    fingerprint TEXT NOT NULL, PRIMARY KEY(key,version));",
+            )
+            .map_err(db_error)?;
+            Ok(conn)
+        })
+        .await
+        .map_err(|e| BraidError::Fs(e.to_string()))??;
         Ok(Self {
-            db_path,
-            _meta_db_path: meta_db_path,
+            objects: crate::objects::Objects::new(db_path),
             meta_conn: Arc::new(Mutex::new(conn)),
         })
     }
 
-    pub async fn get(&self, key: &str) -> Result<Option<(Bytes, BlobMetadata)>> {
-        let meta = {
-            let conn = self.meta_conn.lock().await;
-            let mut stmt = conn
-                .prepare("SELECT value FROM meta WHERE key = ?")
-                .map_err(|e| BraidError::Fs(e.to_string()))?;
-            let mut rows = stmt
-                .query(params![key])
-                .map_err(|e| BraidError::Fs(e.to_string()))?;
-
-            if let Some(row) = rows.next().map_err(|e| BraidError::Fs(e.to_string()))? {
-                let value_str: String = row.get(0).map_err(|e| BraidError::Fs(e.to_string()))?;
-                serde_json::from_str::<BlobMetadata>(&value_str)
-                    .map_err(|e| BraidError::Config(e.to_string()))?
-            } else {
-                return Ok(None);
-            }
-        };
-
-        let object_path = meta
-            .content_hash
-            .as_ref()
-            .map(|h| self.db_path.join("objects").join(h));
-        let file_path = if let Some(path) = object_path {
-            if fs::try_exists(&path).await? {
-                path
-            } else {
-                self.get_file_path(key)
-            }
-        } else {
-            self.get_file_path(key)
-        };
-        if fs::try_exists(&file_path)
+    /// SQLite work runs on the blocking pool, including transaction rollback.
+    /// Once started it completes even if the awaiting HTTP request is cancelled.
+    async fn database<T: Send + 'static>(
+        &self,
+        operation: impl FnOnce(&mut Connection) -> Result<T> + Send + 'static,
+    ) -> Result<T> {
+        let mut connection = self.meta_conn.clone().lock_owned().await;
+        tokio::task::spawn_blocking(move || operation(&mut connection))
             .await
-            .map_err(|e| BraidError::Io(e))?
-        {
-            let data = fs::read(&file_path).await.map_err(|e| BraidError::Io(e))?;
-
-            // Verify content hash if available
-            if let Some(expected_hash) = &meta.content_hash {
-                let mut hasher = Sha256::new();
-                hasher.update(&data);
-                let actual_hash = format!("{:x}", hasher.finalize());
-                if &actual_hash != expected_hash {
-                    return Err(BraidError::Fs(format!(
-                        "Checksum mismatch for blob {}: expected {}, got {}",
-                        key, expected_hash, actual_hash
-                    )));
-                }
-            }
-
-            Ok(Some((Bytes::from(data), meta)))
-        } else {
-            Err(BraidError::Fs(format!(
-                "Missing committed blob data for {key}"
-            )))
-        }
+            .map_err(|e| BraidError::Fs(e.to_string()))?
     }
 
     pub async fn get_meta(&self, key: &str) -> Result<Option<BlobMetadata>> {
-        let conn = self.meta_conn.lock().await;
-        let mut stmt = conn
-            .prepare("SELECT value FROM meta WHERE key = ?")
-            .map_err(|e| BraidError::Fs(e.to_string()))?;
-        let mut rows = stmt
-            .query(params![key])
-            .map_err(|e| BraidError::Fs(e.to_string()))?;
+        let key = key.to_owned();
+        self.database(move |conn| {
+            let value: Option<String> = conn
+                .query_row("SELECT value FROM meta WHERE key=?", params![key], |row| {
+                    row.get(0)
+                })
+                .optional()
+                .map_err(db_error)?;
+            value
+                .map(|value| serde_json::from_str(&value).map_err(BraidError::from))
+                .transpose()
+        })
+        .await
+    }
 
-        if let Some(row) = rows.next().map_err(|e| BraidError::Fs(e.to_string()))? {
-            let value_str: String = row.get(0).map_err(|e| BraidError::Fs(e.to_string()))?;
-            Ok(Some(
-                serde_json::from_str::<BlobMetadata>(&value_str)
-                    .map_err(|e| BraidError::Config(e.to_string()))?,
-            ))
-        } else {
-            Ok(None)
+    /// Verify an immutable payload with a fixed 64 KiB buffer, then rewind it.
+    /// Consumers can stream large files without collecting their contents.
+    pub async fn open(&self, key: &str) -> Result<Option<(fs::File, BlobMetadata)>> {
+        let Some(meta) = self.get_meta(key).await? else {
+            return Ok(None);
+        };
+        let file = self.objects.open(&meta).await?;
+        Ok(Some((file, meta)))
+    }
+
+    /// Convenience collection API, capped at 64 MiB. Use `open` for larger objects.
+    pub async fn get(&self, key: &str) -> Result<Option<(Bytes, BlobMetadata)>> {
+        use tokio::io::AsyncReadExt;
+        let Some((file, meta)) = self.open(key).await? else {
+            return Ok(None);
+        };
+        let limit = crate::objects::DEFAULT_BUFFER_LIMIT;
+        if file.metadata().await?.len() > limit {
+            return Err(BraidError::ResourceLimit {
+                resource: "buffered blob read",
+                limit,
+            });
         }
+        let mut bytes = Vec::new();
+        file.take(limit + 1).read_to_end(&mut bytes).await?;
+        if bytes.len() as u64 > limit {
+            return Err(BraidError::ResourceLimit {
+                resource: "buffered blob read",
+                limit,
+            });
+        }
+        if let Some(expected) = &meta.content_hash {
+            if format!("{:x}", Sha256::digest(&bytes)) != *expected {
+                return Err(BraidError::Fs("Checksum mismatch for blob".into()));
+            }
+        }
+        Ok(Some((Bytes::from(bytes), meta)))
     }
 
     pub async fn put(
@@ -179,137 +166,148 @@ impl BlobStore {
         parents: Vec<Version>,
         content_type: Option<String>,
     ) -> Result<Vec<Version>> {
-        if version.len() != 1 || version[0].to_string().is_empty() || parents.contains(&version[0])
+        self.put_stream(
+            key,
+            std::io::Cursor::new(data),
+            BlobUpload::new(version, parents, content_type),
+        )
+        .await
+    }
+
+    /// Stage and hash the entire bounded stream before publishing its reference.
+    /// Unreferenced objects are retained after failures; committed payloads are
+    /// never garbage-collected implicitly because older versions may need them.
+    pub async fn put_stream<R: tokio::io::AsyncRead + Unpin>(
+        &self,
+        key: &str,
+        reader: R,
+        upload: BlobUpload,
+    ) -> Result<Vec<Version>> {
+        let BlobUpload {
+            version,
+            parents,
+            content_type,
+            expected_hash,
+            max_bytes,
+        } = upload;
+        if version.len() != 1
+            || version[0].to_string().is_empty()
+            || parents.contains(&version[0])
+            || parents
+                .iter()
+                .collect::<std::collections::HashSet<_>>()
+                .len()
+                != parents.len()
         {
             return Err(BraidError::Protocol(
                 "Blob update requires a unique, non-self-parented event".into(),
             ));
         }
-        let content_hash = format!("{:x}", Sha256::digest(&data));
-        // Serialize compare/commit across every handle sharing this metadata database.
-        let _guard = braid_http::durable::document_lock(self._meta_db_path.clone()).await;
-        let conn = self.meta_conn.clone().lock_owned().await;
-        conn.execute_batch("BEGIN IMMEDIATE")
-            .map_err(|e| BraidError::Fs(e.to_string()))?;
-        let mut transaction = BlobTransaction {
-            conn,
-            committed: false,
-        };
-        let id = version[0].to_string();
-        let mut canonical_parents = parents.clone();
-        canonical_parents.sort_by_key(ToString::to_string);
-        let fingerprint = format!(
-            "{:x}",
-            Sha256::digest(serde_json::to_vec(&(
-                &version,
-                &canonical_parents,
-                &content_hash,
-                &content_type
-            ))?)
-        );
-        let old_fingerprint: Option<String> = transaction
-            .conn
-            .query_row(
-                "SELECT fingerprint FROM events WHERE key=? AND version=?",
-                params![key, id],
-                |row| row.get(0),
-            )
-            .optional()
-            .map_err(|e| BraidError::Fs(e.to_string()))?;
-        if let Some(old) = old_fingerprint {
-            return if old == fingerprint {
-                Ok(version)
-            } else {
-                Err(BraidError::Protocol(
-                    "Blob version reused with different payload".into(),
-                ))
-            };
-        }
-        let current_meta: Option<String> = transaction
-            .conn
-            .query_row("SELECT value FROM meta WHERE key=?", params![key], |row| {
-                row.get(0)
-            })
-            .optional()
-            .map_err(|e| BraidError::Fs(e.to_string()))?;
-        let current_meta = current_meta
-            .map(|json| serde_json::from_str::<BlobMetadata>(&json))
-            .transpose()?;
-        if let Some(meta) = &current_meta {
-            if same_frontier(&meta.version, &version) {
-                return if meta.content_hash.as_deref() == Some(&content_hash)
-                    && same_frontier(&meta.parents, &parents)
-                    && meta.content_type == content_type
-                {
-                    Ok(meta.version.clone())
+        let (hash, size) = self
+            .objects
+            .stage(reader, max_bytes, expected_hash.as_deref())
+            .await?;
+        let key = key.to_owned();
+        self.database(move |conn| {
+            let tx = conn
+                .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+                .map_err(db_error)?;
+            let id = version[0].to_string();
+            let mut canonical_parents = parents.clone();
+            canonical_parents.sort_by_key(ToString::to_string);
+            let fingerprint = format!(
+                "{:x}",
+                Sha256::digest(serde_json::to_vec(&(
+                    &version,
+                    &canonical_parents,
+                    &hash,
+                    &content_type
+                ))?)
+            );
+            let previous: Option<String> = tx
+                .query_row(
+                    "SELECT fingerprint FROM events WHERE key=? AND version=?",
+                    params![key, id],
+                    |row| row.get(0),
+                )
+                .optional()
+                .map_err(db_error)?;
+            if let Some(previous) = previous {
+                return if previous == fingerprint {
+                    Ok(version)
                 } else {
                     Err(BraidError::Protocol(
-                        "Blob version reused with different content".into(),
+                        "Blob version reused with different payload".into(),
                     ))
                 };
             }
-            if !same_frontier(&meta.version, &parents) {
-                return Err(BraidError::Protocol(
-                    "Concurrent blob update requires explicit conflict resolution".into(),
-                ));
+            let current: Option<String> = tx
+                .query_row("SELECT value FROM meta WHERE key=?", params![key], |row| {
+                    row.get(0)
+                })
+                .optional()
+                .map_err(db_error)?;
+            if let Some(current) = current {
+                let current: BlobMetadata = serde_json::from_str(&current)?;
+                if same_frontier(&current.version, &version) {
+                    return if current.content_hash.as_deref() == Some(&hash)
+                        && same_frontier(&current.parents, &parents)
+                        && current.content_type == content_type
+                    {
+                        Ok(version)
+                    } else {
+                        Err(BraidError::Protocol(
+                            "Blob version reused with different content".into(),
+                        ))
+                    };
+                }
+                if !same_frontier(&current.version, &parents) {
+                    return Err(BraidError::Protocol(
+                        "Concurrent blob update requires explicit conflict resolution".into(),
+                    ));
+                }
+            } else if !parents.is_empty() {
+                return Err(BraidError::Protocol("Unknown blob parents".into()));
             }
-        } else if !parents.is_empty() {
-            return Err(BraidError::Protocol("Unknown blob parents".into()));
-        }
-        let new_meta = BlobMetadata {
-            key: key.into(),
-            version: version.clone(),
-            content_type,
-            parents,
-            content_hash: Some(content_hash.clone()),
-            size: Some(data.len() as u64),
-        };
-        // Immutable objects are durable before their SQLite reference becomes visible.
-        // A crash before the reference commit leaves only an unreferenced object.
-        let path = self.db_path.join("objects").join(&content_hash);
-        if fs::try_exists(&path).await? {
-            let stored = fs::read(&path).await?;
-            if stored.as_slice() != data.as_ref() {
-                return Err(BraidError::Fs("Corrupt content-addressed object".into()));
-            }
-        } else {
-            braid_http::durable::atomic_write(&path, &data).await?;
-        }
-        transaction
-            .conn
-            .execute(
+            let meta = BlobMetadata {
+                key: key.clone(),
+                version: version.clone(),
+                parents,
+                content_type,
+                content_hash: Some(hash),
+                size: Some(size),
+            };
+            tx.execute(
                 "INSERT OR REPLACE INTO meta (key,value) VALUES (?,?)",
-                params![key, serde_json::to_string(&new_meta)?],
+                params![key, serde_json::to_string(&meta)?],
             )
-            .map_err(|e| BraidError::Fs(e.to_string()))?;
-        transaction
-            .conn
-            .execute(
+            .map_err(db_error)?;
+            tx.execute(
                 "INSERT INTO events (key,version,fingerprint) VALUES (?,?,?)",
                 params![key, id, fingerprint],
             )
-            .map_err(|e| BraidError::Fs(e.to_string()))?;
-        transaction
-            .conn
-            .execute_batch("COMMIT")
-            .map_err(|e| BraidError::Fs(e.to_string()))?;
-        transaction.committed = true;
-        Ok(version)
+            .map_err(db_error)?;
+            tx.commit().map_err(db_error)?;
+            Ok(version)
+        })
+        .await
     }
 
+    /// Remove the current reference. Historical immutable payloads/events remain retained.
     pub async fn delete(&self, key: &str) -> Result<()> {
-        {
-            let conn = self.meta_conn.lock().await;
-            conn.execute("DELETE FROM meta WHERE key = ?", params![key])
-                .map_err(|e| BraidError::Fs(e.to_string()))?;
-        }
-
-        Ok(())
+        let key = key.to_owned();
+        self.database(move |conn| {
+            conn.execute("DELETE FROM meta WHERE key=?", params![key])
+                .map_err(db_error)?;
+            Ok(())
+        })
+        .await
     }
+}
 
-    fn get_file_path(&self, key: &str) -> PathBuf {
-        self.db_path.join(encode_filename(key))
-    }
+#[cfg(feature = "native")]
+fn db_error(error: rusqlite::Error) -> BraidError {
+    BraidError::Fs(error.to_string())
 }
 
 #[cfg(feature = "native")]
@@ -344,24 +342,23 @@ impl BraidStorage for BlobStore {
     }
 
     async fn list_keys(&self) -> Result<Vec<String>> {
-        let conn = self.meta_conn.lock().await;
-        let mut stmt = conn
-            .prepare("SELECT key FROM meta")
-            .map_err(|e| BraidError::Fs(e.to_string()))?;
-        let rows = stmt
-            .query_map([], |row| row.get(0))
-            .map_err(|e| BraidError::Fs(e.to_string()))?;
-
-        let mut keys = Vec::new();
-        for key in rows {
-            keys.push(key.map_err(|e| BraidError::Fs(e.to_string()))?);
-        }
-        Ok(keys)
+        self.database(|conn| {
+            let mut statement = conn
+                .prepare("SELECT key FROM meta ORDER BY key")
+                .map_err(db_error)?;
+            let rows = statement
+                .query_map([], |row| row.get(0))
+                .map_err(db_error)?;
+            rows.collect::<std::result::Result<Vec<String>, _>>()
+                .map_err(db_error)
+        })
+        .await
     }
 }
 
 fn same_frontier(a: &[Version], b: &[Version]) -> bool {
-    a.len() == b.len() && a.iter().all(|v| b.contains(v))
+    a.iter().collect::<std::collections::HashSet<_>>()
+        == b.iter().collect::<std::collections::HashSet<_>>()
 }
 
 pub fn encode_filename(s: &str) -> String {
@@ -408,18 +405,17 @@ pub fn encode_filename(s: &str) -> String {
                 && name_part
                     .chars()
                     .nth(3)
-                    .map_or(false, |c| c.is_ascii_digit() && c != '0'))
+                    .is_some_and(|c| c.is_ascii_digit() && c != '0'))
             || (name_part.len() == 4
                 && name_part.starts_with("lpt")
                 && name_part
                     .chars()
                     .nth(3)
-                    .map_or(false, |c| c.is_ascii_digit() && c != '0'))
+                    .is_some_and(|c| c.is_ascii_digit() && c != '0'))
     };
 
     if is_reserved {
-        if s.len() >= 3 {
-            let char_at_2 = s.chars().nth(2).unwrap();
+        if let Some(char_at_2) = s.chars().nth(2) {
             let encoded_char = format!("%{:02X}", char_at_2 as u8);
             let chars: Vec<char> = s.chars().collect();
             let prefix: String = chars.iter().take(2).collect();
@@ -445,8 +441,10 @@ fn bits_to_hex(bits: &str) -> String {
 
     let mut hex = String::new();
     for chunk in padded.as_bytes().chunks(4) {
-        let chunk_str = std::str::from_utf8(chunk).unwrap();
-        let val = u8::from_str_radix(chunk_str, 2).unwrap();
+        // The caller constructs this string exclusively from zero/one bits.
+        let val = chunk
+            .iter()
+            .fold(0u8, |value, bit| (value << 1) | u8::from(*bit == b'1'));
         hex.push_str(&format!("{:x}", val));
     }
 

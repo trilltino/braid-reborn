@@ -1,7 +1,7 @@
-use server::ai::{AiChatManager, AiConfig};
-use server::config::ChatServerConfig;
-use server::models::MessageType;
-use server::store::JsonChatStore;
+use local_link_server::chat::ai::{AiChatManager, AiConfig};
+use local_link_server::core::config::ChatServerConfig;
+use local_link_server::core::models::MessageType;
+use local_link_server::core::store::json_store::JsonChatStore;
 use std::sync::Arc;
 use tempfile::tempdir;
 use tokio::time::{sleep, Duration};
@@ -11,7 +11,7 @@ async fn main() -> anyhow::Result<()> {
     println!("--- AI Context Reading Test (Terminal Mock) ---");
 
     // 1. Setup temporary playground
-    let dir = tempdir().unwrap();
+    let dir = tempdir()?;
     let braid_root = dir.path();
     std::env::set_var("BRAID_ROOT", braid_root);
 

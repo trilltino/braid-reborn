@@ -5,16 +5,23 @@ use std::future::Future;
 use std::pin::Pin;
 use std::time::Duration;
 
+/// Browser futures run on the local executor; native futures may move between threads.
+#[cfg(not(target_arch = "wasm32"))]
+pub type RuntimeFuture = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
+#[cfg(target_arch = "wasm32")]
+pub type RuntimeFuture = Pin<Box<dyn Future<Output = ()> + 'static>>;
+
 /// Abstraction for asynchronous runtime operations.
 pub trait BraidRuntime: Send + Sync + 'static {
-    fn spawn(&self, future: Pin<Box<dyn Future<Output = ()> + Send + 'static>>);
-    fn sleep(&self, duration: Duration) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
+    fn spawn(&self, future: RuntimeFuture);
+    fn sleep(&self, duration: Duration) -> RuntimeFuture;
     fn now_ms(&self) -> u64;
 }
 
 /// Abstraction for network operations.
 #[cfg_attr(target_arch="wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[allow(clippy::double_must_use)] // async-trait emits must_use on an already must_use boxed Future.
 pub trait BraidNetwork: Send + Sync + 'static {
     async fn fetch(&self, url: &str, req: BraidRequest) -> Result<BraidResponse>;
     async fn subscribe(
@@ -26,6 +33,7 @@ pub trait BraidNetwork: Send + Sync + 'static {
 
 /// Abstraction for persistent storage.
 #[async_trait]
+#[allow(clippy::double_must_use)] // Same async-trait macro expansion.
 pub trait BraidStorage: Send + Sync + 'static {
     async fn put(&self, key: &str, data: bytes::Bytes, meta: String) -> Result<()>;
     async fn get(&self, key: &str) -> Result<Option<(bytes::Bytes, String)>>;
@@ -38,18 +46,18 @@ pub struct NativeRuntime;
 
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 impl BraidRuntime for NativeRuntime {
-    fn spawn(&self, future: Pin<Box<dyn Future<Output = ()> + Send + 'static>>) {
+    fn spawn(&self, future: RuntimeFuture) {
         tokio::spawn(future);
     }
 
-    fn sleep(&self, duration: Duration) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>> {
+    fn sleep(&self, duration: Duration) -> RuntimeFuture {
         Box::pin(tokio::time::sleep(duration))
     }
 
     fn now_ms(&self) -> u64 {
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_millis() as u64
     }
 }
@@ -58,30 +66,13 @@ impl BraidRuntime for NativeRuntime {
 pub struct WasmRuntime;
 
 #[cfg(all(feature = "wasm", target_arch = "wasm32"))]
-struct SendFuture<F>(F);
-#[cfg(all(feature = "wasm", target_arch = "wasm32"))]
-unsafe impl<F> Send for SendFuture<F> {}
-#[cfg(all(feature = "wasm", target_arch = "wasm32"))]
-impl<F: Future> Future for SendFuture<F> {
-    type Output = F::Output;
-    fn poll(
-        self: Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
-        let inner = unsafe { self.map_unchecked_mut(|s| &mut s.0) };
-        inner.poll(cx)
-    }
-}
-
-#[cfg(all(feature = "wasm", target_arch = "wasm32"))]
 impl BraidRuntime for WasmRuntime {
-    fn spawn(&self, future: Pin<Box<dyn Future<Output = ()> + Send + 'static>>) {
+    fn spawn(&self, future: RuntimeFuture) {
         wasm_bindgen_futures::spawn_local(future);
     }
 
-    fn sleep(&self, duration: Duration) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>> {
-        let f = gloo_timers::future::sleep(duration);
-        Box::pin(SendFuture(f))
+    fn sleep(&self, duration: Duration) -> RuntimeFuture {
+        Box::pin(gloo_timers::future::sleep(duration))
     }
 
     fn now_ms(&self) -> u64 {

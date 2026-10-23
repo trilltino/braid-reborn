@@ -1,12 +1,4 @@
 [workspace]
-members = [
-    "crates/*",
-    "references/iroh-gossip",
-    "references/iroh-h3/iroh-h3",
-    "references/iroh-h3/iroh-h3-client",
-    "references/iroh-h3/iroh-h3-axum",
-    "references/iroh-h3/example",
-]
-# Plain cargo commands select project packages; --workspace also selects the forks.
+members = ["crates/*"]
 default-members = ["crates/*"]
 resolver = "2"

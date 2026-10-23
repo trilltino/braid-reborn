@@ -116,9 +116,9 @@ impl ResourceStateManager {
 
         let len = state.crdt.content().chars().count();
         if len > 0 {
-            let _ = state.crdt.add_delete(0..len);
+            state.crdt.add_delete(0..len);
         }
-        let _ = state.crdt.add_insert(0, content);
+        state.crdt.add_insert(0, content);
 
         if let Some(vid) = version_id {
             if state.crdt.resolve_version(vid).is_none() {
@@ -134,6 +134,7 @@ impl ResourceStateManager {
         Ok(Self::export_operations(&state.crdt))
     }
 
+    #[allow(clippy::too_many_arguments)] // Retained public compatibility API.
     pub fn apply_remote_insert_versioned(
         &self,
         resource_id: &str,
@@ -212,7 +213,7 @@ impl ResourceStateManager {
             return Err("Insertion outside document".into());
         }
         // Diamond insert without strict parents (uses current frontier)
-        let _ = state.crdt.add_insert(pos, text);
+        state.crdt.add_insert(pos, text);
 
         if let Some(vid) = version_id {
             if state.crdt.resolve_version(vid).is_none() {

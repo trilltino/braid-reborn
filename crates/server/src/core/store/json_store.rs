@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs;
 use tokio::sync::{broadcast, RwLock};
-use tracing::{info, warn};
+use tracing::info;
 use uuid::Uuid;
 
 /// Broadcast channel for real-time updates
@@ -56,6 +56,7 @@ pub struct JsonChatStore {
 }
 
 /// Room data including CRDT state
+#[derive(Clone)]
 pub struct RoomData {
     pub room: ChatRoom,
     pub crdt: ChatCrdt,
@@ -94,8 +95,24 @@ impl JsonChatStore {
     }
 
     /// Get the storage path for a room
-    fn room_path(&self, room_id: &str) -> PathBuf {
-        self.config.storage_dir.join(format!("{}.json", room_id))
+    fn room_path(&self, room_id: &str) -> Result<PathBuf> {
+        let stem = room_id.split('.').next().unwrap_or("").to_ascii_lowercase();
+        let reserved = matches!(stem.as_str(), "con" | "prn" | "aux" | "nul")
+            || (stem.len() == 4
+                && (stem.starts_with("com") || stem.starts_with("lpt"))
+                && matches!(stem.as_bytes().last(), Some(b'1'..=b'9')));
+        anyhow::ensure!(
+            !room_id.is_empty()
+                && room_id.len() <= 200
+                && !room_id.starts_with('.')
+                && !room_id.ends_with(['.', ' '])
+                && !reserved
+                && !room_id
+                    .chars()
+                    .any(|c| c.is_control() || "/\\:<>\"|?*".contains(c)),
+            "Invalid room identifier"
+        );
+        Ok(self.config.storage_dir.join(format!("{}.json", room_id)))
     }
 
     /// Load all existing rooms from disk
@@ -117,7 +134,9 @@ impl JsonChatStore {
                             count += 1;
                         }
                         Err(e) => {
-                            warn!("Failed to load room from {:?}: {}", path, e);
+                            return Err(
+                                e.context(format!("Cannot recover room at {}", path.display()))
+                            )
                         }
                     }
                 }
@@ -150,32 +169,34 @@ impl JsonChatStore {
             .with_context(|| format!("Failed to parse room {} JSON", room_id))?;
 
         // Extract CRDT state from room or create new
-        let crdt = if !room.crdt_state.version_graph.is_empty() {
-            // Convert old format to new ChatCrdt
-            ChatCrdt::import_state(ChatCrdtState {
-                room_id: room_id.to_string(),
-                node_id: room.crdt_state.node_id.clone(),
-                next_seq: room.crdt_state.next_seq,
-                current_version: room.crdt_state.current_version.clone(),
-                version_graph: room.crdt_state.version_graph.clone(),
-                messages: room.crdt_state.messages.clone(),
-            })
-        } else {
-            ChatCrdt::new(room_id, &self.config.node_id)
-        };
+        let crdt =
+            if !room.crdt_state.messages.is_empty() || !room.crdt_state.version_graph.is_empty() {
+                // Convert old format to new ChatCrdt
+                ChatCrdt::import_state(ChatCrdtState {
+                    events: room.crdt_state.events.clone(),
+                    room_id: room_id.to_string(),
+                    node_id: room.crdt_state.node_id.clone(),
+                    next_seq: room.crdt_state.next_seq,
+                    current_version: room.crdt_state.current_version.clone(),
+                    version_graph: room.crdt_state.version_graph.clone(),
+                    messages: room.crdt_state.messages.clone(),
+                })
+            } else {
+                ChatCrdt::new(room_id, &self.config.node_id)
+            };
 
         Ok((room, crdt))
     }
 
     /// Save a room to disk atomically
     async fn save_room_to_disk(&self, room_data: &RoomData) -> Result<()> {
-        let path = self.room_path(&room_data.room.id);
-        let temp_path = path.with_extension("tmp");
+        let path = self.room_path(&room_data.room.id)?;
 
         // Update room with current CRDT state
         let mut room = room_data.room.clone();
         let crdt_state = room_data.crdt.export_state();
         room.crdt_state = CrdtState {
+            events: crdt_state.events,
             node_id: crdt_state.node_id,
             next_seq: crdt_state.next_seq,
             current_version: crdt_state.current_version,
@@ -186,11 +207,7 @@ impl JsonChatStore {
         // Serialize room
         let json = serde_json::to_string_pretty(&room)?;
 
-        // Write to temp file
-        fs::write(&temp_path, json).await?;
-
-        // Atomic rename
-        fs::rename(&temp_path, &path).await?;
+        braid_http::durable::atomic_write(&path, json.as_bytes()).await?;
 
         Ok(())
     }
@@ -201,6 +218,8 @@ impl JsonChatStore {
         room_id: &str,
         created_by: Option<&str>,
     ) -> Result<Arc<RwLock<RoomData>>> {
+        let path = self.room_path(room_id)?;
+        let _creation_guard = braid_http::durable::document_lock(path.clone()).await;
         // Check if already loaded
         {
             let rooms = self.rooms.read().await;
@@ -210,7 +229,6 @@ impl JsonChatStore {
         }
 
         // Try to load from disk
-        let path = self.room_path(room_id);
         if path.exists() {
             let (room, crdt) = self.load_room_from_disk(room_id, &path).await?;
             let room = Arc::new(RwLock::new(RoomData { room, crdt }));
@@ -247,6 +265,8 @@ impl JsonChatStore {
 
     /// Get a room if it exists
     pub async fn get_room(&self, room_id: &str) -> Result<Option<Arc<RwLock<RoomData>>>> {
+        let path = self.room_path(room_id)?;
+        let _creation_guard = braid_http::durable::document_lock(path.clone()).await;
         {
             let rooms = self.rooms.read().await;
             if let Some(room) = rooms.get(room_id) {
@@ -255,7 +275,6 @@ impl JsonChatStore {
         }
 
         // Try to load from disk
-        let path = self.room_path(room_id);
         if path.exists() {
             let (room, crdt) = self.load_room_from_disk(room_id, &path).await?;
             let room = Arc::new(RwLock::new(RoomData { room, crdt }));
@@ -281,15 +300,17 @@ impl JsonChatStore {
     ) -> Result<Message> {
         let room_lock = self.get_or_create_room(room_id, Some(sender)).await?;
         let mut room_data = room_lock.write().await;
+        let mut candidate = room_data.clone();
 
         // Use CRDT to add message
         let (version, message) =
-            room_data
+            candidate
                 .crdt
                 .add_message(sender, content, msg_type, reply_to.as_deref(), blob_refs);
 
         // Save to disk
-        self.save_room_to_disk(&*room_data).await?;
+        self.save_room_to_disk(&candidate).await?;
+        *room_data = candidate;
 
         // Broadcast update
         let update = RoomUpdate {
@@ -317,18 +338,20 @@ impl JsonChatStore {
     ) -> Result<Message> {
         let room_lock = self.get_room(room_id).await?.context("Room not found")?;
         let mut room_data = room_lock.write().await;
+        let mut candidate = room_data.clone();
 
         // Use CRDT to edit (note: we need to verify sender matches)
         // For now, we'll look up the message to get its sender
-        let sender = room_data
+        let sender = candidate
             .crdt
             .get_message(msg_id)
             .map(|m| m.sender.clone())
-            .unwrap_or_default();
-        let (version, message) = room_data.crdt.edit_message(msg_id, new_content, &sender)?;
+            .context("Message not found")?;
+        let (version, message) = candidate.crdt.edit_message(msg_id, new_content, &sender)?;
 
         // Save to disk
-        self.save_room_to_disk(&*room_data).await?;
+        self.save_room_to_disk(&candidate).await?;
+        *room_data = candidate;
 
         // Broadcast update
         let update = RoomUpdate {
@@ -361,7 +384,7 @@ impl JsonChatStore {
             .collect();
 
         // Sort by timestamp
-        messages.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+        messages.sort_by_key(|a| a.created_at);
 
         // Filter by version if specified
         if let Some(since) = since_version {
@@ -405,7 +428,7 @@ impl JsonChatStore {
         // For now, returning everything ensures the client gets the data, even if slightly inefficient.
 
         // Sort by timestamp for consistent ordering
-        result.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+        result.sort_by_key(|a| a.created_at);
 
         // Apply limit
         if result.len() > limit {
@@ -483,11 +506,13 @@ impl JsonChatStore {
         let mut room_data = room_lock.write().await;
 
         // Use CRDT to merge
-        let new_messages = room_data.crdt.merge_updates(updates);
+        let mut candidate = room_data.clone();
+        let new_messages = candidate.crdt.merge_updates(updates)?;
 
         // Save to disk
         if !new_messages.is_empty() {
-            self.save_room_to_disk(&*room_data).await?;
+            self.save_room_to_disk(&candidate).await?;
+            *room_data = candidate;
 
             // Broadcast sync event
             let update = RoomUpdate {
@@ -512,7 +537,7 @@ impl JsonChatStore {
         let room_lock = self.get_room(room_id).await?.context("Room not found")?;
         let room_data = room_lock.read().await;
 
-        let braid = room_data.crdt.generate_sync_braid(known_versions);
+        let braid = room_data.crdt.generate_sync_braid(known_versions)?;
         Ok(braid)
     }
 

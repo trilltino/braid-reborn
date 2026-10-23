@@ -6,14 +6,12 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::sqlite::SqlitePoolOptions;
 use std::path::Path;
 use tracing::info;
 use uuid::Uuid;
 
 /// Friend request status
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(rename_all = "snake_case")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RequestStatus {
     Pending,
     Accepted,
@@ -53,6 +51,17 @@ pub struct Contact {
 pub struct FriendManager {
     db_path: std::path::PathBuf,
 }
+
+type FriendRequestRow = (
+    String,
+    String,
+    String,
+    String,
+    String,
+    Option<String>,
+    String,
+    String,
+);
 
 impl FriendManager {
     /// Create new friend manager
@@ -203,7 +212,7 @@ impl FriendManager {
         .bind(&from_user_id)
         .bind(&to_user_id)
         .bind(&request.message)
-        .bind(&request.status)
+        .bind(match request.status { RequestStatus::Pending => "pending", RequestStatus::Accepted => "accepted", RequestStatus::Rejected => "rejected" })
         .bind(request.created_at.to_rfc3339())
         .execute(&pool)
         .await?;
@@ -222,16 +231,7 @@ impl FriendManager {
     pub async fn get_pending_requests(&self, user_id: &str) -> Result<Vec<FriendRequest>> {
         let pool = self.get_pool().await?;
 
-        let rows: Vec<(
-            String,
-            String,
-            String,
-            String,
-            String,
-            Option<String>,
-            String,
-            String,
-        )> = sqlx::query_as(
+        let rows: Vec<FriendRequestRow> = sqlx::query_as(
             r#"
             SELECT 
                 fr.id, fr.from_user_id, u.username, u.email, fr.to_user_id,

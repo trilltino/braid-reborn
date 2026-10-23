@@ -33,9 +33,18 @@ use crate::core::protocol_mod::constants::headers;
 use crate::core::{Update, Version};
 use axum::{
     body::Body,
-    http::{header, HeaderValue, StatusCode},
+    http::{header, StatusCode},
     response::{IntoResponse, Response},
 };
+
+pub(crate) fn response_error(error: http::Error) -> Response {
+    tracing::error!(%error, "Could not construct HTTP response");
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "Could not construct HTTP response",
+    )
+        .into_response()
+}
 use bytes::Bytes;
 
 use std::collections::BTreeMap;
@@ -65,8 +74,8 @@ pub trait SendUpdateExt {
 /// # Examples
 ///
 /// ```ignore
-/// use crate::core::server::UpdateResponse;
-/// use crate::core::Version;
+/// use braid_core::core::server::UpdateResponse;
+/// use braid_core::core::Version;
 ///
 /// let response = UpdateResponse::new(200)
 ///     .with_version(vec![Version::new("v2")])
@@ -140,27 +149,23 @@ impl UpdateResponse {
     pub fn build(self) -> Response {
         let mut response = match self.status {
             200 => Response::builder().status(StatusCode::OK),
-            209 => Response::builder().status(StatusCode::from_u16(209).unwrap()),
+            209 => Response::builder().status(209),
             404 => Response::builder().status(StatusCode::NOT_FOUND),
             500 => Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR),
-            _ => Response::builder().status(StatusCode::from_u16(self.status).unwrap()),
+            _ => Response::builder().status(self.status),
         };
 
         for (key, value) in &self.headers {
-            if let Ok(header_value) = value.parse::<HeaderValue>() {
-                response = response.header(key, header_value);
-            }
+            response = response.header(key, value);
         }
 
         if let Some(body) = self.body {
             response
                 .header(header::CONTENT_LENGTH, body.len())
                 .body(Body::from(body))
-                .unwrap_or_else(|_| Response::default())
+                .unwrap_or_else(response_error)
         } else {
-            response
-                .body(Body::empty())
-                .unwrap_or_else(|_| Response::default())
+            response.body(Body::empty()).unwrap_or_else(response_error)
         }
     }
 }
@@ -201,12 +206,12 @@ pub mod status {
 
     #[allow(dead_code)]
     pub fn subscription_response() -> StatusCode {
-        StatusCode::from_u16(SUBSCRIPTION).unwrap()
+        StatusCode::from_u16(SUBSCRIPTION).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)
     }
 
     #[allow(dead_code)]
     pub fn multiplex_response() -> StatusCode {
-        StatusCode::from_u16(RESPONDED_VIA_MULTIPLEX).unwrap()
+        StatusCode::from_u16(RESPONDED_VIA_MULTIPLEX).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)
     }
 }
 
@@ -252,20 +257,27 @@ mod tests {
         assert!(response.headers().contains_key("parents"));
     }
 
-    #[test]
-    fn test_patch_content_type() {
-        // GAP-S03: Patch updates MUST use application/braid-patch Content-Type
+    #[tokio::test]
+    async fn test_patch_content_type() {
         use crate::core::Patch;
         let update = Update::patched(Version::from("v1"), vec![Patch::json(".a", "1")]);
         let response: Response = BraidUpdate(update).into_response();
-
-        let ct = response
-            .headers()
-            .get("content-type")
-            .unwrap()
-            .to_str()
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()["patches"], "1");
+        assert_eq!(
+            response.headers()["content-type"],
+            "application/http-patches; count=1"
+        );
+        let headers = braid_http::protocol::headers_from_http(response.headers()).unwrap();
+        let body = axum::body::to_bytes(response.into_body(), 8192)
+            .await
             .unwrap();
-        assert_eq!(ct, "application/braid-patch");
+        let decoded = braid_http::protocol::WireCodec::decode_entity(headers, body).unwrap();
+        let patches = decoded.patches.unwrap();
+        assert_eq!(patches.len(), 1);
+        assert_eq!(patches[0].unit, "json");
+        assert_eq!(patches[0].range, ".a");
+        assert_eq!(patches[0].content.as_ref(), b"1");
     }
 
     #[test]

@@ -19,7 +19,7 @@
 //! ## Default Configuration
 //!
 //! ```
-//! use crate::core::server::ServerConfig;
+//! use braid_core::core::server::ServerConfig;
 //!
 //! let config = ServerConfig::default();
 //! assert!(config.enable_subscriptions);
@@ -29,7 +29,7 @@
 //! ## Custom Configuration
 //!
 //! ```
-//! use crate::core::server::ServerConfig;
+//! use braid_core::core::server::ServerConfig;
 //!
 //! let config = ServerConfig {
 //!     enable_subscriptions: true,
@@ -43,7 +43,7 @@
 //! ## Partial Override
 //!
 //! ```
-//! use crate::core::server::ServerConfig;
+//! use braid_core::core::server::ServerConfig;
 //!
 //! let config = ServerConfig {
 //!     max_subscriptions: 5000,
@@ -61,7 +61,7 @@
 /// # Example
 ///
 /// ```
-/// use crate::core::server::ServerConfig;
+/// use braid_core::core::server::ServerConfig;
 ///
 /// let config = ServerConfig {
 ///     enable_subscriptions: true,

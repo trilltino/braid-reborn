@@ -1,6 +1,7 @@
 //! Braid HTTP Protocol Implementation for Rust (Core + Server)
 
 pub mod error;
+#[cfg(all(feature = "serde", feature = "smallvec"))]
 pub mod merge;
 #[cfg(feature = "server")]
 pub mod server;

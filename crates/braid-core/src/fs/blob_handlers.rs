@@ -35,7 +35,7 @@ pub async fn handle_put_blob(
 
     // Minimal version - just store as "local-upload"
     let uuid_str = hash.clone();
-    let version = vec![crate::core::Version::new(&format!(
+    let version = vec![crate::core::Version::new(format!(
         "local-{}",
         &uuid_str[..8]
     ))];

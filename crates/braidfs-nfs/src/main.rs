@@ -93,7 +93,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // 4. Start NFS Server
-    let backend = fs::nfs::BraidNfsBackend::new(state.clone(), blob_store);
+    let backend = fs::nfs::BraidNfsBackend::new(state.clone(), blob_store)?;
 
     // Trigger OS Mount if requested
     if let Some(mp) = &cli.mount_point {

@@ -80,11 +80,9 @@ async fn scan_directory(
     sync_urls: &HashMap<String, bool>,
     changed: &mut Vec<PathBuf>,
 ) -> Result<()> {
-    let mut entries = tokio::fs::read_dir(dir)
-        .await
-        .map_err(|e| BraidError::Io(e))?;
+    let mut entries = tokio::fs::read_dir(dir).await.map_err(BraidError::Io)?;
 
-    while let Some(entry) = entries.next_entry().await.map_err(|e| BraidError::Io(e))? {
+    while let Some(entry) = entries.next_entry().await.map_err(BraidError::Io)? {
         let path = entry.path();
         let rel_path = path.strip_prefix(root).unwrap_or(&path);
         let rel_str = rel_path.to_string_lossy();
@@ -94,13 +92,11 @@ async fn scan_directory(
             continue;
         }
 
-        let metadata = entry.metadata().await.map_err(|e| BraidError::Io(e))?;
+        let metadata = entry.metadata().await.map_err(BraidError::Io)?;
 
         if metadata.is_dir() {
             // Recurse into subdirectories
             Box::pin(scan_directory(&path, root, state, sync_urls, changed)).await?;
-        } else if metadata.is_file() {
-            // Check if this file is being synced
         } else if metadata.is_file() {
             // Check if this file is being synced
             if let Ok(url) = mapping::path_to_url(&path) {

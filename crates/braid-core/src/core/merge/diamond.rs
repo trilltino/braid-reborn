@@ -27,7 +27,7 @@
 //! ## Basic Text Editing
 //!
 //! ```
-//! use crate::core::merge::DiamondCRDT;
+//! use braid_core::core::merge::DiamondCRDT;
 //!
 //! let mut doc = DiamondCRDT::new("session-uuid-abc");
 //! doc.add_insert(0, "hello");
@@ -38,7 +38,7 @@
 //! ## Concurrent Edits from Multiple Peers
 //!
 //! ```
-//! use crate::core::merge::DiamondCRDT;
+//! use braid_core::core::merge::DiamondCRDT;
 //!
 //! let mut doc = DiamondCRDT::new("editor-1");
 //! doc.add_insert(0, "hello");
@@ -63,6 +63,17 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use super::merge_type::{MergePatch, MergeResult, MergeType};
+
+/// The pinned engine limits agent names to 50 UTF-8 bytes. Preserve older short
+/// names and map longer opaque wire identities without truncating their entropy.
+pub(crate) fn bounded_agent_id(name: &str) -> String {
+    if name.len() <= 50 {
+        return name.to_owned();
+    }
+    use base64::Engine;
+    use sha2::{Digest, Sha256};
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(Sha256::digest(name.as_bytes()))
+}
 
 /// High-performance text CRDT wrapper for collaborative editing.
 ///
@@ -122,14 +133,14 @@ impl DiamondCRDT {
     /// # Examples
     ///
     /// ```
-    /// use crate::core::merge::DiamondCRDT;
+    /// use braid_core::core::merge::DiamondCRDT;
     ///
     /// let doc = DiamondCRDT::new("550e8400-e29b-41d4-a716-446655440000");
     /// assert!(doc.is_empty());
     /// ```
     #[must_use]
     pub fn new(agent_id: impl Into<String>) -> Self {
-        let agent_id_str = agent_id.into();
+        let agent_id_str = bounded_agent_id(&agent_id.into());
         let mut oplog = crate::vendor::diamond_types::OpLog::new();
         // Use a deterministic agent for the initial CRDT setup so that different nodes
         // can agree on the same object ID for the "content" field.
@@ -158,6 +169,104 @@ impl DiamondCRDT {
 
     // ========== Local Editing Methods ==========
 
+    fn parent_frontier(
+        &self,
+        parents: &[braid_http::types::Version],
+    ) -> Result<crate::vendor::diamond_types::Frontier, String> {
+        if parents.is_empty() {
+            return Ok(crate::vendor::diamond_types::Frontier::new_1(self.text_id));
+        }
+        let mut versions = Vec::new();
+        for parent in parents {
+            let frontier = self
+                .resolve_version(&parent.to_string())
+                .ok_or_else(|| format!("Missing historical checkpoint for parent: {parent}"))?;
+            versions.extend_from_slice(frontier.as_ref());
+        }
+        versions.sort_unstable();
+        versions.dedup();
+        Ok(self.oplog.cg.graph.find_dominators(&versions))
+    }
+
+    pub(crate) fn content_at_parents(
+        &self,
+        parents: &[braid_http::types::Version],
+    ) -> Result<String, String> {
+        let frontier = self.parent_frontier(parents)?;
+        self.oplog
+            .checkout_text_at(self.text_id, frontier.as_ref())
+            .map(|text| text.to_string())
+            .ok_or_else(|| "Invalid historical text frontier".into())
+    }
+
+    /// Each wire event gets a deterministic agent and an operation chain rooted
+    /// in its own parents. Other concurrent tips never become implicit parents.
+    pub(crate) fn apply_wire_event(
+        &mut self,
+        update: &braid_http::types::Update,
+    ) -> Result<(), String> {
+        let [version] = update.version.as_slice() else {
+            return Err("A mutation must name one event".into());
+        };
+        let mut frontier = self.parent_frontier(&update.parents)?;
+        let base = self.content_at_parents(&update.parents)?;
+        let length = base.chars().count();
+        let mut operations = Vec::new();
+        match (&update.body, &update.patches) {
+            (Some(body), None) => {
+                let content = std::str::from_utf8(body).map_err(|e| e.to_string())?;
+                if length > 0 {
+                    operations.push(TextOperation::new_delete(0..length));
+                }
+                if !content.is_empty() {
+                    operations.push(TextOperation::new_insert(0, content));
+                }
+            }
+            (None, Some(patches)) => {
+                // Validate the entire original-coordinate patch set before mutation.
+                braid_http::protocol::text::apply_text_patches(&base, patches)
+                    .map_err(|e| e.to_string())?;
+                let mut edits = patches
+                    .iter()
+                    .map(|patch| {
+                        let (start, end) =
+                            braid_http::protocol::text::text_range(&patch.range, length)
+                                .map_err(|e| e.to_string())?;
+                        let content =
+                            std::str::from_utf8(&patch.content).map_err(|e| e.to_string())?;
+                        Ok((start, end, content))
+                    })
+                    .collect::<Result<Vec<_>, String>>()?;
+                edits.sort_by_key(|(start, end, _)| (*start, *end));
+                for (start, end, content) in edits.into_iter().rev() {
+                    if start < end {
+                        operations.push(TextOperation::new_delete(start..end));
+                    }
+                    if !content.is_empty() {
+                        operations.push(TextOperation::new_insert(start, content));
+                    }
+                }
+            }
+            _ => return Err("Expected one snapshot or patch set".into()),
+        }
+        let agent = self
+            .oplog
+            .cg
+            .get_or_create_agent_id(&bounded_agent_id(&format!("braid-event:{version}")));
+        for operation in operations {
+            let range = self.oplog.cg.assign_local_op_with_parents(
+                frontier.as_ref(),
+                agent,
+                operation.len(),
+            );
+            self.oplog.remote_text_op(self.text_id, range, operation);
+            frontier = crate::vendor::diamond_types::Frontier::new_1(range.last());
+        }
+        self.register_version_mapping(version.to_string(), frontier);
+        self.branch = self.oplog.checkout_tip();
+        Ok(())
+    }
+
     /// Insert text at a position in the document.
     ///
     /// This is a local edit operation. The insertion is immediately applied to the document
@@ -175,7 +284,7 @@ impl DiamondCRDT {
     /// # Examples
     ///
     /// ```
-    /// use crate::core::merge::DiamondCRDT;
+    /// use braid_core::core::merge::DiamondCRDT;
     ///
     /// let mut doc = DiamondCRDT::new("session-1");
     /// doc.add_insert(0, "hello");
@@ -212,7 +321,7 @@ impl DiamondCRDT {
     /// # Examples
     ///
     /// ```
-    /// use crate::core::merge::DiamondCRDT;
+    /// use braid_core::core::merge::DiamondCRDT;
     ///
     /// let mut doc = DiamondCRDT::new("session-1");
     /// doc.add_insert(0, "hello world");
@@ -270,7 +379,10 @@ impl DiamondCRDT {
         if lvs != current || pos > self.content().chars().count() {
             return Err("Historical positional insertion requires reconciliation".into());
         }
-        let agent = self.oplog.cg.get_or_create_agent_id(agent_id);
+        let agent = self
+            .oplog
+            .cg
+            .get_or_create_agent_id(&bounded_agent_id(agent_id));
 
         if text.is_empty() {
             return Err("Empty remote insertion".into());
@@ -311,7 +423,7 @@ impl DiamondCRDT {
     /// # Examples
     ///
     /// ```
-    /// use crate::core::merge::DiamondCRDT;
+    /// use braid_core::core::merge::DiamondCRDT;
     ///
     /// let mut doc = DiamondCRDT::new("session-1");
     /// doc.add_insert(0, "hello");
@@ -324,7 +436,10 @@ impl DiamondCRDT {
         if text.is_empty() {
             return;
         }
-        let agent = self.oplog.cg.get_or_create_agent_id(agent_id);
+        let agent = self
+            .oplog
+            .cg
+            .get_or_create_agent_id(&bounded_agent_id(agent_id));
         self.oplog.local_text_op(
             agent,
             self.text_id,
@@ -364,7 +479,10 @@ impl DiamondCRDT {
         if lvs != current || range.start > range.end || range.end > self.content().chars().count() {
             return Err("Historical positional deletion requires reconciliation".into());
         }
-        let agent = self.oplog.cg.get_or_create_agent_id(agent_id);
+        let agent = self
+            .oplog
+            .cg
+            .get_or_create_agent_id(&bounded_agent_id(agent_id));
 
         if range.start >= range.end {
             return Err("Invalid remote deletion".into());
@@ -398,7 +516,7 @@ impl DiamondCRDT {
     /// # Examples
     ///
     /// ```
-    /// use crate::core::merge::DiamondCRDT;
+    /// use braid_core::core::merge::DiamondCRDT;
     ///
     /// let mut doc = DiamondCRDT::new("session-1");
     /// doc.add_insert(0, "hello world");
@@ -407,7 +525,10 @@ impl DiamondCRDT {
     /// assert_eq!(doc.content(), "helloworld");
     /// ```
     pub fn add_delete_remote(&mut self, agent_id: &str, range: std::ops::Range<usize>) {
-        let agent = self.oplog.cg.get_or_create_agent_id(agent_id);
+        let agent = self
+            .oplog
+            .cg
+            .get_or_create_agent_id(&bounded_agent_id(agent_id));
         self.oplog.local_text_op(
             agent,
             self.text_id,
@@ -430,7 +551,7 @@ impl DiamondCRDT {
     /// # Examples
     ///
     /// ```
-    /// use crate::core::merge::DiamondCRDT;
+    /// use braid_core::core::merge::DiamondCRDT;
     ///
     /// let mut doc = DiamondCRDT::new("session-1");
     /// doc.add_insert(0, "hello");
@@ -457,7 +578,7 @@ impl DiamondCRDT {
     /// # Examples
     ///
     /// ```
-    /// use crate::core::merge::DiamondCRDT;
+    /// use braid_core::core::merge::DiamondCRDT;
     ///
     /// let doc = DiamondCRDT::new("session-1");
     /// assert_eq!(doc.agent_id(), "session-1");
@@ -470,7 +591,7 @@ impl DiamondCRDT {
 
     /// Get the total count of operations in the operation log.
     ///
-    /// Each character insertion or deletion counts as one operation. This is useful
+    /// The count includes the genesis text-object operation. Each character insertion or deletion counts as one operation. This is useful
     /// for version tracking and detecting whether the document has changed.
     ///
     /// # Note
@@ -482,11 +603,11 @@ impl DiamondCRDT {
     /// # Examples
     ///
     /// ```
-    /// use crate::core::merge::DiamondCRDT;
+    /// use braid_core::core::merge::DiamondCRDT;
     ///
     /// let mut doc = DiamondCRDT::new("session-1");
     /// doc.add_insert(0, "hi");  // 2 operations
-    /// assert_eq!(doc.operation_count(), 2);
+    /// assert_eq!(doc.operation_count(), 3); // Genesis object plus two characters.
     /// ```
     #[inline]
     #[must_use]
@@ -506,7 +627,7 @@ impl DiamondCRDT {
     /// # Examples
     ///
     /// ```
-    /// use crate::core::merge::DiamondCRDT;
+    /// use braid_core::core::merge::DiamondCRDT;
     ///
     /// let mut doc = DiamondCRDT::new("session-1");
     /// assert!(doc.is_empty());
@@ -538,7 +659,7 @@ impl DiamondCRDT {
     /// # Examples
     ///
     /// ```
-    /// use crate::core::merge::DiamondCRDT;
+    /// use braid_core::core::merge::DiamondCRDT;
     ///
     /// let mut doc = DiamondCRDT::new("session-1");
     /// doc.add_insert(0, "hello");
@@ -570,7 +691,7 @@ impl DiamondCRDT {
     /// # Examples
     ///
     /// ```
-    /// use crate::core::merge::DiamondCRDT;
+    /// use braid_core::core::merge::DiamondCRDT;
     ///
     /// let mut doc = DiamondCRDT::new("session-1");
     /// let v1 = doc.get_version();
@@ -604,7 +725,7 @@ impl DiamondCRDT {
     /// # Examples
     ///
     /// ```
-    /// use crate::core::merge::DiamondCRDT;
+    /// use braid_core::core::merge::DiamondCRDT;
     ///
     /// let mut doc = DiamondCRDT::new("session-1");
     /// doc.add_insert(0, "hello");
@@ -639,7 +760,7 @@ impl DiamondCRDT {
     /// # Examples
     ///
     /// ```
-    /// use crate::core::merge::DiamondCRDT;
+    /// use braid_core::core::merge::DiamondCRDT;
     ///
     /// let doc = DiamondCRDT::new("session-1");
     /// assert_eq!(doc.merge_quality(), 100);  // No remote edits yet
@@ -691,9 +812,24 @@ impl DiamondCRDT {
     }
 
     pub fn durable_checkpoint(&self) -> Result<Value, String> {
+        let version_ids: HashMap<_, Vec<_>> = self
+            .version_fronties
+            .iter()
+            .map(|(id, frontier)| {
+                (
+                    id,
+                    frontier
+                        .as_ref()
+                        .iter()
+                        .map(|v| self.oplog.cg.agent_assignment.local_to_remote_version(*v))
+                        .collect(),
+                )
+            })
+            .collect();
         Ok(json!({ "agent_id": self.agent_id,
             "ops": serde_json::to_value(self.oplog.ops_since(&[])).map_err(|e|e.to_string())?,
-            "versions": self.version_fronties }))
+            "versions": self.version_fronties,
+            "version_ids": version_ids }))
     }
     pub fn restore_checkpoint(value: &Value) -> Result<Self, String> {
         let agent = value["agent_id"]
@@ -707,8 +843,33 @@ impl DiamondCRDT {
             .merge_ops(ops)
             .map_err(|e| format!("Invalid operation checkpoint: {e:?}"))?;
         crdt.branch = crdt.oplog.checkout_tip();
-        crdt.version_fronties =
-            serde_json::from_value(value["versions"].clone()).map_err(|e| e.to_string())?;
+        if let Some(ids) = value.get("version_ids") {
+            use crate::vendor::diamond_types::causalgraph::agent_assignment::remote_ids::RemoteVersionOwned;
+            let ids: HashMap<String, Vec<RemoteVersionOwned>> =
+                serde_json::from_value(ids.clone()).map_err(|e| e.to_string())?;
+            crdt.version_fronties = ids
+                .into_iter()
+                .map(|(id, versions)| {
+                    crdt.oplog
+                        .cg
+                        .agent_assignment
+                        .try_remote_to_local_frontier(versions.iter())
+                        .map(|frontier| (id, frontier))
+                        .map_err(|e| format!("Invalid checkpoint version: {e:?}"))
+                })
+                .collect::<Result<_, _>>()?;
+        } else {
+            crdt.version_fronties =
+                serde_json::from_value(value["versions"].clone()).map_err(|e| e.to_string())?;
+            if crdt
+                .version_fronties
+                .values()
+                .flat_map(|f| f.as_ref())
+                .any(|v| *v >= crdt.oplog.cg.len())
+            {
+                return Err("Invalid legacy checkpoint version".into());
+            }
+        }
         Ok(crdt)
     }
     pub fn history_since(&self, versions: &[&str]) -> Result<Vec<Value>, String> {
