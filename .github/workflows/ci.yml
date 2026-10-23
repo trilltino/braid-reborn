@@ -53,11 +53,14 @@ jobs:
           node-version: 22
       - run: cargo build -p braid-http --locked --example fuzz_controller
       - run: cargo build -p braid-core --locked --example simpleton_controller
+      - run: node tests/interoperability/source-checkout.mjs
       - run: node scripts/run-upstream-conformance.mjs
       - run: node tests/interoperability/codec.mjs
   fuzz:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      RUSTUP_TOOLCHAIN: nightly-2026-10-22
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master

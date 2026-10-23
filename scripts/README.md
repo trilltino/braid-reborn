@@ -22,3 +22,8 @@ It does not upgrade dependencies. Coverage-guided targets have their own
 
 The [legacy directory](legacy/) preserves earlier repository generation and
 publishing scripts. They are outside the current workspace workflow.
+
+`upstream-checkout.mjs` verifies repository ownership before mutating any cached
+checkout. Invalid or modified caches get a fresh isolated clone; they are not
+deleted and Git cannot discover/mutate the parent project. The regression is
+`node tests/interoperability/source-checkout.mjs`. Both protocol runners use it.

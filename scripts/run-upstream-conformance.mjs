@@ -2,11 +2,12 @@
 import { spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { checkoutUpstream } from './upstream-checkout.mjs';
 import path from 'node:path';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 process.chdir(root);
-const harness = path.join('target', 'audit', 'braid-fuzz');
+let harness = path.join('target', 'audit', 'braid-fuzz');
 const revision = 'b79c23f877d2e6807e3925bc0165a4da139a4458';
 function run(program, args, options = {}) {
   const result = spawnSync(program, args, { cwd: root, stdio: 'inherit', ...options });
@@ -14,25 +15,19 @@ function run(program, args, options = {}) {
   if (result.status !== 0) throw new Error(`${program} exited ${result.status}`);
 }
 mkdirSync(path.dirname(harness), { recursive: true });
-if (!existsSync(path.join(harness, '.git'))) {
-  run('git', ['clone', '--no-checkout', 'https://github.com/braid-org/braid-fuzz.git', harness]);
-}
-// Rust caches may restore .git metadata without all checkout objects. Fetch the
-// exact tree again rather than trusting the presence of a cached directory.
-run('git', ['-C', harness, 'fetch', '--refetch', '--depth=1', 'https://github.com/braid-org/braid-fuzz.git', revision]);
-run('git', ['-C', harness, 'checkout', revision]);
+harness = checkoutUpstream(harness, 'https://github.com/braid-org/braid-fuzz.git', revision);
 // Keep the independent runner source pinned while locking its full npm graph.
 // The compatible send override fixes the bridge's test-only XSS advisory.
 for (const file of ['package.json', 'package-lock.json']) {
   copyFileSync(path.join(root, 'tests', 'interoperability', 'upstream-harness', file),
-    path.join(root, harness, file));
+    path.join(harness, file));
 }
 run(process.platform === 'win32' ? 'npm.cmd' : 'npm',
   ['ci', '--ignore-scripts'],
-  { cwd: path.join(root, harness), shell: process.platform === 'win32' });
+  { cwd: harness, shell: process.platform === 'win32' });
 run(process.platform === 'win32' ? 'npm.cmd' : 'npm',
   ['audit', '--omit=dev'],
-  { cwd: path.join(root, harness), shell: process.platform === 'win32' });
+  { cwd: harness, shell: process.platform === 'win32' });
 const suffix = process.platform === 'win32' ? '.exe' : '';
 const rawExecutable = 'target/debug/examples/fuzz_controller' + suffix;
 const textExecutable = 'target/debug/examples/simpleton_controller' + suffix;

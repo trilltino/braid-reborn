@@ -72,8 +72,9 @@ timed out after 300 seconds; no unsafe-count result is claimed. Cargo machete is
 corroborating source evidence rather than proof of dead public APIs.
 
 The local WSL Ubuntu registration points at a missing ext4.vhdx and cannot boot
-(ERROR_PATH_NOT_FOUND). It was not modified. Real Linux mounting and sanitizing
-fuzz runs are assigned to their CI jobs; creating jobs is not a passing result.
+(ERROR_PATH_NOT_FOUND). It was not modified. The real Linux mount test passed on the follow-up commit e7fcd6c. Sanitizing
+fuzz execution still needs the corrected explicit nightly selection; creating
+a job is not a passing result.
 WASM is compile checked, with browser runtime behavior still unverified.
 
 ## Remaining release work
@@ -119,3 +120,12 @@ passed as the toolchain input to the action. Cached upstream source metadata
 lacked its pinned tree in CI, so both scripts now refetch the exact pinned
 revision before checkout. These failures are retained as evidence rather than
 being reclassified as passing jobs; the follow-up push reruns the repaired gates.
+
+The follow-up remote run passed the Linux native gate, security, WASM and the
+real mounted NFS test. Further tooling evidence showed that incomplete cache
+metadata was not a valid independent repository: Git walked into the parent.
+The shared checkout helper now verifies the actual repository root before any
+mutation, uses a fresh isolated clone for invalid/modified caches, verifies the
+pinned HEAD, and preserves the old cache. Its regression proves the parent HEAD
+and files remain unchanged and local source modifications are retained. The
+fuzz job sets its own RUSTUP_TOOLCHAIN so the root stable pin cannot override it.

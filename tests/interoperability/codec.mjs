@@ -1,28 +1,24 @@
 // Differential codec contract against actual upstream source, pinned by Git SHA.
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import http from 'node:http';
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import { checkoutUpstream } from '../../scripts/upstream-checkout.mjs';
 const root = path.resolve(import.meta.dirname, '../..');
 process.chdir(root);
 const sha = '639b811ec91e5d1aae4a4a7d162616b499f95b07';
-const source = 'target/engineering/upstream/braid-http';
+let source = 'target/engineering/upstream/braid-http';
 function run(program, args, options = {}) {
   const result = spawnSync(program, args, { encoding: 'utf8', ...options });
   if (result.status !== 0) throw Error(result.stderr || result.error || result.stdout);
   return result.stdout;
 }
-if (!existsSync(source + '/.git')) {
-  mkdirSync(path.dirname(source), { recursive: true });
-  run('git', ['clone', '--no-checkout', 'https://github.com/braid-org/braid-http.git', source]);
-}
-run('git', ['-C', source, 'fetch', '--refetch', '--depth=1', 'https://github.com/braid-org/braid-http.git', sha]);
-run('git', ['-C', source, 'checkout', sha]);
+source = checkoutUpstream(source, 'https://github.com/braid-org/braid-http.git', sha);
 const require = createRequire(import.meta.url);
-const { braidify } = require(path.join(root, source, 'braid-http-server.js'));
-const { parse_update } = require(path.join(root, source, 'braid-http-client.js'));
+const { braidify } = require(path.join(source, 'braid-http-server.js'));
+const { parse_update } = require(path.join(source, 'braid-http-client.js'));
 const fixtures = [
   { name: 'unicode-snapshot', expected: { version: ['one'], parents: [], body: [...Buffer.from('a\u{1f600}\u00e9\r\nb')] } },
   { name: 'empty-snapshot', expected: { version: ['two'], parents: ['one'], body: [] } },
