@@ -1,0 +1,13 @@
+{
+  "registry": "https://crates.io/crates/nfsserve/0.10.2",
+  "source_sha": null,
+  "source_sha_note": "The published 0.10.2 archive contains no .cargo_vcs_info.json; archive SHA-256 is the exact provenance pin. No source commit is fabricated.",
+  "archive_sha256": "d73615e054238e6bf5e554407b5b23e82fc63616db459057c51b794799eda6fb",
+  "license": "BSD-3-Clause",
+  "changes": [
+    "src/nfs_handlers.rs: plain READDIR forwards the actual cookie to the existing readdir adapter",
+    "READDIR/READDIRPLUS reject framing budgets below 128 bytes and directory budgets below 32 bytes before unsigned subtraction",
+    "Cargo manifests: num-derive 0.3.3 -> 0.4, as used by upstream 0.11, avoids obsolete generated non-local impls"
+  ],
+  "reason": "Raw TCP RPC regression repeats the first READDIR page with registry 0.10.2. Registry 0.11.0 retains the same cookie omission and subtraction. Public adapter APIs are unchanged."
+}

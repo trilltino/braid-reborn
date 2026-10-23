@@ -113,3 +113,13 @@ The narrow netlink 0.8.1 patch replaces only its macro dependency, as recorded i
 4652ced0cd685430a3df0207a50a95445d3b9aa5, and comparison HEAD was
 4b49dd4548b43ab744962cd31236aa15cb1cde20. Its incompatible removed macro API
 precludes an isolated transitive upgrade. No advisory suppression is used.
+
+The mounted Linux follow-up required an archive-pinned nfsserve 0.10.2 patch.
+Its raw READDIR handler discarded the supplied cookie, despite the adapter's
+correct pagination. Both directory procedures also subtracted framing overhead
+from unchecked small byte counts. Registry 0.11.0 (source
+ af4f1176dd709847f3dda4f1a7cd093edaadde63) was read and retains both issues.
+A raw TCP RPC test reproduces duplicate pages before the patch and checks
+both zero-budget responses afterward. Version 0.10.2 has no source SHA metadata
+in its archive; its exact checksum and changes are recorded in vendor/nfsserve,
+with a compatible num-derive 0.4 manifest update following 0.11's usage.

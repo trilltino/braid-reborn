@@ -423,6 +423,7 @@
       "crates/braid-core/tests/engineering_causality.rs:19",
       "crates/braid-core/tests/engineering_causality.rs:58",
       "crates/braid-core/tests/engineering_causality.rs:75",
+      "crates/braid-core/tests/nfs_wire.rs:104",
       "crates/braid-core/tests/sync_integrity_tests.rs:3",
       "crates/braid-core/src/fs/mapping.rs:259",
       "crates/braid-core/src/fs/nfs.rs:362",
@@ -934,6 +935,12 @@
       "crates/braid-core/tests/audit_replica.rs:154",
       "crates/braid-core/tests/audit_replica.rs:191",
       "crates/braid-core/tests/audit_shared_channel.rs:89",
+      "crates/braid-core/tests/nfs_wire.rs:19",
+      "crates/braid-core/tests/nfs_wire.rs:20",
+      "crates/braid-core/tests/nfs_wire.rs:21",
+      "crates/braid-core/tests/nfs_wire.rs:72",
+      "crates/braid-core/tests/nfs_wire.rs:73",
+      "crates/braid-core/tests/nfs_wire.rs:74",
       "crates/braid-core/tests/sync_integrity_tests.rs:34",
       "crates/braid-core/src/core/traits.rs:22",
       "crates/braid-core/src/core/traits.rs:23",
@@ -1714,6 +1721,7 @@
     ],
     "source_files": [
       "crates/braid-core/tests/audit_shared_channel.rs:246",
+      "crates/braid-core/tests/nfs_wire.rs:5",
       "crates/braid-core/src/fs/mod.rs:544",
       "crates/braid-core/src/fs/mod.rs:546",
       "crates/braid-core/src/fs/nfs.rs:7",
@@ -1725,8 +1733,8 @@
     "locked_packages": [
       {
         "version": "0.10.2",
-        "source": "registry+https://github.com/rust-lang/crates.io-index",
-        "checksum": "d73615e054238e6bf5e554407b5b23e82fc63616db459057c51b794799eda6fb"
+        "source": null,
+        "checksum": null
       }
     ]
   },
@@ -1838,6 +1846,7 @@
     "source_files": [
       "crates/braid-core/tests/audit_filesystem.rs:87",
       "crates/braid-core/tests/audit_shared_channel.rs:51",
+      "crates/braid-core/tests/nfs_wire.rs:111",
       "crates/braid-core/src/fs/mod.rs:13",
       "crates/braid-core/src/fs/mod.rs:222",
       "crates/braid-core/src/fs/nfs.rs:57",
@@ -1956,6 +1965,7 @@
     "source_files": [
       "crates/braid-core/tests/audit_filesystem.rs:88",
       "crates/braid-core/tests/audit_shared_channel.rs:52",
+      "crates/braid-core/tests/nfs_wire.rs:112",
       "crates/braid-core/src/fs/mod.rs:14",
       "crates/braid-core/src/fs/nfs.rs:57",
       "crates/braid-core/src/fs/nfs.rs:370",
@@ -2638,6 +2648,10 @@
       "crates/braid-core/tests/engineering_causality.rs:65",
       "crates/braid-core/tests/engineering_causality.rs:69",
       "crates/braid-core/tests/engineering_causality.rs:72",
+      "crates/braid-core/tests/nfs_wire.rs:13",
+      "crates/braid-core/tests/nfs_wire.rs:65",
+      "crates/braid-core/tests/nfs_wire.rs:102",
+      "crates/braid-core/tests/nfs_wire.rs:124",
       "crates/braid-core/tests/sync_integrity_tests.rs:5",
       "crates/braid-core/tests/sync_integrity_tests.rs:26",
       "crates/braid-core/src/fs/api.rs:86",
@@ -5475,8 +5489,8 @@
     "locked_packages": [
       {
         "version": "0.10.2",
-        "source": "registry+https://github.com/rust-lang/crates.io-index",
-        "checksum": "d73615e054238e6bf5e554407b5b23e82fc63616db459057c51b794799eda6fb"
+        "source": null,
+        "checksum": null
       }
     ]
   },

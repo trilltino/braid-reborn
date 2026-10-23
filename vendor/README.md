@@ -21,3 +21,15 @@ agent names strictly below the engine's 50-byte limit and reserves `ROOT`.
 The copied algorithm's internal assertions and unsafe implementation are
 isolated from the first-party lint guarantee. This is not a claim of a complete
 engine replacement or complete historical binary-format compatibility.
+
+`nfsserve` is registry release 0.10.2, BSD-3-Clause licensed. Its
+[patch record](nfsserve/BRAID_PATCH.json) pins the exact archive SHA-256;
+the published archive supplies no source commit metadata. The only modified
+source file is `src/nfs_handlers.rs`: READDIR now forwards the actual cookie
+to the existing `readdir` adapter, and both directory procedures reject tiny
+framing budgets before subtracting overhead. Public adapter APIs are unchanged. Manifests use num-derive 0.4 (also used
+by upstream 0.11) instead of 0.3 to avoid obsolete generated non-local impls.
+The independent raw TCP RPC regression first failed by repeating page one,
+then passes with the patch and checks both zero-count error responses. Registry
+0.11.0 was inspected (source af4f1176dd709847f3dda4f1a7cd093edaadde63)
+and retains these defects, so upgrading it would not repair them.

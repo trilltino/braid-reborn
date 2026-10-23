@@ -45,7 +45,7 @@ Completed local gates:
 | `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` | Passed; an initial needless-borrow finding was repaired and the gate rerun |
 | Minimal `cargo check --no-default-features --locked` for core, HTTP and Iroh | All three passed |
 | HTTP `wasm32-unknown-unknown`, no defaults, `wasm` feature | Passed on Rust 1.99.0 |
-| `cargo fmt --all -- --check` and `cargo machete` | Passed |
+| `cargo fmt --all -- --check` and `cargo machete crates tests/fuzz` | Passed |
 | `cargo audit --json`, `cargo deny check` | Passed, zero vulnerabilities and no advisory warnings; duplicate-version notices remain informational |
 | `cargo audit --file tests/fuzz/Cargo.lock --json` | Passed, zero vulnerabilities/warnings |
 | Independent pinned upstream runner | HTTP 2/2, subscriptions 7/7, reliable updates 15/15, Simpleton 12/12 |
@@ -101,3 +101,21 @@ WASM is compile checked, with browser runtime behavior still unverified.
 
 The conformance matrix separates these gaps from the implemented subset. Do not
 promote this status to full completion until the corresponding evidence exists.
+
+## Remote CI follow-up
+
+The first pushed continuation (7e198585cdefb1773d798dd8957086b90639b652)
+passed GitHub security, WASM and the Linux native workspace gate. Its Linux
+mount test exposed directory listing loss; inspection also found that registry
+nfsserve 0.10.2 ignores plain READDIR cookies and underflows tiny directory byte
+budgets. A new independent TCP RPC test reproduces repeated pages on the original
+library. The narrow archive-pinned patch fixes cookie forwarding and returns
+NFS3ERR_TOOSMALL for both zero-count directory procedures. Registry 0.11.0 was
+compared and retains these bugs. Adapter-only cookie tests could not detect a
+handler discarding the cookie before the call.
+
+The first fuzz job also used an unavailable dated action ref; the date is now
+passed as the toolchain input to the action. Cached upstream source metadata
+lacked its pinned tree in CI, so both scripts now refetch the exact pinned
+revision before checkout. These failures are retained as evidence rather than
+being reclassified as passing jobs; the follow-up push reruns the repaired gates.

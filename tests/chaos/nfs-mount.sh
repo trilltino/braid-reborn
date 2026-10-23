@@ -16,7 +16,7 @@ cleanup() {
   rm -rf -- "$test_root"
 }
 trap cleanup EXIT
-"$repo_root/target/debug/braidfs-nfs" --nfs-port 20491 >"$test_root/server.log" 2>&1 &
+RUST_LOG=braidfs_nfs=info,nfsserve=debug "$repo_root/target/debug/braidfs-nfs" --nfs-port 20491 >"$test_root/server.log" 2>&1 &
 server_pid=$!
 for attempt in $(seq 1 100); do
   if ! kill -0 "$server_pid" 2>/dev/null; then cat "$test_root/server.log"; exit 1; fi
@@ -45,7 +45,9 @@ with destination.open('r+b', buffering=0) as file:
 assert destination.stat().st_size == 5 * 1024 * 1024 + 3
 for i in range(180):
     (directory / f'entry-{i:03}').touch()
-assert len(list(directory.iterdir())) == 181, 'READDIR must paginate using inode cookies'
+names = {entry.name for entry in directory.iterdir()}
+expected = {'renamed.bin'} | {f'entry-{i:03}' for i in range(180)}
+assert names == expected, f'READDIR lost entries: missing={sorted(expected-names)}, unexpected={sorted(names-expected)}'
 destination.unlink()
 for entry in directory.iterdir(): entry.unlink()
 directory.rmdir()

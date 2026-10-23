@@ -31,7 +31,7 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-audit@0.22.0,cargo-deny@0.19.9,cargo-machete@0.9.1
-      - run: cargo machete
+      - run: cargo machete crates tests/fuzz
       - run: cargo deny check bans licenses sources
       # Audit both shipped crates and the isolated fuzz tooling; no blanket ignores.
       - run: cargo audit

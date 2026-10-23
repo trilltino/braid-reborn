@@ -3,3 +3,6 @@
 
 # Fuzz seeds are wire bytes, independent of checkout line-ending settings.
 tests/fuzz/seeds/** binary
+
+# Preserve whitespace in the checksum-pinned third-party archive.
+vendor/nfsserve/** whitespace=-blank-at-eol

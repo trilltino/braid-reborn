@@ -1,9 +1,11 @@
 [workspace]
 members = ["crates/*"]
-exclude = ["vendor/netlink-packet-core", "tests/fuzz"]
+exclude = ["vendor/netlink-packet-core", "vendor/nfsserve", "tests/fuzz"]
 default-members = ["crates/*"]
 resolver = "2"
 
 [patch.crates-io]
 # Maintenance-only backport: retain the 0.8 API used by the pinned Iroh stack.
 netlink-packet-core = { path = "vendor/netlink-packet-core" }
+
+nfsserve = { path = "vendor/nfsserve" }

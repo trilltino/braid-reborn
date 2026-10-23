@@ -80,3 +80,10 @@ unused server dev dependency (tokio-test), now removed. Target-only libc (macOS)
 and gloo/js/wasm dependencies were moved to their owning targets after source
 review. Geiger did not complete within the recorded timeout; no unsafe count
 is claimed from that attempt.
+
+The maintained-code dependency scan is `cargo machete crates tests/fuzz`.
+The narrowly patched registry NFS archive keeps its upstream manifests, including
+optional demo declarations whose example files were not published in the archive.
+Running machete recursively over vendor/ therefore reports those declarations;
+this is not hidden by package ignore lists or by changing the library API.
+Security/license/source gates still cover the complete resolved dependency graph.

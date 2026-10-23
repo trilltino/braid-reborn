@@ -18,6 +18,7 @@ if (!existsSync(source + '/.git')) {
   mkdirSync(path.dirname(source), { recursive: true });
   run('git', ['clone', '--no-checkout', 'https://github.com/braid-org/braid-http.git', source]);
 }
+run('git', ['-C', source, 'fetch', '--refetch', '--depth=1', 'https://github.com/braid-org/braid-http.git', sha]);
 run('git', ['-C', source, 'checkout', sha]);
 const require = createRequire(import.meta.url);
 const { braidify } = require(path.join(root, source, 'braid-http-server.js'));

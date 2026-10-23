@@ -17,6 +17,9 @@ mkdirSync(path.dirname(harness), { recursive: true });
 if (!existsSync(path.join(harness, '.git'))) {
   run('git', ['clone', '--no-checkout', 'https://github.com/braid-org/braid-fuzz.git', harness]);
 }
+// Rust caches may restore .git metadata without all checkout objects. Fetch the
+// exact tree again rather than trusting the presence of a cached directory.
+run('git', ['-C', harness, 'fetch', '--refetch', '--depth=1', 'https://github.com/braid-org/braid-fuzz.git', revision]);
 run('git', ['-C', harness, 'checkout', revision]);
 // Keep the independent runner source pinned while locking its full npm graph.
 // The compatible send override fixes the bridge's test-only XSS advisory.

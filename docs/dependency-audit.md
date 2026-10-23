@@ -46,6 +46,13 @@ Latest releases are observations as of the audit, not upgrade instructions.
   Cargo outdated failed on its temporary path-patch copy; Geiger timed out after
   300 seconds. Neither is represented as a passing audit.
 
+- NFS mount/RPC evidence requires a narrow nfsserve 0.10.2 patch. Its plain
+  READDIR handler discarded the continuation cookie; both directory procedures
+  subtracted unsigned framing budgets without checking tiny counts. An independent
+  wire client reproduces the first failure. The inspected 0.11.0 source retains
+  both defects, so changing version alone is insufficient. The archive hash,
+  BSD license and precise patch are recorded under vendor/nfsserve.
+
 ## Security and licenses
 
 Baseline cargo audit reported 30 vulnerability entries, plus unsound, unmaintained
