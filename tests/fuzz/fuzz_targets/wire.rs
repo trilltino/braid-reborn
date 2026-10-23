@@ -14,7 +14,7 @@ fn decode(data: &[u8], chunk: usize) -> Result<Vec<serde_json::Value>, braid_htt
     let mut updates = Vec::new();
     for chunk in data.chunks(chunk) {
         for message in parser.feed(chunk)? {
-            let update = braid_http::client::utils::message_to_update(message)?;
+            let update = braid_http::client::message_to_update(message)?;
             // Accepted input must also be safely encodable by the canonical codec.
             braid_http::protocol::format_update(&update)?;
             updates.push(serde_json::to_value(update)?);

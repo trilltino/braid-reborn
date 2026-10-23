@@ -69,6 +69,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: tests/fuzz
+          cache-on-failure: true
       - run: cargo install cargo-fuzz --version 0.13.2 --locked
       - run: cargo metadata --manifest-path tests/fuzz/Cargo.toml --locked --format-version 1 > /dev/null
       - run: |
