@@ -70,7 +70,12 @@ impl BraidState {
                 } else if name_lower == headers::PEER.as_str() {
                     braid_state.peer = Some(value_str.to_string());
                 } else if name_lower == headers::HEARTBEATS.as_str() {
-                    braid_state.heartbeat = protocol::parse_heartbeat(value_str).ok();
+                    braid_state.heartbeat =
+                        protocol::parse_heartbeat_duration(value_str)
+                            .ok()
+                            .map(|duration| {
+                                duration.as_secs() + u64::from(duration.subsec_nanos() != 0)
+                            });
                 } else if name_lower == headers::MERGE_TYPE.as_str() {
                     braid_state.merge_type = Some(value_str.to_string());
                 } else if name_lower == headers::CONTENT_RANGE.as_str() {

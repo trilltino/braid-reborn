@@ -169,7 +169,7 @@ impl DiamondCRDT {
 
     // ========== Local Editing Methods ==========
 
-    fn parent_frontier(
+    pub(crate) fn parent_frontier(
         &self,
         parents: &[braid_http::types::Version],
     ) -> Result<crate::vendor::diamond_types::Frontier, String> {

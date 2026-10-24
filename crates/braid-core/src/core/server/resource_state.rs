@@ -27,6 +27,80 @@ pub struct ResourceStateManager {
 use tokio::sync::broadcast;
 
 impl ResourceStateManager {
+    /// Compatibility mutations stage an independent engine and publish exactly
+    /// once. The callback must not mutate external state or publish notifications.
+    pub(crate) fn apply_atomic(
+        &self,
+        resource_id: &str,
+        update: &crate::Update,
+        agent_id: &str,
+        apply: impl FnOnce(&mut DiamondCRDT) -> Result<(), String>,
+    ) -> Result<crate::Update, String> {
+        let [version] = update.version.as_slice() else {
+            return Err("A mutation must identify exactly one event".into());
+        };
+        if !version.is_string()
+            || version.to_string().is_empty()
+            || update.parents.contains(version)
+        {
+            return Err("Invalid or self-parented event".into());
+        }
+        let mut parents = update.parents.clone();
+        parents.sort_by_key(ToString::to_string);
+        if parents.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err("Duplicate parents".into());
+        }
+        let id = version.to_string();
+        let fingerprint =
+            serde_json::to_string(&(agent_id, &parents, &update.body, &update.patches))
+                .map_err(|e| e.to_string())?;
+        // A rejected first mutation must not leave an empty indexed resource.
+        // Existing resources release the registry immediately; a new resource
+        // remains private until its complete candidate has validated.
+        let mut registration = Some(self.resources.lock());
+        let existing = registration
+            .as_ref()
+            .and_then(|resources| resources.get(resource_id).cloned());
+        let resource = if let Some(resource) = existing {
+            registration = None;
+            resource
+        } else {
+            Arc::new(Mutex::new(ResourceState {
+                crdt: DiamondCRDT::new(agent_id),
+                last_sync: SystemTime::now(),
+                seen_versions: HashSet::new(),
+                fingerprints: HashMap::new(),
+                merge_type: "diamond".into(),
+            }))
+        };
+        let mut state = resource.lock();
+        if state.merge_type != "diamond" {
+            return Err("Merge type mismatch".into());
+        }
+        if let Some(previous) = state.fingerprints.get(&id) {
+            if previous != &fingerprint {
+                return Err("Version reused with a different operation".into());
+            }
+        } else {
+            let mut candidate = state.crdt.clone();
+            apply(&mut candidate)?;
+            state.crdt = candidate;
+            state.fingerprints.insert(id.clone(), fingerprint);
+            state.seen_versions.insert(id);
+            state.last_sync = SystemTime::now();
+        }
+        let response = crate::Update::snapshot(version.clone(), state.crdt.content())
+            .with_merge_type("diamond")
+            .with_parents(update.parents.clone());
+        drop(state);
+        if let Some(mut resources) = registration {
+            resources.insert(resource_id.into(), resource);
+            drop(resources);
+            let _ = self.new_resource_tx.send(resource_id.into());
+        }
+        Ok(response)
+    }
+
     #[must_use]
     pub fn new() -> Self {
         let (tx, _) = broadcast::channel(1024);

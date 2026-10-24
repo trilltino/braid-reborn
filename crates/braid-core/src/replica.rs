@@ -26,6 +26,10 @@ pub enum ReplicaError {
     Invalid(String),
     #[error("{0}")]
     Conflict(String),
+    #[error("Requested history is unavailable: {0:?}")]
+    HistoryUnavailable(Vec<Version>),
+    #[error("{0}")]
+    Limit(String),
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]
@@ -81,6 +85,106 @@ impl ReplicaDocument {
             content_type: Some("text/plain; charset=utf-8".into()),
             ..Update::default()
         }
+    }
+
+    /// Materialize a known causal frontier without changing current state.
+    pub fn snapshot_at(&self, frontier: &[Version]) -> Result<Update, ReplicaError> {
+        let ids: Vec<_> = frontier.iter().map(ToString::to_string).collect();
+        self.ancestors(frontier)?;
+        if same_frontier(&ids, &self.heads) {
+            return Ok(self.snapshot());
+        }
+        if self.merge_state.is_null() {
+            return Err(ReplicaError::HistoryUnavailable(frontier.to_vec()));
+        }
+        let crdt =
+            DiamondCRDT::restore_checkpoint(&self.merge_state).map_err(ReplicaError::Invalid)?;
+        let content = crdt
+            .content_at_parents(frontier)
+            .map_err(|_| ReplicaError::HistoryUnavailable(frontier.to_vec()))?;
+        Ok(Update {
+            version: frontier.to_vec(),
+            body: Some(content.into()),
+            merge_type: Some(self.merge_type.clone()),
+            content_type: Some("text/plain; charset=utf-8".into()),
+            ..Update::default()
+        })
+    }
+
+    fn ancestors(
+        &self,
+        frontier: &[Version],
+    ) -> Result<std::collections::HashSet<String>, ReplicaError> {
+        if frontier
+            .iter()
+            .any(|v| !v.is_string() || v.to_string().is_empty())
+        {
+            return Err(ReplicaError::Invalid("Invalid history frontier".into()));
+        }
+        let mut pending: Vec<_> = frontier.iter().map(|v| (v.to_string(), false)).collect();
+        let mut known = std::collections::HashSet::new();
+        let mut active = std::collections::HashSet::new();
+        while let Some((id, expanded)) = pending.pop() {
+            if expanded {
+                active.remove(&id);
+                known.insert(id);
+                continue;
+            }
+            if known.contains(&id) {
+                continue;
+            }
+            if !active.insert(id.clone()) {
+                return Err(ReplicaError::Invalid(
+                    "Cycle in persisted version graph".into(),
+                ));
+            }
+            let parents = self
+                .version_graph
+                .get(&id)
+                .ok_or_else(|| ReplicaError::HistoryUnavailable(vec![Version::new(&id)]))?;
+            pending.push((id, true));
+            pending.extend(parents.iter().map(|p| (p.clone(), false)));
+        }
+        Ok(known)
+    }
+
+    /// Original events in dependency order, never positional patches rebased by
+    /// arrival order. Both boundaries must describe a reachable history interval.
+    pub fn causal_history(
+        &self,
+        from: &[Version],
+        to: &[Version],
+    ) -> Result<Vec<Update>, ReplicaError> {
+        let base = self.ancestors(from)?;
+        let target = self.ancestors(to)?;
+        if !base.is_subset(&target) {
+            return Err(ReplicaError::Invalid(
+                "History boundaries are not causally ordered".into(),
+            ));
+        }
+        let mut events = Vec::new();
+        let mut bytes = 0usize;
+        for event in self.history.iter().filter(|u| {
+            u.version
+                .iter()
+                .any(|v| target.contains(&v.to_string()) && !base.contains(&v.to_string()))
+        }) {
+            bytes = bytes.saturating_add(serde_json::to_vec(event)?.len());
+            if events.len() >= 1024 || bytes > 32 * 1024 * 1024 {
+                return Err(ReplicaError::Limit(
+                    "History response exceeds 1024 events or 32 MiB".into(),
+                ));
+            }
+            events.push(event.clone());
+        }
+        let retained: std::collections::HashSet<_> = events
+            .iter()
+            .flat_map(|u| u.version.iter().map(ToString::to_string))
+            .collect();
+        if target.difference(&base).any(|id| !retained.contains(id)) {
+            return Err(ReplicaError::HistoryUnavailable(to.to_vec()));
+        }
+        Ok(events)
     }
     /// Validate the entire update on a candidate; callers persist before publishing it.
     pub fn apply(&mut self, update: &Update) -> Result<bool, ReplicaError> {
@@ -214,13 +318,7 @@ impl ReplicaDocument {
     }
     /// A snapshot is a valid replacement when old history predates migration.
     pub fn replay_since(&self, frontier: &[String]) -> Result<Vec<Update>, ReplicaError> {
-        for v in frontier {
-            if !self.version_graph.contains_key(v) && !self.heads.contains(v) {
-                return Err(ReplicaError::Conflict(format!(
-                    "Unknown replay version: {v}"
-                )));
-            }
-        }
+        self.ancestors(&frontier.iter().map(Version::new).collect::<Vec<_>>())?;
         if same_frontier(frontier, &self.heads) {
             return Ok(vec![]);
         }
@@ -256,6 +354,16 @@ pub struct ReplicaStore {
     lease: Arc<tokio::sync::OnceCell<Arc<std::fs::File>>>,
 }
 impl ReplicaStore {
+    pub async fn snapshot_at(
+        &self,
+        resource: &str,
+        frontier: &[Version],
+    ) -> Result<Option<Update>, ReplicaError> {
+        self.load(resource)
+            .await?
+            .map(|document| document.snapshot_at(frontier))
+            .transpose()
+    }
     pub fn new(base_dir: PathBuf) -> Result<Self, ReplicaError> {
         Ok(Self {
             base_dir: std::path::absolute(base_dir)?,

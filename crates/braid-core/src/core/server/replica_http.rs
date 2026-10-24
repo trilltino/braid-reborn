@@ -9,9 +9,20 @@ use braid_http::protocol::{format_update, WireCodec};
 use bytes::Bytes;
 
 pub fn error_response(error: ReplicaError) -> Response {
+    if let ReplicaError::HistoryUnavailable(frontier) = &error {
+        return Response::builder()
+            .status(432)
+            .header(
+                "version",
+                braid_http::protocol::format_version_header(frontier),
+            )
+            .body(Body::from(error.to_string()))
+            .unwrap_or_else(crate::core::server::response_error);
+    }
     let status = match &error {
         ReplicaError::Invalid(_) => StatusCode::BAD_REQUEST,
         ReplicaError::Conflict(_) => StatusCode::CONFLICT,
+        ReplicaError::Limit(_) => StatusCode::PAYLOAD_TOO_LARGE,
         _ => StatusCode::INTERNAL_SERVER_ERROR,
     };
     (status, error.to_string()).into_response()
@@ -25,6 +36,38 @@ pub async fn get(
     let fields = match braid_http::protocol::headers_from_http(&headers) {
         Ok(fields) => fields,
         Err(error) => return (StatusCode::BAD_REQUEST, error.to_string()).into_response(),
+    };
+    if fields.contains_key("version") && fields.contains_key("subscribe") {
+        return (
+            StatusCode::BAD_REQUEST,
+            "Version and Subscribe cannot be combined",
+        )
+            .into_response();
+    }
+    let version = match fields
+        .get("version")
+        .map(|v| braid_http::protocol::parse_version_header(v))
+        .transpose()
+    {
+        Ok(version) => version,
+        Err(error) => return (StatusCode::BAD_REQUEST, error.to_string()).into_response(),
+    };
+    let parents = match fields
+        .get("parents")
+        .map(|v| braid_http::protocol::parse_version_header(v))
+        .transpose()
+    {
+        Ok(parents) => parents,
+        Err(error) => return (StatusCode::BAD_REQUEST, error.to_string()).into_response(),
+    };
+    let heartbeat = match fields
+        .get("heartbeats")
+        .map(|v| braid_http::protocol::parse_heartbeat_duration(v))
+        .transpose()
+    {
+        Ok(Some(interval)) if interval >= std::time::Duration::from_millis(100) => interval,
+        Ok(None) => std::time::Duration::from_secs(30),
+        _ => return (StatusCode::BAD_REQUEST, "Unsupported heartbeat interval").into_response(),
     };
     let subscribe = match fields
         .get("subscribe")
@@ -40,11 +83,11 @@ pub async fn get(
             Ok(subscription) => subscription,
             Err(e) => return error_response(e),
         };
-        let initial = if let Some(parents) = fields.get("parents") {
-            let frontier = match braid_http::protocol::parse_version_header(parents).ok() {
-                Some(v) => v.into_iter().map(|v| v.to_string()).collect::<Vec<_>>(),
-                None => return (StatusCode::BAD_REQUEST, "Invalid Parents").into_response(),
-            };
+        let initial = if let Some(parents) = parents {
+            let frontier = parents
+                .into_iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>();
             match document.replay_since(&frontier) {
                 Ok(updates) => updates,
                 Err(e) => return error_response(e),
@@ -59,7 +102,7 @@ pub async fn get(
             for update in initial {
                 match format_update(&update) {Ok(bytes)=>yield Ok::<Bytes,std::io::Error>(bytes),Err(e)=>{yield Err(std::io::Error::other(e.to_string()));return;}}
             }
-            let mut heartbeat=tokio::time::interval(std::time::Duration::from_secs(30));
+            let mut heartbeat=tokio::time::interval(heartbeat);
             heartbeat.tick().await;
             loop {
                 tokio::select! {
@@ -77,14 +120,53 @@ pub async fn get(
         return Response::builder()
             .status(209)
             .header("subscribe", "true")
-            .header("heartbeats", "30")
+            .header("heartbeats", heartbeat.as_secs_f64().to_string())
             .header("merge-type", document.merge_type)
             .header("cache-control", "no-cache")
             .body(Body::from_stream(stream))
             .unwrap_or_else(crate::core::server::response_error);
     }
     match store.load(&resource).await {
-        Ok(Some(document)) => super::BraidUpdate(document.snapshot()).into_response(),
+        Ok(Some(document)) => {
+            if let Some(parents) = parents {
+                let target = version.unwrap_or_else(|| document.snapshot().version);
+                let updates = match document.causal_history(&parents, &target) {
+                    Ok(updates) => updates,
+                    Err(error) => return error_response(error),
+                };
+                let frames = updates
+                    .iter()
+                    .map(format_update)
+                    .collect::<Result<Vec<_>, _>>();
+                match frames {
+                    Ok(frames) => Response::builder()
+                        .status(200)
+                        .header(
+                            "version",
+                            braid_http::protocol::format_version_header(&target),
+                        )
+                        .header(
+                            "parents",
+                            braid_http::protocol::format_version_header(&parents),
+                        )
+                        .body(Body::from_stream(futures::stream::iter(
+                            frames.into_iter().map(Ok::<_, std::io::Error>),
+                        )))
+                        .unwrap_or_else(crate::core::server::response_error),
+                    Err(error) => {
+                        (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response()
+                    }
+                }
+            } else {
+                match version.map_or_else(
+                    || Ok(document.snapshot()),
+                    |frontier| document.snapshot_at(&frontier),
+                ) {
+                    Ok(update) => super::BraidUpdate(update).into_response(),
+                    Err(error) => error_response(error),
+                }
+            }
+        }
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(e) => error_response(e),
     }

@@ -140,7 +140,10 @@ impl BraidIrohNode {
             .spawn();
 
         // 5. Start TCP Proxy if configured (Phase 4)
+        #[cfg(feature = "proxy")]
         let mut proxy_task = None;
+        #[cfg(not(feature = "proxy"))]
+        let proxy_task = None;
         #[cfg(feature = "proxy")]
         if let Some(proxy_conf) = config.proxy_config {
             let endpoint_clone = endpoint.clone();

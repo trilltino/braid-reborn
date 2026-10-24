@@ -70,6 +70,31 @@ writers remain unsupported.
 
 ## Public Rust/configuration changes
 
+### Release continuation
+
+`protocol::parse_heartbeat_duration` is the shared checked duration API. The
+deprecated integer `protocol::parse_heartbeat` rounds positive fractions upward;
+`500ms` is no longer zero. Server intervals are limited to 100ms through 24h.
+Chat streams use the canonical codec, reject invalid headers before streaming,
+and terminate on lag for parent-based reconnection. `Version` and `Subscribe`
+cannot appear together, even for a false subscription value.
+
+`ReplicaDocument::snapshot_at` / `ReplicaStore::snapshot_at` materialize retained
+historical frontiers. `causal_history` returns original events between ordered
+causal boundaries, capped at 1024 events / 32 MiB of serialized events per call.
+Finite history GET is encoded as a sequence of update frames. New ReplicaError
+variants distinguish unavailable history (HTTP 432) and response limits (413);
+downstream exhaustive matches must handle these variants. Legacy snapshot-only
+documents remain readable at their current frontier; absent history is not invented.
+
+The compatibility ConflictResolver keeps its entry point and JSON batch syntax,
+but validates all operations before publishing one candidate. Invalid batches,
+unknown/stale bases and reused identities fail without partial publication. Engine
+deltas from its legacy `get_history` method carry the explicit
+`application/vnd.braid.legacy-operations+json` media type and no fabricated Braid
+event ID; use ReplicaStore for causal event replay. The unmeasured merge-quality
+field is no longer emitted from structured batch responses.
+
 - BraidClient construction is fallible: use `BraidClient::new()?`; its panic-prone
   Default implementation was removed.
 - RuntimeFuture is target-specific: Send on native, local on WASM. Unsafe future

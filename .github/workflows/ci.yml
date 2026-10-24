@@ -18,6 +18,9 @@ jobs:
       - run: cargo check -p braid-core --no-default-features --locked
       - run: cargo check -p braid-http --no-default-features --locked
       - run: cargo check -p braid-iroh --no-default-features --locked
+      - run: cargo clippy -p braid-core --no-default-features --locked -- -D warnings
+      - run: cargo clippy -p braid-http --no-default-features --locked -- -D warnings
+      - run: cargo clippy -p braid-iroh --no-default-features --locked -- -D warnings
   wasm:
     runs-on: ubuntu-latest
     steps:

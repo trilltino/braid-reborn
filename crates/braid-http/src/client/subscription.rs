@@ -42,13 +42,9 @@ impl HeartbeatConfig {
         }
     }
     pub fn from_header(value: &str) -> Option<Self> {
-        let value = value.trim();
-        let seconds = if let Some(ms) = value.strip_suffix("ms") {
-            ms.parse::<f64>().ok()? / 1000.0
-        } else {
-            value.strip_suffix('s').unwrap_or(value).parse().ok()?
-        };
-        (seconds.is_finite() && seconds > 0.0 && seconds <= 86400.0).then(|| Self::new(seconds))
+        crate::protocol::parse_heartbeat_duration(value)
+            .ok()
+            .map(|duration| Self::new(duration.as_secs_f64()))
     }
 }
 

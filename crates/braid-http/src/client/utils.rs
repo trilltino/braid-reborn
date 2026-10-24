@@ -1,7 +1,7 @@
 //! Utility functions for the Braid HTTP client.
 
 use crate::client::parser::Message;
-use crate::error::{BraidError, Result};
+use crate::error::Result;
 use crate::protocol;
 use crate::types::{Update, Version};
 use bytes::{Bytes, BytesMut};
@@ -16,20 +16,7 @@ pub fn format_content_range(unit: &str, range: &str) -> String {
 }
 
 pub fn parse_heartbeat(value: &str) -> Result<Duration> {
-    let trimmed = value.trim();
-    let num_str = if let Some(s) = trimmed.strip_suffix("ms") {
-        s
-    } else if let Some(s) = trimmed.strip_suffix('s') {
-        s
-    } else {
-        trimmed
-    };
-
-    let num: f64 = num_str
-        .parse()
-        .map_err(|_| BraidError::HeaderParse(format!("Invalid heartbeat: {}", value)))?;
-    Duration::try_from_secs_f64(num)
-        .map_err(|_| BraidError::HeaderParse(format!("Invalid heartbeat: {}", value)))
+    protocol::parse_heartbeat_duration(value)
 }
 
 pub fn version_to_json_string(version: &str) -> String {

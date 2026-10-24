@@ -126,22 +126,32 @@ pub fn format_content_range(unit: &str, range: &str) -> String {
     format!("{} {}", unit, range)
 }
 
-pub fn parse_heartbeat(value: &str) -> Result<u64> {
+/// Checked wire duration. Bare values are seconds; the legacy `s`/`ms` suffixes
+/// are accepted without losing precision. There is no data-dependent fallback.
+pub fn parse_heartbeat_duration(value: &str) -> Result<std::time::Duration> {
     let trimmed = value.trim();
-    if let Some(ms_str) = trimmed.strip_suffix("ms") {
-        return ms_str
-            .parse::<u64>()
-            .map(|n| n / 1000)
-            .map_err(|_| BraidError::HeaderParse(format!("Invalid heartbeat: {}", value)));
+    let (number, scale) = if let Some(number) = trimmed.strip_suffix("ms") {
+        (number, 0.001)
+    } else {
+        (trimmed.strip_suffix('s').unwrap_or(trimmed), 1.0)
+    };
+    let seconds = number.parse::<f64>().ok().map(|n| n * scale);
+    let seconds = seconds
+        .filter(|n| n.is_finite() && *n > 0.0 && *n <= 86400.0)
+        .ok_or_else(|| BraidError::HeaderParse(format!("Invalid heartbeat: {value}")))?;
+    let duration = std::time::Duration::try_from_secs_f64(seconds)
+        .map_err(|_| BraidError::HeaderParse(format!("Invalid heartbeat: {value}")))?;
+    if duration.is_zero() {
+        return Err(BraidError::HeaderParse("Heartbeat rounds to zero".into()));
     }
-    if let Some(s_str) = trimmed.strip_suffix('s') {
-        return s_str
-            .parse()
-            .map_err(|_| BraidError::HeaderParse(format!("Invalid heartbeat: {}", value)));
-    }
-    trimmed
-        .parse()
-        .map_err(|_| BraidError::HeaderParse(format!("Invalid heartbeat: {}", value)))
+    Ok(duration)
+}
+
+/// Compatibility API: positive fractional seconds round upward, never to zero.
+#[deprecated(note = "use parse_heartbeat_duration to retain subsecond precision")]
+pub fn parse_heartbeat(value: &str) -> Result<u64> {
+    let duration = parse_heartbeat_duration(value)?;
+    Ok(duration.as_secs() + u64::from(duration.subsec_nanos() != 0))
 }
 
 pub fn parse_merge_type(value: &str) -> Result<String> {
@@ -187,7 +197,10 @@ mod tests {
     use super::*;
     #[test]
     fn test_headers() {
-        assert_eq!(parse_heartbeat("5s").unwrap(), 5);
+        assert_eq!(
+            parse_heartbeat_duration("500ms").unwrap(),
+            std::time::Duration::from_millis(500)
+        );
         assert_eq!(format_content_range("json", ".f"), "json .f");
     }
 }

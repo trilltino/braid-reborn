@@ -1,5 +1,13 @@
 # Removed and consolidated code
 
+Release continuation: ConflictResolver's per-operation insert/delete helpers,
+ad hoc merged-response builder and silent string extraction fallback were private
+and only called inside that module. Their replacement is one ResourceStateManager
+candidate transaction, retaining the public resolver interface. Regression tests
+cover failed second operations, multiple valid operations, identity replay and
+collision. Chat's private manual frame formatter is replaced by WireCodec-backed
+format_update; existing message JSON payloads remain available.
+
 Baseline: 4f5275b9ab83bc3cff1ef91ff068be6539edbfa2. Removal decisions combine
 source search, manifests, feature edges and regression checks. The earlier audit
 was not treated as a command to delete every mentioned module.
