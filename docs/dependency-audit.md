@@ -217,3 +217,18 @@ requires review. See the JSON record for all matching files and exact features.
 | local_link_server | [tracing](https://crates.io/crates/tracing) | 0.1.44 / 0.1.44 | normal; all; default | server/src/lib.rs:30 |
 | local_link_server | [tracing-subscriber](https://crates.io/crates/tracing-subscriber) | 0.3.22 / 0.3.23 | normal; all; env-filter | server/src/lib.rs:31 |
 | local_link_server | [uuid](https://crates.io/crates/uuid) | 1.21.0 / 1.29.0 | normal; all; v4,serde | server/src/chat/crdt.rs:10 |
+
+## Resource-policy continuation (2026-10-25)
+
+The policy store, local administrator, shared HTTP/H3 authorization and application
+route boundary use existing serde, SHA-256, UUID, Tokio and durable-file edges.
+No registry dependency or Cargo.lock revision is added. Policy JSON is a separate
+versioned format, not an engine storage-format change. Existing trusted local
+replica APIs remain available; network mutation and read adapters add explicit
+principal checks. The old Iroh error-hiding conveniences remain deprecated
+adapters alongside fallible reads/history APIs. Full public-API, dependency and
+provenance review remains an open release gate.
+
+Individual fs compilation reproduced undeclared server/client feature needs.
+The fs feature now enables those existing edges and nfs enables fs. The
+13-profile runner checks each profile independently, including library tests.

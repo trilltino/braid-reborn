@@ -34,6 +34,8 @@ pub enum ReplicaError {
     Io(#[from] std::io::Error),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
+    #[error(transparent)]
+    Access(#[from] crate::access::AccessError),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -375,6 +377,10 @@ impl ReplicaStore {
             lease: Default::default(),
         })
     }
+    /// Resource policy directory for transports owning this replica root.
+    pub fn policy_store(&self) -> Result<crate::access::PolicyStore, crate::access::AccessError> {
+        crate::access::PolicyStore::new(self.base_dir.join(".resource-policies"))
+    }
     async fn ensure_writer(&self) -> Result<(), ReplicaError> {
         self.lease
             .get_or_try_init(|| async {
@@ -436,7 +442,7 @@ impl ReplicaStore {
         update: &Update,
         merge_type: &str,
     ) -> Result<ReplicaDocument, ReplicaError> {
-        self.commit_profile(resource, update, merge_type, false)
+        self.commit_profile(resource, update, merge_type, false, None)
             .await
     }
 
@@ -447,8 +453,36 @@ impl ReplicaStore {
         resource: &str,
         update: &Update,
     ) -> Result<ReplicaDocument, ReplicaError> {
-        self.commit_profile(resource, update, "simpleton", true)
+        self.commit_profile(resource, update, "simpleton", true, None)
             .await
+    }
+
+    /// Network mutation boundary. Existing ownerless data cannot be claimed by
+    /// a request; only genuinely new data receives a recoverable private policy.
+    pub async fn commit_authorized(
+        &self,
+        resource: &str,
+        update: &Update,
+        merge_type: &str,
+        policies: &crate::access::PolicyStore,
+        principal: &crate::access::Principal,
+    ) -> Result<ReplicaDocument, ReplicaError> {
+        let transforming = merge_type == "simpleton"
+            && update
+                .extra_headers
+                .get("peer")
+                .map(|peer| braid_http::protocol::parse_peer(peer))
+                .transpose()
+                .map_err(|error| ReplicaError::Invalid(error.to_string()))?
+                .is_some();
+        self.commit_profile(
+            resource,
+            update,
+            merge_type,
+            transforming,
+            Some((policies, principal)),
+        )
+        .await
     }
 
     async fn commit_profile(
@@ -457,14 +491,24 @@ impl ReplicaStore {
         update: &Update,
         merge_type: &str,
         transforming: bool,
+        authority: Option<(&crate::access::PolicyStore, &crate::access::Principal)>,
     ) -> Result<ReplicaDocument, ReplicaError> {
         let _guard = document_lock(self.path(resource)).await;
-        let mut document = self
-            .load(resource)
-            .await?
-            .unwrap_or_else(|| ReplicaDocument::empty(merge_type));
+        let stored = self.load(resource).await?;
+        let mut permit = match authority {
+            Some((policies, principal)) => Some(
+                policies
+                    .begin_write(resource, principal, stored.is_none())
+                    .await?,
+            ),
+            None => None,
+        };
+        let mut document = stored.unwrap_or_else(|| ReplicaDocument::empty(merge_type));
         if document.apply_profile(update, transforming)? {
             document.resource = Some(resource.to_owned());
+            if let (Some(permit), Some((policies, _))) = (&mut permit, authority) {
+                permit.reserve(policies).await?;
+            }
             atomic_write(&self.path(resource), &serde_json::to_vec(&document)?).await?;
             let mut broadcast = update.clone();
             broadcast.current_version = Some(document.heads.iter().map(Version::new).collect());

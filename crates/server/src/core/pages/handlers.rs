@@ -130,7 +130,7 @@ pub async fn search_wiki_pages(
 
 // Helpers
 
-fn resolve_path(base: &std::path::Path, path_str: &str) -> Result<PathBuf, String> {
+pub(crate) fn resolve_path(base: &std::path::Path, path_str: &str) -> Result<PathBuf, String> {
     let path = PathBuf::from(path_str);
     if path_str.is_empty()
         || path_str.contains([':', '\\', '\0'])
@@ -150,7 +150,9 @@ fn resolve_path(base: &std::path::Path, path_str: &str) -> Result<PathBuf, Strin
     let mut target = base.clone();
     for component in path.components() {
         target.push(component);
-        if std::fs::symlink_metadata(&target).is_ok_and(|m| m.file_type().is_symlink()) {
+        if std::fs::symlink_metadata(&target)
+            .is_ok_and(|m| braid_http::durable::is_link_or_reparse_point(&m))
+        {
             return Err("Symlink page paths are unsupported".into());
         }
     }

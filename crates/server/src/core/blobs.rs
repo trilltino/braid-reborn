@@ -19,7 +19,7 @@ pub async fn upload_blob(
     mut multipart: Multipart,
 ) -> std::result::Result<Json<BlobRef>, StatusCode> {
     use sha2::{Digest, Sha256};
-    crate::core::auth::middleware::authenticate_headers(&state.auth, &headers)
+    let ctx = crate::core::auth::middleware::authenticate_headers(&state.auth, &headers)
         .await
         .map_err(|_| StatusCode::UNAUTHORIZED)?;
 
@@ -52,6 +52,23 @@ pub async fn upload_blob(
     let mut hasher = Sha256::new();
     hasher.update(&data);
     let hash = format!("{:x}", hasher.finalize());
+    let policies = state
+        .auth
+        .policies()
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let principal = braid_core::access::Principal::User(ctx.user_id().into());
+    let mut permit = policies
+        .begin_write(
+            &format!("upload/{}/{hash}", ctx.user_id()),
+            &principal,
+            true,
+        )
+        .await
+        .map_err(|_| StatusCode::FORBIDDEN)?;
+    permit
+        .reserve(&policies)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let version = vec![braid_http::types::Version::from(hash.clone())];
     let parents = vec![];
@@ -84,9 +101,16 @@ pub async fn get_blob(
     State(state): State<AppState>,
     request_headers: HeaderMap,
 ) -> std::result::Result<(HeaderMap, axum::body::Bytes), StatusCode> {
-    crate::core::auth::middleware::authenticate_headers(&state.auth, &request_headers)
+    let principal = crate::core::access::principal(&state, &request_headers).await?;
+    crate::core::access::authorize_blob(&state, principal.as_ref(), &hash)
         .await
-        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+        .map_err(|error| match error {
+            braid_core::access::AccessError::Denied if principal.is_none() => {
+                StatusCode::UNAUTHORIZED
+            }
+            braid_core::access::AccessError::Denied => StatusCode::FORBIDDEN,
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
+        })?;
     info!("GET /blobs/{}", hash);
 
     let (data, meta) = state

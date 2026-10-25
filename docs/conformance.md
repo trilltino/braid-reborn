@@ -22,7 +22,7 @@ of drafts, not a claim of complete IETF standard conformance.
 | Simpleton historical-parent transforms and peer echo | commit_transforming_simpleton / SimpletonSubscription | release_simpleton_server; pinned JS/Rust server interop; conservative direct commit still rejects stale writes |
 | Persist-before-notify and durable receive/outbox | replica, fs sync | audit_filesystem; engineering_storage; streaming blob faults |
 | Authenticated Iroh GET/PUT/209 and active revocation | protocol policy + RemoteId | braid-iroh/tests/transport.rs, local direct connections |
-| Chat session sender, catch-all and blob authorization | server auth middleware / handlers | engineering_auth through the actual Router |
+| Resource principals, private defaults, sharing and revocation | braid-core::access; server route boundary; H3 adapter | release_access; real two-user release_authorization and three-peer transport tests; attachment guessing and ownerless claims denied |
 | Stable encoded URL/path mapping and collision rejection | fs::mapping / shared session registry | encoded segments round-trip without double-encoding; removed paths keep canonical prefixes; conflicting enabled URLs fail explicitly |
 | Malformed room paths/state fail closed | JsonChatStore | engineering_storage; NFS component name unit test |
 | JS encoder -> Rust and Rust encoder -> JS | tests/interoperability/codec.mjs | checked-in source-pinned protocol-fixtures; run script for both directions |

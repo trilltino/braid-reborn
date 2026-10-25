@@ -1,7 +1,8 @@
 # Migration and rollback
 
 Stop writers and make a byte-for-byte backup of the configured BRAID_ROOT before
-upgrading a deployment. No command in this implementation mutates deployed data.
+upgrading a deployment. Implementation tests use temporary data only. The local
+administration tool mutates only its explicitly supplied policy directory.
 Exercise the upgrade against a copy and compare content, heads, graph and history.
 Keep the old executable, Cargo.lock and backup together. Roll back by stopping the
 new executable and restoring the whole backup; do not mix old metadata with newer
@@ -155,3 +156,8 @@ simpleton_interop_server example. The test forces same-base Unicode edits betwee
 the pinned JavaScript client and the production Rust client, loses one accepted
 PUT acknowledgment, verifies historical content, and checks empty replacement.
 This does not close the browser runtime, partition repair or provenance gates.
+
+Resource policies and their local assignment commands are documented in
+[resource access](resource-access.md). Existing ownerless data now denies network
+access until an explicit local assignment; names and old created_by fields never
+establish ownership. Back up the whole data root before enabling writers.

@@ -6,6 +6,20 @@ use std::{
 };
 use tokio::io::AsyncWriteExt;
 
+/// Junctions and other Windows reparse points also redirect filesystem access.
+pub fn is_link_or_reparse_point(metadata: &std::fs::Metadata) -> bool {
+    let linked = metadata.file_type().is_symlink();
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        linked || metadata.file_attributes() & 0x400 != 0
+    }
+    #[cfg(not(windows))]
+    {
+        linked
+    }
+}
+
 /// Kernel-managed exclusive ownership. Busy writers fail explicitly; no async
 /// worker blocks waiting for another process, and process death releases it.
 pub async fn writer_lease(path: &Path) -> std::io::Result<std::fs::File> {
@@ -26,7 +40,7 @@ pub fn try_writer_lease(path: &Path) -> std::io::Result<std::fs::File> {
         use std::os::unix::fs::OpenOptionsExt;
         options.mode(0o600);
     }
-    if std::fs::symlink_metadata(path).is_ok_and(|meta| meta.file_type().is_symlink()) {
+    if std::fs::symlink_metadata(path).is_ok_and(|meta| is_link_or_reparse_point(&meta)) {
         return Err(std::io::Error::new(
             std::io::ErrorKind::PermissionDenied,
             "Writer lease cannot be a symlink",

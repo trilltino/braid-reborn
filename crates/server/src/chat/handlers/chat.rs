@@ -79,12 +79,13 @@ pub async fn get_chat_room(
         if let Some(parents) = &parents {
             room.crdt
                 .validate_interval(parents, &target)
-                .map_err(braid_core::server::replica_http::error_response)?;
+                .map_err(|error| {
+                    braid_core::server::replica_http::selector_error_response(error, &fields)
+                })?;
         }
-        let view = room
-            .crdt
-            .snapshot_at(&target)
-            .map_err(braid_core::server::replica_http::error_response)?;
+        let view = room.crdt.snapshot_at(&target).map_err(|error| {
+            braid_core::server::replica_http::selector_error_response(error, &fields)
+        })?;
         let exported = view.export_state();
         let mut info = room.room.clone();
         info.crdt_state = crate::core::models::CrdtState {
@@ -157,6 +158,12 @@ pub async fn put_message(
     info!("PUT /chat/{}", room_id);
 
     let sender = ctx.user_id().to_owned();
+    let principal = braid_core::access::Principal::User(sender.clone());
+    for reference in input.blob_refs.as_deref().unwrap_or_default() {
+        crate::core::access::authorize_blob(&state, Some(&principal), &reference.hash)
+            .await
+            .map_err(|_| StatusCode::FORBIDDEN)?;
+    }
 
     // Convert message type
     let msg_type = match input.message_type {

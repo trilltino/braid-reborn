@@ -7,7 +7,7 @@ applications.
 Current verification and remaining release work are recorded in the
 [engineering status](docs/audit/engineering-status.md), with
 [architecture](docs/architecture.md), [conformance](docs/conformance.md) and
-[migration notes](docs/migration.md). The earlier
+[migration notes](docs/migration.md) and [local ownership administration](docs/resource-access.md). The earlier
 [audit status](docs/audits/AUDIT_IMPLEMENTATION_STATUS.md) is historical.
 
 ## Repository layout
@@ -61,7 +61,7 @@ share the root `target/`.
 | Historical-parent Diamond concurrency | Opposite-order delivery, seeded schedules and restarts tested |
 | Simpleton client/server | Durable native owner and transforming peer profile; pinned JS/Rust concurrency and lost-ACK evidence |
 | Blob streaming, limits, digests and durable references | Tested; historical objects retained; no automatic GC |
-| Chat persistence and authentication | Tested regressions; per-resource ACLs incomplete |
+| Resource authorization | Private defaults, user/peer grants, index and attachment isolation, active revocation; see migration limits |
 | Iroh 1.4.1 HTTP/3 | Local GET/PUT/209/revocation tested; relay and anti-entropy open |
 | Browser/WASM | Compile checked; browser behavior remains experimental |
 | NFS | Persistent namespace recovery, binary offsets/truncate and text rename/delete reconciliation tested; Linux mount CI |

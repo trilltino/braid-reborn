@@ -13,7 +13,7 @@ application data is used for implementation or migration testing.
 | GET selectors and historical state (E3/E4; F05/F07) | ReplicaStore and shared HTTP/H3 adapter | release_regressions: historical branches, interval, 432, true/false Subscribe+Version rejection | Historical reads and transforming Simpleton implemented; broader schedules and legacy event recovery remain open |
 | Canonical chat streaming (F03/F05/F08/F10) | Chat store replay/subscribe boundary and codec | release_streams: snapshot/subscribe overlap, lag, drop and invalid headers | Codec/race/lag repairs implemented; broader independent app-route interop and legacy history recovery remain pending |
 | Transforming Simpleton (phase 3) | Shared Diamond replica and per-subscriber view | release_simpleton_server; pinned JS/Rust Unicode, echo, restart/lost ACK; H3 observer reconstruction | Implemented for retained history; missing legacy events remain explicit unavailable boundaries |
-| Resource ACL and migration (phases 5/6/8) | Common policy and all app/transport routes | Two users/peers; grants/revocation; blob references; legacy dry-run/rollback | Pending; private by default, ownerless data assigned locally |
+| Resource ACL and migration (phases 5/6/8) | Common policy and all app/transport routes | Two users/peers; grants/revocation; blob references; legacy dry-run/rollback | Policies, application/H3 enforcement and resumable owner assignment implemented; credentials, complete backup/fault matrix and multiplex binding still open |
 | Browser/native/H3 channel (phase 4; F10/F12) | Portable worker, journal, transport | IndexedDB/Web Locks; reload/quota/cancel/slow read in three browsers | Pending; native API compatibility required |
 | Iroh repair (phase 6; F09) | Owned peer/resource reconciliation | Partition, late join, missed gossip, relay, gap, revoke, restart | Pending; gossip never acknowledges commits |
 | Binary/NFS recovery (phase 5; F02/F11/F14) | Binary outbox, immutable conflicts, namespace journal | Lost ACK, competing binaries, destination-before-tombstone, mounted NFS | Pending; retain both binary versions |
@@ -48,3 +48,25 @@ equating process termination with a power cut.
 - Formatting and diff whitespace checks passed. Raw logs are under target/release-*.
 - No data format migration or deployed-data mutation occurred. Dependency graph
   and lockfiles are unchanged. Remaining rows stay open.
+
+## Authorization and feature checkpoint
+
+- Default-feature workspace: 406 passed, 0 failed, 26 ignored. This includes the
+  real Windows junction case in the production-router authorization test.
+- All-feature workspace: 405 passed, 0 failed, 26 ignored before the final
+  outbox-header test was added. The complete wire/channel suites then passed
+  12 tests with that new case; one subprocess helper remains intentionally ignored.
+- All 13 isolated supported profiles passed warnings-denied Clippy and their
+  library tests. WASM compile and final all-target/all-feature Clippy passed.
+- The first broad run timed out in existing shared-channel rename recovery.
+  Its focused reruns and the subsequent full default/all-feature runs passed;
+  the failed observation remains in target/release-acl-workspace.log.
+- Common user/peer policies, application/H3 protection, attachment-reference
+  validation, local inventory and resumable owner assignment are implemented.
+  Policies have schema version 1, immutable creation IDs, grant revisions and
+  pre-publication write generations. Rollback refuses changed or used policies.
+- Original input hashes are in release-inputs.json; the user-supplied source
+  documents remain untracked and unchanged. No deployed data was migrated.
+- Per-origin daemon credentials, complete backup/legacy-secret migration, browser
+  channels, anti-entropy, binary recovery, extensions and later release gates
+  remain open. Local Windows evidence does not certify new Linux CI results.

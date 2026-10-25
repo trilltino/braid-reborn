@@ -23,11 +23,79 @@ pub fn error_response(error: ReplicaError) -> Response {
         ReplicaError::Invalid(_) => StatusCode::BAD_REQUEST,
         ReplicaError::Conflict(_) => StatusCode::CONFLICT,
         ReplicaError::Limit(_) => StatusCode::PAYLOAD_TOO_LARGE,
+        ReplicaError::Access(crate::access::AccessError::Denied) => StatusCode::FORBIDDEN,
+        ReplicaError::Access(crate::access::AccessError::AlreadyOwned) => StatusCode::CONFLICT,
+        ReplicaError::Access(crate::access::AccessError::Invalid(_)) => StatusCode::BAD_REQUEST,
         _ => StatusCode::INTERNAL_SERVER_ERROR,
     };
     (status, error.to_string()).into_response()
 }
-fn selector_error_response(
+
+/// Checks authority before loading data or revealing historical selectors.
+pub async fn get_authorized(
+    store: ReplicaStore,
+    policies: crate::access::PolicyStore,
+    principal: Option<crate::access::Principal>,
+    resource: String,
+    headers: HeaderMap,
+    merge_type: &str,
+) -> Response {
+    if let Err(error) = policies
+        .authorize(&resource, principal.as_ref(), crate::access::Action::Read)
+        .await
+    {
+        return error_response(error.into());
+    }
+    let response = get(store, resource.clone(), headers, merge_type).await;
+    protect_response(policies, resource, principal, response).await
+}
+
+/// Rechecks active streams on every frame and at least once per second, including
+/// idle streams. Dropping the response cancels the timer and upstream receiver.
+pub async fn protect_response(
+    policies: crate::access::PolicyStore,
+    resource: String,
+    principal: Option<crate::access::Principal>,
+    response: Response,
+) -> Response {
+    if let Err(error) = policies
+        .authorize(&resource, principal.as_ref(), crate::access::Action::Read)
+        .await
+    {
+        return error_response(error.into());
+    }
+    if response.status().as_u16() != 209 {
+        return response;
+    }
+    let (parts, body) = response.into_parts();
+    let stream = async_stream::stream! {
+        use futures::StreamExt;
+        let mut upstream = body.into_data_stream();
+        let mut timer = tokio::time::interval(std::time::Duration::from_secs(1));
+        timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            if policies.authorize(&resource, principal.as_ref(), crate::access::Action::Read).await.is_err() {
+                yield Err(std::io::Error::other("Resource access revoked or policy unavailable"));
+                break;
+            }
+            tokio::select! {
+                _ = timer.tick() => {},
+                frame = upstream.next() => match frame {
+                    Some(frame) => {
+                        if policies.authorize(&resource, principal.as_ref(), crate::access::Action::Read).await.is_err() {
+                            yield Err(std::io::Error::other("Resource access revoked or policy unavailable"));
+                            break;
+                        }
+                        yield frame.map_err(std::io::Error::other);
+                    },
+                    None => break,
+                },
+            }
+        }
+    };
+    Response::from_parts(parts, Body::from_stream(stream))
+}
+pub fn selector_error_response(
     error: ReplicaError,
     fields: &std::collections::BTreeMap<String, String>,
 ) -> Response {
@@ -225,6 +293,37 @@ pub async fn put(
     body: Bytes,
     merge_type: &str,
 ) -> Response {
+    put_profile(store, resource, headers, body, merge_type, None).await
+}
+
+pub async fn put_authorized(
+    store: ReplicaStore,
+    policies: crate::access::PolicyStore,
+    principal: crate::access::Principal,
+    resource: String,
+    headers: HeaderMap,
+    body: Bytes,
+    merge_type: &str,
+) -> Response {
+    put_profile(
+        store,
+        resource,
+        headers,
+        body,
+        merge_type,
+        Some((policies, principal)),
+    )
+    .await
+}
+
+async fn put_profile(
+    store: ReplicaStore,
+    resource: String,
+    headers: HeaderMap,
+    body: Bytes,
+    merge_type: &str,
+    authority: Option<(crate::access::PolicyStore, crate::access::Principal)>,
+) -> Response {
     let headers = match braid_http::protocol::headers_from_http(&headers) {
         Ok(headers) => headers,
         Err(e) => return (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
@@ -242,7 +341,11 @@ pub async fn put(
         Err(e) => return (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
     };
     let negotiated = update.merge_type.as_deref().unwrap_or(merge_type);
-    let committed = if transforming && negotiated == "simpleton" {
+    let committed = if let Some((policies, principal)) = authority {
+        store
+            .commit_authorized(&resource, &update, negotiated, &policies, &principal)
+            .await
+    } else if transforming && negotiated == "simpleton" {
         store
             .commit_transforming_simpleton(&resource, &update)
             .await

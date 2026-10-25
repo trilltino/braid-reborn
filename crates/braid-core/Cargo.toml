@@ -118,3 +118,8 @@ libc = "0.2.139"
 [lib]
 path = "src/lib.rs"
 crate-type = ["rlib", "cdylib"]
+
+[[bin]]
+name = "braid-admin"
+path = "src/bin/braid_admin.rs"
+required-features = ["native"]

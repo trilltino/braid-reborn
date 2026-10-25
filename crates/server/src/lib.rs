@@ -141,6 +141,7 @@ pub async fn run() -> anyhow::Result<()> {
 
 /// Build the production routes with supplied application state.
 pub fn router(app_state: AppState) -> Router {
+    let access_state = app_state.clone();
     // Services routers
     let core_router = core::router();
     let chat_router = chat::router().route_layer(middleware::from_fn_with_state(
@@ -161,6 +162,10 @@ pub fn router(app_state: AppState) -> Router {
         .route("/health", get(health_check))
         // State and Layers
         .with_state(app_state)
+        .layer(middleware::from_fn_with_state(
+            access_state,
+            core::access::enforce,
+        ))
         .layer(tower_http::cors::CorsLayer::permissive())
         .layer(tower_http::trace::TraceLayer::new_for_http())
 }
@@ -186,7 +191,7 @@ async fn dispatch_get(
 
     if is_local_org {
         crate::core::pages::handlers::get_local_page(
-            Path(path.replace("local.org/", "")),
+            Path(path.strip_prefix("local.org/").unwrap_or(&path).into()),
             State(state),
             headers,
         )
@@ -194,12 +199,9 @@ async fn dispatch_get(
     } else if is_simpleton || has_extension {
         crate::core::pages::handlers::get_wiki_page(Path(path), State(state), headers).await
     } else {
-        if let Err(error) = ax_auth::authenticate_headers(&state.auth, &headers).await {
-            return error.into_response();
+        match crate::chat::handlers::chat::get_chat_room(Path(path), headers, State(state)).await {
+            Ok(response) | Err(response) => response,
         }
-        crate::chat::handlers::braid_subscribe::braid_subscribe(Path(path), State(state), headers)
-            .await
-            .into_response()
     }
 }
 
@@ -224,7 +226,7 @@ async fn dispatch_put(
 
     if is_local_org {
         return crate::core::pages::handlers::put_local_page(
-            Path(path.replace("local.org/", "")),
+            Path(path.strip_prefix("local.org/").unwrap_or(&path).into()),
             State(state),
             parts.headers,
             bytes,
@@ -265,17 +267,8 @@ async fn dispatch_put(
             }
         }
         Err(e) => {
-            warn!(
-                "Failed to parse Chat JSON for {}: {}. Fallback to Wiki?",
-                path, e
-            );
-            crate::core::pages::handlers::put_wiki_page(
-                Path(path),
-                State(state),
-                parts.headers,
-                bytes,
-            )
-            .await
+            warn!("Failed to parse Chat JSON for {}: {}", path, e);
+            axum::http::StatusCode::BAD_REQUEST.into_response()
         }
     }
 }

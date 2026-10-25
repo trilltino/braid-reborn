@@ -14,6 +14,8 @@
 //! - **fs**: Filesystem synchronization client logic.
 
 pub use smallvec;
+#[cfg(feature = "native")]
+pub mod access;
 pub mod core;
 #[cfg(feature = "native")]
 pub mod replica;

@@ -58,7 +58,9 @@ pub fn url_to_path(url_str: &str) -> Result<PathBuf> {
 
     let mut ancestor = path.as_path();
     loop {
-        if std::fs::symlink_metadata(ancestor).is_ok_and(|m| m.file_type().is_symlink()) {
+        if std::fs::symlink_metadata(ancestor)
+            .is_ok_and(|m| braid_http::durable::is_link_or_reparse_point(&m))
+        {
             return Err(anyhow!("Sync paths cannot traverse symlinks"));
         }
         match ancestor.parent() {

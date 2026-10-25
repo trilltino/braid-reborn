@@ -38,6 +38,18 @@ pub async fn mw_require_auth(
 ) -> Result<Response> {
     debug!("MIDDLEWARE: require_auth");
 
+    if req
+        .extensions()
+        .get::<crate::core::access::AuthorizedPublicRead>()
+        .is_some()
+        && matches!(
+            *req.method(),
+            axum::http::Method::GET | axum::http::Method::HEAD
+        )
+    {
+        return Ok(next.run(req).await);
+    }
+
     let ctx = authenticate_headers(&state.auth, req.headers()).await?;
 
     // Store Ctx in request extensions

@@ -24,15 +24,18 @@ mutation, atomic file publication and notification. Event fingerprints make
 retries idempotent. Diamond text changes use the declared historical parent
 frontier and preserve concurrent heads. Checkpoints contain operation history
 and both legacy local positions and stable remote agent/sequence mappings.
-Simpleton accepts coordinated writes at the current frontier; a stale positional
-write conflicts. The public legacy merge wrappers are a separate compatibility
-surface and have not acquired every ReplicaStore guarantee.
+The conservative Simpleton commit API rejects stale positional writes. The
+Peer-bearing HTTP/H3 profile transforms historical-parent writes through Diamond.
+The public legacy resolver stages a whole batch and records one identity only
+after every operation succeeds.
 
 HTTP and Iroh H3 call the same replica adapter. Subscriptions subscribe before
 loading replay state, send an initial snapshot or valid linear replay, then
 publish committed updates through a bounded broadcast. Lag terminates the stream
-for frontier-based repair. Concurrent histories use an authoritative merged
-snapshot rather than replaying positional patches at the wrong base.
+for frontier-based repair. Simpleton subscribers receive patches relative to their own view, with own-peer
+echo suppression and delayed concurrent corrections. Original causal events are
+available through finite historical interval GET; they are separate from
+positional stream projections.
 
 The native `braid-http::client::ReliableChannel` actor owns a resource's GET and
 serial PUT queue. A durable journal separates received, optimistic and pending
@@ -47,8 +50,9 @@ an ambiguous ACK. Application state and its queue/cursor commit together.
 representation digests and offline pending text, following the pinned upstream
 client. It uses this channel rather than an independent retry loop. Its revision
 comparison guards filesystem decisions against a concurrent receive. The Rust
-server's conservative stale-Simpleton rejection is a separate capability: it
-does not implement the upstream transforming multi-writer server algorithm.
+server's explicit transforming profile is verified with concurrent production
+Rust and pinned JavaScript clients, Unicode edits and an accepted PUT whose ACK
+is lost. Missing legacy events still require an explicit repair boundary.
 
 The filesystem registry shares one Simpleton client per URL. The daemon owns
 scanner, replay, subscription and debouncer workers and cancels/drains them at
@@ -109,3 +113,14 @@ runs on a bounded blocking pool.
 These locks cover cooperating services, not arbitrary external editors or
 physical power loss. Unix parent directories are synced after atomic replacement;
 Windows directory durability and exhaustive crash points require separate tests.
+
+Resource policy lives outside replicated payloads. User and authenticated peer
+principals occupy different namespaces. Policies are private by default; missing
+legacy ownership denies network access. Creation locks prove data is new before
+a request may reserve ownership. A policy writer lease spans data publication;
+write generations block adoption rollback after publication starts. Reads check
+policy before disclosing history, indexes are filtered, and stream readers
+recheck each frame and every second. Blob authority comes from an existing
+authorized resource or private upload reference. Attachment insertion must
+authorize the reference before it is added to a message. Iroh transport peer
+allowlists and per-resource grants are independent checks.

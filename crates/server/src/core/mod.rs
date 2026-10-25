@@ -3,6 +3,7 @@
 //! Provides shared infrastructure for the Braid server, including
 //! authentication, data models, configuration, and storage.
 
+pub mod access;
 pub mod auth;
 pub mod blobs;
 pub mod config;

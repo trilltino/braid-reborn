@@ -1,3 +1,26 @@
+# Release continuation, 2026-10-25
+
+Commits 0ad15f3 and 1d2319d repair the four reproduced defects, add bounded
+historical reads, and implement the transforming Simpleton peer profile. The
+pinned JavaScript and production Rust clients converge through same-base Unicode
+edits and lost ACKs. The causal checkpoint all-feature workspace run passed 394
+tests, with 26 ignored; three early policy tests were included in that run.
+Warnings-denied all-target Clippy passed.
+
+The policy continuation passed 406 default-workspace tests, the 13 isolated
+profile checks and WASM compilation. Final all-target Clippy passed. It adds
+private resource grants, idle-stream
+revocation, resource-filtered indexes and attachment-reference checks in actual
+application routes and H3. The local administration tool supports explicit
+owner assignment with dry-run, resume and guarded rollback. Its assignment
+rollback is deliberately blocked after protected data writes begin. Full
+browser runtime, anti-entropy, binary conflicts, extension deployment, complete
+legacy provenance, crash matrices and representative benchmarks remain open in
+[the release checklist](release-completion.md). This is not full release sign-off.
+
+The following section preserves earlier validation evidence; its older capability
+statements are superseded by the continuation and current conformance profile.
+
 # Engineering refactor status, 2026-10-23
 
 The validated code commit is

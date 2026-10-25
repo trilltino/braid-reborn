@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "starting_revision": "a10620eea582dc4d68f6b752ba480e16893ed911",
+  "inputs": [
+    {
+      "file": "BRAID_REBORN_ENGINEERING_REFACTOR_PROMPT_2026-10-23.md",
+      "bytes": 112714,
+      "sha256": "4df39b4162bcebdbd202f0c04c44178ae3af2cd723d876a92adf7bae906e06c0",
+      "disposition": "Preserved user-supplied untracked input; do not rewrite or stage the source document"
+    },
+    {
+      "file": "BRAID_REBORN_PROTOCOL_AND_RUST_AUDIT_2026-10-22 (1).md",
+      "bytes": 142073,
+      "sha256": "f5a49f8a1379655ef56c72a8ce2f26f4e95adbeb250dafeddca5bcd50ff19f4d",
+      "disposition": "Preserved user-supplied untracked input; do not rewrite or stage the source document"
+    }
+  ]
+}

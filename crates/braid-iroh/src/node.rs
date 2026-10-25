@@ -188,22 +188,64 @@ impl BraidIrohNode {
         url: &str,
         bootstrap: Vec<EndpointId>,
     ) -> anyhow::Result<GossipReceiver> {
-        println!(
-            "[NODE] Subscribing to {} with {} bootstrap peers",
-            url,
-            bootstrap.len()
-        );
-        for peer in &bootstrap {
-            println!("[NODE]   bootstrap: {}", peer);
+        let normalized = SubscriptionManager::normalize_url(url);
+        if !self
+            .replica
+            .policy_store()?
+            .get(&normalized)
+            .await?
+            .is_some_and(|policy| policy.public_read)
+        {
+            anyhow::bail!("Private resources require authenticated H3 subscriptions");
         }
         let (_sender, receiver) = self.subscription_mgr.subscribe(url, bootstrap).await?;
-        println!("[NODE] Subscribed successfully to {}", url);
         Ok(receiver)
     }
 
     /// PUT a Braid Update to a resource. Stores it locally and broadcasts
     /// to all gossip subscribers.
     pub async fn put(&self, url: &str, update: Update) -> anyhow::Result<()> {
+        let normalized = SubscriptionManager::normalize_url(url);
+        let policies = self.replica.policy_store()?;
+        self.replica
+            .commit_authorized(
+                &normalized,
+                &update,
+                update.merge_type.as_deref().unwrap_or("simpleton"),
+                &policies,
+                &braid_http_rs::access::Principal::Peer(self.node_id().to_string()),
+            )
+            .await?;
+        // Gossip failure never rolls back an already durable commit. Peers catch up via HTTP.
+        let public_resource = match policies.get(&normalized).await {
+            Ok(policy) => policy.is_some_and(|policy| policy.public_read),
+            Err(error) => {
+                tracing::warn!(%error, "Gossip policy unavailable after durable commit");
+                false
+            }
+        };
+        if public_resource && matches!(*self.access.read(), crate::protocol::AccessPolicy::Public) {
+            if let Err(e) = self.subscription_mgr.broadcast(&normalized, &update).await {
+                tracing::warn!(%e,"Gossip announcement failed after commit");
+            }
+        }
+        Ok(())
+    }
+    /// Trusted local compatibility adapter. Remote ingestion must carry an
+    /// authenticated principal through the protected HTTP/H3 mutation boundary.
+    #[deprecated(
+        note = "Use try_store_update and handle storage errors; never ingest untrusted gossip bodies"
+    )]
+    pub async fn store_update(&self, url: &str, update: Update) {
+        if let Err(e) = self.try_store_update(url, update).await {
+            tracing::warn!(%e,%url,"Local update was not committed");
+        }
+    }
+    pub async fn try_store_update(
+        &self,
+        url: &str,
+        update: Update,
+    ) -> Result<(), braid_http_rs::replica::ReplicaError> {
         let normalized = SubscriptionManager::normalize_url(url);
         self.replica
             .commit(
@@ -212,63 +254,66 @@ impl BraidIrohNode {
                 update.merge_type.as_deref().unwrap_or("simpleton"),
             )
             .await?;
-        // Gossip failure never rolls back an already durable commit. Peers catch up via HTTP.
-        if matches!(*self.access.read(), crate::protocol::AccessPolicy::Public) {
-            if let Err(e) = self.subscription_mgr.broadcast(&normalized, &update).await {
-                tracing::warn!(%e,"Gossip announcement failed after commit");
-            }
-        }
         Ok(())
     }
-    /// Incoming gossip is validated by the replica; it cannot overwrite a conflicting edit.
-    pub async fn store_update(&self, url: &str, update: Update) {
-        let normalized = SubscriptionManager::normalize_url(url);
-        if let Err(e) = self
-            .replica
-            .commit(
-                &normalized,
-                &update,
-                update.merge_type.as_deref().unwrap_or("simpleton"),
-            )
-            .await
-        {
-            tracing::warn!(%e,%url,"Gossip update requires authoritative history repair");
-        }
-    }
+    #[deprecated(note = "Use try_get to distinguish unavailable storage from a missing resource")]
     pub async fn get(&self, url: &str) -> Option<Update> {
-        let url = SubscriptionManager::normalize_url(url);
-        self.replica
-            .load(&url)
-            .await
-            .ok()
-            .flatten()
-            .map(|doc| doc.snapshot())
+        self.try_get(url).await.ok().flatten()
     }
+    pub async fn try_get(
+        &self,
+        url: &str,
+    ) -> Result<Option<Update>, braid_http_rs::replica::ReplicaError> {
+        let url = SubscriptionManager::normalize_url(url);
+        Ok(self.replica.load(&url).await?.map(|doc| doc.snapshot()))
+    }
+    /// Legacy event lookup. For materialized historical content use snapshot_at.
+    #[deprecated(note = "Use try_get_version or try_snapshot_at and handle storage errors")]
     pub async fn get_version(&self, url: &str, version_id: &str) -> Option<Update> {
-        let url = SubscriptionManager::normalize_url(url);
-        self.replica
-            .load(&url)
-            .await
-            .ok()
-            .flatten()?
-            .history
-            .into_iter()
-            .find(|u| u.version.iter().any(|v| v.to_string() == version_id))
+        self.try_get_version(url, version_id).await.ok().flatten()
     }
-    pub async fn get_history(&self, url: &str) -> Vec<String> {
+    pub async fn try_get_version(
+        &self,
+        url: &str,
+        version_id: &str,
+    ) -> Result<Option<Update>, braid_http_rs::replica::ReplicaError> {
         let url = SubscriptionManager::normalize_url(url);
+        Ok(self.replica.load(&url).await?.and_then(|document| {
+            document
+                .history
+                .into_iter()
+                .find(|u| u.version.iter().any(|v| v.to_string() == version_id))
+        }))
+    }
+    pub async fn try_snapshot_at(
+        &self,
+        url: &str,
+        frontier: &[braid_http_rs::Version],
+    ) -> Result<Option<Update>, braid_http_rs::replica::ReplicaError> {
         self.replica
-            .load(&url)
+            .snapshot_at(&SubscriptionManager::normalize_url(url), frontier)
             .await
-            .ok()
-            .flatten()
+    }
+    #[deprecated(note = "Use try_get_history to distinguish storage errors from empty history")]
+    pub async fn get_history(&self, url: &str) -> Vec<String> {
+        self.try_get_history(url).await.unwrap_or_default()
+    }
+    pub async fn try_get_history(
+        &self,
+        url: &str,
+    ) -> Result<Vec<String>, braid_http_rs::replica::ReplicaError> {
+        let url = SubscriptionManager::normalize_url(url);
+        Ok(self
+            .replica
+            .load(&url)
+            .await?
             .map(|doc| {
                 doc.history
                     .into_iter()
                     .flat_map(|u| u.version.into_iter().map(|v| v.to_string()))
                     .collect()
             })
-            .unwrap_or_default()
+            .unwrap_or_default())
     }
 
     /// Shut down the node gracefully.
@@ -291,6 +336,14 @@ impl BraidIrohNode {
     /// Access the iroh endpoint (for advanced usage).
     pub fn endpoint(&self) -> &Endpoint {
         &self.endpoint
+    }
+
+    /// Trusted local administration. Network grants must additionally authorize
+    /// the caller as an owner; this handle is never sent to remote peers.
+    pub fn resource_policies(
+        &self,
+    ) -> Result<braid_http_rs::access::PolicyStore, braid_http_rs::access::AccessError> {
+        self.replica.policy_store()
     }
 
     pub fn allow_peer(&self, peer: EndpointId) {

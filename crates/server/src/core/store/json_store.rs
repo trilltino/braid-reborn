@@ -64,6 +64,24 @@ pub struct RoomData {
 }
 
 impl JsonChatStore {
+    /// Reserve ownership only while the same lock used by room creation proves
+    /// there is no existing room. Keep the returned permit through publication.
+    pub async fn authorize_resource_write(
+        &self,
+        room_id: &str,
+        policies: &braid_core::access::PolicyStore,
+        principal: &braid_core::access::Principal,
+    ) -> Result<braid_core::access::MutationPermit> {
+        let path = self.room_path(room_id)?;
+        let _guard = braid_http::durable::document_lock(path.clone()).await;
+        let exists =
+            self.rooms.read().await.contains_key(room_id) || tokio::fs::try_exists(&path).await?;
+        let key = crate::core::access::resource_key("chat", room_id)
+            .map_err(|_| anyhow::anyhow!("Invalid resource identifier"))?;
+        let mut permit = policies.begin_write(&key, principal, !exists).await?;
+        permit.reserve(policies).await?;
+        Ok(permit)
+    }
     /// Create a new JSON chat store
     pub async fn new(config: ChatServerConfig) -> Result<Self> {
         // Ensure directories exist

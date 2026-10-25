@@ -66,6 +66,12 @@ pub struct AuthManager {
 }
 
 impl AuthManager {
+    /// Separate, versioned policies; never stored in replicated payloads.
+    pub fn policies(
+        &self,
+    ) -> Result<braid_core::access::PolicyStore, braid_core::access::AccessError> {
+        braid_core::access::PolicyStore::new(self.db_path.with_extension("policies"))
+    }
     /// Create new auth manager
     pub async fn new(base_dir: &std::path::Path) -> Result<Self> {
         let db_path = base_dir.join("users.sqlite");

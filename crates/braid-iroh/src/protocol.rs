@@ -17,7 +17,8 @@ use std::{collections::HashSet, sync::Arc};
 #[derive(Clone, Debug)]
 pub enum AccessPolicy {
     Peers(HashSet<EndpointId>),
-    /// Explicitly public resources. Topic names are never authentication secrets.
+    /// Open the transport to all authenticated endpoints. Resource policies still
+    /// apply independently; topic names never supply resource authority.
     Public,
 }
 impl Default for AccessPolicy {
@@ -56,8 +57,19 @@ async fn handle_get(
         return axum::http::StatusCode::FORBIDDEN.into_response();
     }
     let mut changed = state.policy_changed.subscribe();
-    let response =
-        replica_http::get(state.replica, format!("/{resource}"), headers, "simpleton").await;
+    let policies = match state.replica.policy_store() {
+        Ok(policies) => policies,
+        Err(error) => return replica_http::error_response(error.into()),
+    };
+    let response = replica_http::get_authorized(
+        state.replica,
+        policies,
+        Some(braid_http_rs::access::Principal::Peer(peer.to_string())),
+        format!("/{resource}"),
+        headers,
+        "simpleton",
+    )
+    .await;
     let (parts, body) = response.into_parts();
     let stream = async_stream::stream! {
         use futures::StreamExt;
@@ -89,8 +101,14 @@ async fn handle_put(
     if !state.access.read().permits(peer) {
         return axum::http::StatusCode::FORBIDDEN.into_response();
     }
-    replica_http::put(
+    let policies = match state.replica.policy_store() {
+        Ok(policies) => policies,
+        Err(error) => return replica_http::error_response(error.into()),
+    };
+    replica_http::put_authorized(
         state.replica,
+        policies,
+        braid_http_rs::access::Principal::Peer(peer.to_string()),
         format!("/{resource}"),
         headers,
         body,
