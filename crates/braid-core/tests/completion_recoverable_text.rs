@@ -48,6 +48,8 @@ struct Fake {
     put_status: AtomicU16,
     puts: Mutex<Vec<(String, Vec<u8>)>>,
     history: Mutex<HashMap<String, String>>,
+    /// None echoes the requested frontier; Some("") omits the header.
+    history_version_override: Mutex<Option<String>>,
     subscriptions: Mutex<Vec<HeaderMap>>,
     /// Senders for connections nobody scripted; kept open so reconnects idle quietly.
     idle: Mutex<Vec<mpsc::UnboundedSender<Update>>>,
@@ -59,6 +61,7 @@ impl Fake {
             put_status: AtomicU16::new(200),
             puts: Default::default(),
             history: Default::default(),
+            history_version_override: Default::default(),
             subscriptions: Default::default(),
             idle: Default::default(),
         })
@@ -103,7 +106,14 @@ async fn serve(fake: Arc<Fake>) -> String {
                     let fields = protocol::headers_from_http(&headers).unwrap();
                     let key = fields.get("version").cloned().unwrap_or_default();
                     match fake.history.lock().unwrap().get(&key) {
-                        Some(text) => (StatusCode::OK, text.clone()).into_response(),
+                        Some(text) => {
+                            let selected = fake.history_version_override.lock().unwrap().clone().unwrap_or_else(|| key.clone());
+                            let mut response = (StatusCode::OK, text.clone()).into_response();
+                            if !selected.is_empty() {
+                                response.headers_mut().insert("version", selected.parse().unwrap());
+                            }
+                            response
+                        },
                         None => StatusCode::from_u16(432).unwrap().into_response(),
                     }
                 }
@@ -279,6 +289,8 @@ async fn legacy_journal_without_a_queue_gets_a_verified_base_and_a_byte_exact_ba
     .unwrap();
     std::fs::write(&path, &original).unwrap();
     let fake = Fake::new();
+    fake.history.lock().unwrap().insert("\"v7\"".into(), "legacy text".into());
+    fake.put_status.store(0, Ordering::SeqCst);
     let url = serve(fake.clone()).await;
     let server = fake.stream();
     let client = SimpletonClient::connect(
@@ -288,7 +300,8 @@ async fn legacy_journal_without_a_queue_gets_a_verified_base_and_a_byte_exact_ba
     )
     .await
     .unwrap();
-    assert_eq!(client.status().borrow().recovery, RecoveryState::Verified);
+    let status = client.status();
+    wait_for(|| status.borrow().recovery == RecoveryState::Verified).await;
     assert_eq!(
         client.status().borrow().text,
         "legacy text edited",
@@ -300,7 +313,9 @@ async fn legacy_journal_without_a_queue_gets_a_verified_base_and_a_byte_exact_ba
         saved["application"]["base"]["frontier"],
         serde_json::json!(["v7"])
     );
-    assert_eq!(saved["application"]["pending"], "legacy text edited");
+    assert!(saved["application"]["pending"] == "legacy text edited"
+        || saved["outbox"].as_array().is_some_and(|queue| !queue.is_empty()),
+        "the pending intent is retained or durably queued");
     assert_eq!(
         saved["application"]["peer"], "legacy-peer",
         "identity is unchanged"
@@ -419,6 +434,29 @@ async fn unverifiable_legacy_baseline_is_reported_and_the_original_is_retained()
     );
     client.close().await;
     drop(server);
+}
+
+#[tokio::test]
+async fn legacy_recovery_rejects_unidentified_or_wrong_historical_frontiers() {
+    for returned in ["", "\"another-version\""] {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("journal.json");
+        let original = legacy_queued_journal(&path);
+        let fake = Fake::new();
+        fake.history.lock().unwrap().insert("\"seed\"".into(), "ab".into());
+        *fake.history_version_override.lock().unwrap() = Some(returned.into());
+        fake.put_status.store(0, Ordering::SeqCst);
+        let server = fake.stream();
+        let url = serve(fake.clone()).await;
+        let client = SimpletonClient::connect(&BraidClient::new().unwrap(), &url, ChannelJournal::open(&path).await.unwrap()).await.unwrap();
+        let status = client.status();
+        wait_for(|| status.borrow().online && !fake.puts.lock().unwrap().is_empty()).await;
+        assert_eq!(status.borrow().recovery, RecoveryState::NeedsLegacyBaseline);
+        assert!(journal_json(&path)["application"]["base"].is_null());
+        assert_eq!(std::fs::read(dir.path().join("journal.json.pre-recovery-v2.bak")).unwrap(), original);
+        client.close().await;
+        drop(server);
+    }
 }
 
 #[tokio::test]

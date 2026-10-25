@@ -174,13 +174,11 @@ impl SimpletonClient {
         if state.schema < STATE_SCHEMA && journal.checkpoint().application.is_some() {
             // Keep the exact pre-migration bytes before anything is rewritten.
             journal.backup_original("pre-recovery-v2").await?;
-            if !state.initialized || journal.checkpoint().outbox.is_empty() {
-                // With no unacknowledged entries the recorded state is the acknowledged state.
-                if state.initialized {
-                    state.base = Some(VerifiedBase::of(&state.text, &state.version));
-                }
+            if !state.initialized {
                 state.schema = STATE_SCHEMA;
             } else {
+                // A legacy cursor is not proof that the saved bytes materialize
+                // that frontier, even when its outbox is empty.
                 recovery = RecoveryState::NeedsLegacyBaseline;
             }
         }
@@ -380,9 +378,14 @@ impl Driver {
                 && !self.recovery_attempted
             {
                 self.recovery_attempted = true;
-                self.recover_legacy_baseline().await?;
+                match self.recover_legacy_baseline().await {
+                    Ok(()) => {},
+                    Err(BraidError::Aborted) => return Ok(()),
+                    Err(error) => return Err(error),
+                }
             }
-            if self.online && self.state.initialized && self.outstanding < 10 {
+            if self.online && self.state.initialized && self.outstanding < 10
+                && self.recovery == RecoveryState::Verified {
                 if let Some(pending) = self.state.pending.clone() {
                     if pending == self.state.text {
                         let mut next = self.state.clone();
@@ -426,7 +429,8 @@ impl Driver {
             return Ok(());
         }
         check_size(&text)?;
-        if self.online && self.state.initialized && self.outstanding < 10 {
+        if self.online && self.state.initialized && self.outstanding < 10
+            && self.recovery == RecoveryState::Verified {
             self.send(text, sequence).await
         } else {
             let mut next = self.state.clone();
@@ -647,25 +651,9 @@ impl Driver {
     /// digest and the persisted optimistic text. Failure keeps the legacy state.
     async fn recover_legacy_baseline(&mut self) -> Result<()> {
         let outbox = self.channel.pending_updates().await?;
-        let Some(first) = outbox.first() else {
-            return Ok(());
-        };
-        let frontier = first.parents.clone();
-        let text = if frontier.is_empty() {
-            String::new()
-        } else {
-            let mut request = BraidRequest::new().with_versions(frontier.clone());
-            request.extra_headers = self.credentials.clone();
-            match self.client.fetch(&self.url, request).await {
-                Ok(response) if response.is_success() => {
-                    match String::from_utf8(response.body.to_vec()) {
-                        Ok(text) => text,
-                        Err(_) => return Ok(()),
-                    }
-                }
-                _ => return Ok(()),
-            }
-        };
+        let frontier = outbox.first().map(|first| first.parents.clone())
+            .unwrap_or_else(|| self.state.version.clone());
+        let Some(text) = self.fetch_legacy_base(&frontier).await? else { return Ok(()); };
         let candidate = VerifiedBase::of(&text, &frontier);
         match Self::replay(&candidate, &outbox) {
             Ok((replayed, at))
@@ -680,9 +668,59 @@ impl Driver {
                 self.state = next;
                 self.recovery = RecoveryState::Verified;
             }
-            _ => tracing::warn!(url = %self.url, "Legacy Simpleton baseline could not be verified"),
+            _ => tracing::warn!("Legacy Simpleton baseline could not be verified"),
         }
         Ok(())
+    }
+
+    async fn fetch_legacy_base(&mut self, frontier: &[Version]) -> Result<Option<String>> {
+        if frontier.is_empty() { return Ok(Some(String::new())); }
+        let mut request = BraidRequest::new().with_versions(frontier.to_vec());
+        request.extra_headers = self.credentials.clone();
+        let client = self.client.clone();
+        let url = self.url.clone();
+        let fetch = client.fetch(&url, request);
+        let timeout = braid_http::client::sleep(std::time::Duration::from_secs(20));
+        tokio::pin!(fetch, timeout);
+        let response = loop {
+            tokio::select! {
+                response = &mut fetch => break response,
+                _ = &mut timeout => return Ok(None),
+                command = self.commands.recv() => match command {
+                    None => return Err(BraidError::Aborted),
+                    Some(Command::Stop(done)) => { let _ = done.send(()); return Err(BraidError::Aborted); },
+                    Some(Command::Changed(text, sequence, revision, done)) => {
+                        let result = if revision.is_some_and(|revision| revision != self.state.revision) {
+                            Err(BraidError::MergeConflict("Application revision changed".into()))
+                        } else { self.changed(text, sequence).await };
+                        self.publish();
+                        let _ = done.send(result);
+                    }
+                },
+            }
+        };
+        match response {
+                Ok(response) if response.status == 200 => {
+                    // A successful historical lookup must identify the selected
+                    // frontier. Never label a latest-state fallback as the old
+                    // base merely because its text happens to replay correctly.
+                    if !response.get_version().as_ref().is_some_and(|at| versions_eq(at, frontier)) {
+                        return Ok(None);
+                    }
+                    if response.body.len() > MAX_TEXT_BYTES {
+                        return Ok(None);
+                    }
+                    let text = match std::str::from_utf8(&response.body) {
+                        Ok(text) => text,
+                        Err(_) => return Ok(None),
+                    };
+                    if response.header("repr-digest").is_some_and(|expected| expected != digest(text)) {
+                        return Ok(None);
+                    }
+                    Ok(Some(text.to_owned()))
+                }
+                _ => Ok(None),
+        }
     }
 }
 
