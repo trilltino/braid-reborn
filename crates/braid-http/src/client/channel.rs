@@ -86,6 +86,9 @@ impl ChannelJournal {
                 return Err(BraidError::Config("Legacy outbox contains transport headers; preserve it for explicit local migration".into()));
             }
         }
+        if let Some(url) = &checkpoint.resource_url {
+            super::validate_resource_url(url)?;
+        }
         Ok(Self {
             checkpoint,
             path: Some(path),
@@ -247,6 +250,21 @@ impl Drop for ReliableChannel {
 }
 
 impl BraidClient {
+    pub fn reliable_channel_authenticated(
+        &self,
+        url: &str,
+        request: BraidRequest,
+        journal: ChannelJournal,
+        config: ChannelConfig,
+        credentials: &super::ScopedCredentials,
+    ) -> Result<ReliableChannel> {
+        self.reliable_channel(
+            url,
+            credentials.authenticate(url, request)?,
+            journal,
+            config,
+        )
+    }
     pub fn reliable_channel(
         &self,
         url: &str,
@@ -272,6 +290,7 @@ impl ReliableChannel {
         journal: ChannelJournal,
         config: ChannelConfig,
     ) -> Result<Self> {
+        super::validate_resource_url(&url)?;
         if journal
             .checkpoint
             .resource_url

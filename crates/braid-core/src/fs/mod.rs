@@ -366,14 +366,23 @@ pub async fn run_daemon(port: u16) -> Result<()> {
                         .tx_cmd
                         .send(Command::SetCookie { domain, value })
                         .await;
-                    println!("[BraidFS] Cookie updated for {}", parts[1]);
+                    println!("[BraidFS] Cookie update queued for {}", parts[1]);
                 }
                 "sync" if parts.len() >= 2 => {
                     let url_str = parts[1].to_string();
+                    if braid_http::client::validate_resource_url(&url_str).is_err() {
+                        println!("[BraidFS] Invalid resource URL or embedded credentials");
+                        continue;
+                    }
                     if let Ok(u) = url::Url::parse(&url_str) {
                         if let Some(domain) = u.domain() {
                             let cfg = state_console.config.read().await;
-                            if !cfg.cookies.contains_key(domain) && domain.contains("braid.org") {
+                            let scoped = braid_http::client::http_origin(&url_str)
+                                .is_ok_and(|origin| cfg.origin_credentials.contains_key(&origin));
+                            if !scoped
+                                && !cfg.cookies.contains_key(domain)
+                                && (domain == "braid.org" || domain.ends_with(".braid.org"))
+                            {
                                 println!(
                                     "[BraidFS] ⚠️ Missing cookie for {}. Write access will fail.",
                                     domain
@@ -397,10 +406,7 @@ pub async fn run_daemon(port: u16) -> Result<()> {
                     println!("Commands: token <domain> <value>, sync <url>");
                 }
                 _ => {
-                    println!(
-                        "[BraidFS] Unknown command: {}. Try 'token' or 'sync'.",
-                        parts[0]
-                    );
+                    println!("[BraidFS] Unknown command. Try 'token' or 'sync'.");
                 }
             }
         }
@@ -482,11 +488,14 @@ pub async fn run_daemon(port: u16) -> Result<()> {
             Ok(cmd) = rx_cmd.recv() => {
                 match cmd {
                     Command::Sync { url } => {
+                        if braid_http::client::validate_resource_url(&url).is_err() {tracing::error!("Rejected invalid sync URL or embedded credentials"); continue;}
                         tracing::info!("[DEBUG] === Command::Sync received for {}", url);
                         {
                             let mut cfg = state.config.write().await;
-                            cfg.sync.insert(url.clone(), true);
-                            let _ = cfg.save().await;
+                            let mut candidate = cfg.clone();
+                            candidate.sync.insert(url.clone(), true);
+                            if let Err(error) = candidate.save().await {tracing::error!(%error,"Sync configuration was not saved"); continue;}
+                            *cfg = candidate;
                         }
                         tracing::info!("[DEBUG] About to call spawn_subscription for {}", url);
                         spawn_subscription(url.clone(), &mut subscriptions, state.clone()).await;
@@ -504,11 +513,14 @@ pub async fn run_daemon(port: u16) -> Result<()> {
                         sync_urls_map.write().await.insert(url, true);
                     }
                     Command::Unsync { url } => {
+                        if braid_http::client::validate_resource_url(&url).is_err() {tracing::error!("Rejected invalid sync URL or embedded credentials"); continue;}
                         tracing::info!("Disable Sync: {}", url);
                         {
                             let mut cfg = state.config.write().await;
-                            cfg.sync.remove(&url);
-                            let _ = cfg.save().await;
+                            let mut candidate = cfg.clone();
+                            candidate.sync.remove(&url);
+                            if let Err(error) = candidate.save().await {tracing::error!(%error,"Unsync configuration was not saved"); continue;}
+                            *cfg = candidate;
                         }
                         if let Some(handle) = subscriptions.remove(&url) {
                             handle.abort();
@@ -518,16 +530,43 @@ pub async fn run_daemon(port: u16) -> Result<()> {
                         sync_urls_map.write().await.remove(&url);
                     }
                     Command::SetCookie { domain, value } => {
-                        tracing::info!(%domain,"Cookie updated");
                         let mut cfg = state.config.write().await;
-                        cfg.cookies.insert(domain, value);
-                        let _ = cfg.save().await;
+                        let mut candidate = cfg.clone();
+                        candidate.cookies.insert(domain, value);
+                        if let Err(error) = candidate.save().await {tracing::error!(%error,"Cookie configuration was not saved"); continue;}
+                        *cfg = candidate;
+                        tracing::info!("Cookie configuration saved");
+                    }
+                    Command::SetOriginCredentials {origin, credentials, result} => {
+                        let saved = async {
+                            let mut config = state.config.write().await;
+                            let mut candidate = config.clone();
+                            candidate.origin_credentials.insert(origin.clone(), credentials);
+                            candidate.save().await?;
+                            *config = candidate;
+                            Ok::<(), crate::core::BraidError>(())
+                        }.await;
+                        let restart = saved.is_ok();
+                        let _ = result.send(saved).await;
+                        if restart {
+                            let urls: Vec<_> = state.config.read().await.sync.iter()
+                                .filter(|(url, enabled)| **enabled && braid_http::client::http_origin(url).is_ok_and(|scope| scope == origin))
+                                .map(|(url, _)| url.clone()).collect();
+                            for url in urls {
+                                if let Some(task) = subscriptions.remove(&url) {task.abort(); let _ = task.await;}
+                                let session = state.text_sessions.lock().await.remove(&url);
+                                if let Some(session) = session {session.shutdown().await;}
+                                spawn_subscription(url, &mut subscriptions, state.clone()).await;
+                            }
+                        }
                     }
                     Command::SetIdentity { domain, email } => {
                         tracing::info!("Set Identity: {} for {}", email, domain);
                         let mut cfg = state.config.write().await;
-                        cfg.identities.insert(domain, email);
-                        let _ = cfg.save().await;
+                        let mut candidate = cfg.clone();
+                        candidate.identities.insert(domain, email);
+                        if let Err(error) = candidate.save().await {tracing::error!(%error,"Identity configuration was not saved"); continue;}
+                        *cfg = candidate;
                     }
                     #[cfg(feature = "nfs")]
                     Command::Mount { port, mount_point } => {

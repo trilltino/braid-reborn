@@ -29,6 +29,11 @@ pub struct CookieParams {
     pub domain: String,
     pub value: String,
 }
+#[derive(Deserialize)]
+pub struct OriginCredentialsParams {
+    pub origin: String,
+    pub credentials: braid_http::client::OriginCredentials,
+}
 
 #[derive(Deserialize)]
 pub struct IdentityParams {
@@ -49,6 +54,7 @@ pub async fn run_server(port: u16, state: DaemonState) -> Result<()> {
         .route("/api/push", put(handle_push))
         .route("/api/get", axum::routing::get(handle_get_file_api))
         .route("/api/cookie", put(handle_cookie))
+        .route("/api/credentials", put(handle_origin_credentials))
         .route("/api/identity", put(handle_identity));
 
     #[cfg(feature = "nfs")]
@@ -93,6 +99,11 @@ async fn handle_sync(
     State(state): State<DaemonState>,
     Json(params): Json<SyncParams>,
 ) -> Json<serde_json::Value> {
+    if braid_http::client::validate_resource_url(&params.url).is_err() {
+        return Json(
+            serde_json::json!({"status":"error", "message":"Invalid resource URL or embedded credentials"}),
+        );
+    }
     tracing::info!("IPC Command: Sync {}", params.url);
 
     if let Err(e) = state
@@ -113,6 +124,11 @@ async fn handle_unsync(
     State(state): State<DaemonState>,
     Json(params): Json<SyncParams>,
 ) -> Json<serde_json::Value> {
+    if braid_http::client::validate_resource_url(&params.url).is_err() {
+        return Json(
+            serde_json::json!({"status":"error", "message":"Invalid resource URL or embedded credentials"}),
+        );
+    }
     tracing::info!("IPC Command: Unsync {}", params.url);
 
     if let Err(e) = state
@@ -133,6 +149,11 @@ async fn handle_push(
     State(state): State<DaemonState>,
     Json(params): Json<PushParams>,
 ) -> Json<serde_json::Value> {
+    if braid_http::client::validate_resource_url(&params.url).is_err() {
+        return Json(
+            serde_json::json!({"status":"error", "message":"Invalid resource URL or embedded credentials"}),
+        );
+    }
     tracing::info!(
         "IPC Command: Push {} ({} bytes)",
         params.url,
@@ -241,22 +262,52 @@ async fn handle_push(
 async fn handle_cookie(
     State(state): State<DaemonState>,
     Json(params): Json<CookieParams>,
-) -> Json<serde_json::Value> {
-    tracing::info!(domain = %params.domain,"IPC cookie update");
+) -> axum::response::Response {
+    use axum::response::IntoResponse;
+    let scoped =
+        match braid_http::client::ScopedCredentials::legacy_cookie(&params.domain, &params.value) {
+            Ok(scoped) => scoped,
+            _ => return axum::http::StatusCode::BAD_REQUEST.into_response(),
+        };
+    let (origin, credentials) = scoped.into_parts();
+    handle_origin_credentials(
+        State(state),
+        Json(OriginCredentialsParams {
+            origin,
+            credentials,
+        }),
+    )
+    .await
+}
 
-    if let Err(e) = state
+pub async fn handle_origin_credentials(
+    State(state): State<DaemonState>,
+    Json(params): Json<OriginCredentialsParams>,
+) -> axum::response::Response {
+    use axum::{http::StatusCode, response::IntoResponse};
+    let scoped = match braid_http::client::ScopedCredentials::new(&params.origin, params.credentials.clone()) {
+        Ok(scoped) => scoped,
+        Err(_) => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"status":"error", "message":"Invalid credential origin or values"}))).into_response(),
+    };
+    let (sender, receiver) = async_channel::bounded(1);
+    if state
         .tx_cmd
-        .send(Command::SetCookie {
-            domain: params.domain.clone(),
-            value: params.value.clone(),
+        .send(Command::SetOriginCredentials {
+            origin: scoped.origin().into(),
+            credentials: params.credentials,
+            result: sender,
         })
         .await
+        .is_err()
     {
-        tracing::error!("Failed to send cookie command: {}", e);
-        return Json(serde_json::json!({ "status": "error", "message": "Internal channel error" }));
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
     }
-
-    Json(serde_json::json!({ "status": "ok", "domain": params.domain }))
+    match tokio::time::timeout(std::time::Duration::from_secs(15), receiver.recv()).await {
+        Ok(Ok(Ok(()))) => Json(serde_json::json!({"status":"ok", "origin":scoped.origin(), "domain":scoped.origin().split_once("://").map(|(_, authority)| authority)})).into_response(),
+        Ok(Ok(Err(error))) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"status":"error", "message":error.to_string()}))).into_response(),
+        Ok(Err(_)) => StatusCode::SERVICE_UNAVAILABLE.into_response(),
+        Err(_) => (StatusCode::ACCEPTED, Json(serde_json::json!({"status":"pending", "message":"Persistence result is still unknown"}))).into_response(),
+    }
 }
 
 async fn handle_identity(
@@ -287,13 +338,7 @@ async fn handle_identity(
 /// Handle /.braidfs/config - returns the current configuration.
 async fn handle_braidfs_config(State(state): State<DaemonState>) -> Json<serde_json::Value> {
     let config = state.config.read().await;
-    Json(serde_json::json!({
-        "sync": config.sync,
-        "cookies": config.cookies,
-        "port": config.port,
-        "debounce_ms": config.debounce_ms,
-        "ignore_patterns": config.ignore_patterns,
-    }))
+    Json(config.redacted())
 }
 
 /// Error log storage (in-memory for now).

@@ -70,6 +70,51 @@ fn config() -> ChannelConfig {
 }
 
 #[tokio::test]
+async fn scoped_channel_credentials_reach_transport_without_entering_recovery_bytes() {
+    use braid_http::client::{OriginCredentials, ScopedCredentials};
+    let path = std::env::temp_dir().join(format!(
+        "braid-scoped-channel-{}.json",
+        uuid::Uuid::new_v4()
+    ));
+    let network = Arc::new(Network::default());
+    let (_sender, receiver) = async_channel::bounded(1);
+    network.receivers.lock().unwrap().push_back(receiver);
+    let credentials = ScopedCredentials::new(
+        "http://test",
+        OriginCredentials {
+            bearer_token: Some("private-channel-token".into()),
+            cookie: None,
+        },
+    )
+    .unwrap();
+    let request = credentials
+        .authenticate("http://test/doc", BraidRequest::new())
+        .unwrap();
+    let channel = ReliableChannel::start(
+        network.clone(),
+        "http://test/doc".into(),
+        request,
+        ChannelJournal::open(&path).await.unwrap(),
+        config(),
+    )
+    .unwrap();
+    channel
+        .queue(Update::snapshot(Version::new("one"), "content"), None)
+        .await
+        .unwrap();
+    wait_for(|| !network.puts.lock().unwrap().is_empty()).await;
+    assert_eq!(
+        network.puts.lock().unwrap()[0].extra_headers["authorization"],
+        "Bearer private-channel-token"
+    );
+    channel.close().await;
+    let bytes = std::fs::read(&path).unwrap();
+    assert!(!String::from_utf8_lossy(&bytes).contains("private-channel-token"));
+    std::fs::remove_file(&path).unwrap();
+    std::fs::remove_file(path.with_extension("lock")).unwrap();
+}
+
+#[tokio::test]
 async fn transport_headers_cannot_enter_an_outbox_and_old_bytes_are_retained_for_migration() {
     let path = std::env::temp_dir().join(format!(
         "braid-secret-boundary-{}.json",

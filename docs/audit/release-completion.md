@@ -13,7 +13,7 @@ application data is used for implementation or migration testing.
 | GET selectors and historical state (E3/E4; F05/F07) | ReplicaStore and shared HTTP/H3 adapter | release_regressions: historical branches, interval, 432, true/false Subscribe+Version rejection | Historical reads and transforming Simpleton implemented; broader schedules and legacy event recovery remain open |
 | Canonical chat streaming (F03/F05/F08/F10) | Chat store replay/subscribe boundary and codec | release_streams: snapshot/subscribe overlap, lag, drop and invalid headers | Codec/race/lag repairs implemented; broader independent app-route interop and legacy history recovery remain pending |
 | Transforming Simpleton (phase 3) | Shared Diamond replica and per-subscriber view | release_simpleton_server; pinned JS/Rust Unicode, echo, restart/lost ACK; H3 observer reconstruction | Implemented for retained history; missing legacy events remain explicit unavailable boundaries |
-| Resource ACL and migration (phases 5/6/8) | Common policy and all app/transport routes | Two users/peers; grants/revocation; blob references; legacy dry-run/rollback | Policies, application/H3 enforcement and resumable owner assignment implemented; credentials, complete backup/fault matrix and multiplex binding still open |
+| Resource ACL and migration (phases 5/6/8) | Common policy and all app/transport routes | Two users/peers; grants/revocation; blob references; legacy dry-run/rollback | Policies, application/H3 enforcement, resumable owner assignment and origin credentials implemented; complete backup/fault matrix and multiplex binding still open |
 | Browser/native/H3 channel (phase 4; F10/F12) | Portable worker, journal, transport | IndexedDB/Web Locks; reload/quota/cancel/slow read in three browsers | Pending; native API compatibility required |
 | Iroh repair (phase 6; F09) | Owned peer/resource reconciliation | Partition, late join, missed gossip, relay, gap, revoke, restart | Pending; gossip never acknowledges commits |
 | Binary/NFS recovery (phase 5; F02/F11/F14) | Binary outbox, immutable conflicts, namespace journal | Lost ACK, competing binaries, destination-before-tombstone, mounted NFS | Pending; retain both binary versions |
@@ -70,3 +70,22 @@ equating process termination with a power cut.
 - Per-origin daemon credentials, complete backup/legacy-secret migration, browser
   channels, anti-entropy, binary recovery, extensions and later release gates
   remain open. Local Windows evidence does not certify new Linux CI results.
+
+## Origin credential checkpoint
+
+- Full all-feature workspace: 415 passed, 0 failed, 26 ignored.
+- Final all-target/all-feature warnings-denied Clippy passed. The affected HTTP
+  minimal, core native and core fs profiles passed isolated Clippy/library tests.
+  WASM compilation passed; browser runtime remains a separate open gate.
+- Actual daemon IPC/HTTP fixture passed persistence-before-ACK, exact-origin
+  routing, journal/status/log isolation, credential rotation and failure to
+  publish a configuration candidate. The fixture is included in native CI.
+- Production app-route tests deny daemon control to ownerless callers and editors,
+  permit its explicit owner, preserve the cookie adapter and propagate pending
+  outcomes as HTTP 202. App login headers are not copied into the local RPC.
+- Config schema 2 adds bounded per-origin credentials. Original bytes and a
+  versioned hash record support dry-run, resume and guarded format rollback;
+  unknown fields survive and modified configurations block rollback.
+- No dependency/lockfile version or engine storage format changed. Browser
+  ownership/journals, Iroh repair, binary durability, extension deployment and
+  remaining provenance/performance/chaos evidence are unfinished.

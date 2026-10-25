@@ -104,6 +104,7 @@ async fn real_routes_isolate_users_filter_indexes_and_guard_references_and_strea
         pages_manager: pages,
         local_org_manager: Arc::new(LocalOrgManager::new(root.path().to_str().unwrap())),
     };
+    let mut control_state = state.clone();
     let app = local_link_server::router(state);
     // Even an explicitly granted owner may not traverse a junction/symlink.
     policies
@@ -450,4 +451,147 @@ async fn real_routes_isolate_users_filter_indexes_and_guard_references_and_strea
     .await;
     assert_eq!(public.as_array().unwrap().len(), 1);
     assert_eq!(public[0]["id"], "private");
+    // Global daemon credentials are a separate owner-managed control resource.
+    // The app's login token must never be forwarded as daemon authentication.
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let pending = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let reply_pending = pending.clone();
+    let reply_calls = calls.clone();
+    let daemon_app = axum::Router::new().route(
+        "/api/credentials",
+        axum::routing::put(
+            move |headers: axum::http::HeaderMap,
+                  axum::Json(body): axum::Json<serde_json::Value>| {
+                let (pending, calls) = (reply_pending.clone(), reply_calls.clone());
+                async move {
+                    use axum::response::IntoResponse;
+                    assert!(!headers.contains_key("authorization"));
+                    assert!(!headers.contains_key("cookie"));
+                    assert!(body.get("credentials").is_some());
+                    calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    if pending.load(std::sync::atomic::Ordering::SeqCst) {
+                        (
+                            StatusCode::ACCEPTED,
+                            axum::Json(serde_json::json!({"status":"pending"})),
+                        )
+                            .into_response()
+                    } else {
+                        axum::Json(serde_json::json!({"status":"ok"})).into_response()
+                    }
+                }
+            },
+        ),
+    );
+    control_state.config.daemon_port = listener.local_addr().unwrap().port();
+    let (daemon, _receiver) = local_link_server::core::daemon::DaemonIntegration::new(
+        control_state.config.clone(),
+        store,
+    )
+    .await
+    .unwrap();
+    control_state.daemon = Some(Arc::new(daemon));
+    let control_app = local_link_server::router(control_state);
+    let task = tokio::spawn(async move {
+        axum::serve(listener, daemon_app).await.unwrap();
+    });
+    let credential_body = serde_json::json!({"origin":"http://127.0.0.1:3001", "credentials":{"bearer_token":"explicit-control-token"}}).to_string();
+    assert_eq!(
+        control_app
+            .clone()
+            .oneshot(request(
+                "POST",
+                "/config/credentials",
+                Some(a),
+                credential_body.clone()
+            ))
+            .await
+            .unwrap()
+            .status(),
+        403
+    );
+    policies
+        .create("control/daemon", alice.clone())
+        .await
+        .unwrap();
+    policies
+        .change(
+            "control/daemon",
+            alice,
+            PolicyChange::Grant(bob.clone(), Role::Editor),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        control_app
+            .clone()
+            .oneshot(request(
+                "POST",
+                "/config/credentials",
+                Some(b),
+                credential_body.clone()
+            ))
+            .await
+            .unwrap()
+            .status(),
+        403
+    );
+    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+    assert_eq!(
+        control_app
+            .clone()
+            .oneshot(request(
+                "POST",
+                "/config/credentials",
+                Some(a),
+                credential_body.clone()
+            ))
+            .await
+            .unwrap()
+            .status(),
+        200
+    );
+    let cookie_body =
+        serde_json::json!({"domain":"example.test", "value":"explicit-cookie"}).to_string();
+    let legacy = json(
+        control_app
+            .clone()
+            .oneshot(request(
+                "POST",
+                "/config/cookie",
+                Some(a),
+                cookie_body.clone(),
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(legacy["status"], "ok");
+    assert_eq!(legacy["domain"], "example.test");
+    pending.store(true, std::sync::atomic::Ordering::SeqCst);
+    assert_eq!(
+        control_app
+            .clone()
+            .oneshot(request(
+                "POST",
+                "/config/credentials",
+                Some(a),
+                credential_body
+            ))
+            .await
+            .unwrap()
+            .status(),
+        202
+    );
+    assert_eq!(
+        control_app
+            .oneshot(request("POST", "/config/cookie", Some(a), cookie_body))
+            .await
+            .unwrap()
+            .status(),
+        202
+    );
+    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 4);
+    task.abort();
+    let _ = task.await;
 }

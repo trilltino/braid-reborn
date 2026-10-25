@@ -7,25 +7,11 @@ use std::path::PathBuf;
 use tracing::{error, info};
 
 pub(crate) async fn authenticate(
-    mut request: BraidRequest,
+    request: BraidRequest,
     url: &str,
     state: &DaemonState,
-) -> BraidRequest {
-    if let Ok(url) = url::Url::parse(url) {
-        if let Some(domain) = url.domain() {
-            if let Some(token) = state.config.read().await.cookies.get(domain) {
-                let cookie = if token.contains('=') {
-                    token.clone()
-                } else if domain == "braid.org" || domain.ends_with(".braid.org") {
-                    format!("client={token}")
-                } else {
-                    format!("token={token}")
-                };
-                request = request.with_header("Cookie", cookie);
-            }
-        }
-    }
-    request
+) -> Result<BraidRequest> {
+    state.config.read().await.authenticate(request, url)
 }
 pub(crate) fn content_hash(data: &[u8]) -> String {
     format!("{:x}", Sha256::digest(data))
@@ -84,7 +70,7 @@ pub async fn sync_local_to_remote(
             edit
         } else {
             if base.is_none() {
-                let req = authenticate(BraidRequest::new(), &url, &state).await;
+                let req = authenticate(BraidRequest::new(), &url, &state).await?;
                 let response = state
                     .client
                     .fetch(&url, req)
@@ -143,7 +129,7 @@ pub async fn sync_local_to_remote(
                 format!("[0:{}]", edit.base.chars().count()),
                 edit.content.clone(),
             )]);
-        let request = authenticate(request, &url, &state).await;
+        let request = authenticate(request, &url, &state).await?;
         let response = state
             .client
             .fetch(&url, request)
@@ -247,22 +233,7 @@ pub async fn sync_binary_to_remote(
     request = request.with_content_type(ct);
 
     // Auth
-    let mut final_request = request;
-    if let Ok(u) = url::Url::parse(&url_str) {
-        if let Some(domain) = u.domain() {
-            let cfg = state.config.read().await;
-            if let Some(token) = cfg.cookies.get(domain) {
-                let cookie_str = if token.contains('=') {
-                    token.clone()
-                } else if domain.contains("braid.org") {
-                    format!("client={}", token)
-                } else {
-                    format!("token={}", token)
-                };
-                final_request = final_request.with_header("Cookie", cookie_str);
-            }
-        }
-    }
+    let final_request = authenticate(request, &url_str, &state).await?;
 
     // Execute PUT
     match state.client.fetch(&url_str, final_request).await {

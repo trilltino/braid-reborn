@@ -141,21 +141,12 @@ impl LocalBraidServer {
     /// Check a single URL for updates
     async fn check_for_updates(&self, url: &str) -> Result<(), Box<dyn std::error::Error>> {
         // Build request with auth
-        let mut req = BraidRequest::new().with_header("Accept", "text/plain");
-
-        if let Ok(u) = url::Url::parse(url) {
-            if let Some(domain) = u.domain() {
-                let cfg = self.daemon_state.config.read().await;
-                if let Some(token) = cfg.cookies.get(domain) {
-                    let cookie_str = if token.contains('=') {
-                        token.clone()
-                    } else {
-                        format!("client={}", token)
-                    };
-                    req = req.with_header("Cookie", cookie_str);
-                }
-            }
-        }
+        let req = super::sync::authenticate(
+            BraidRequest::new().with_header("Accept", "text/plain"),
+            url,
+            &self.daemon_state,
+        )
+        .await?;
 
         // Fetch current state
         let response = self.daemon_state.client.fetch(url, req).await?;

@@ -51,6 +51,9 @@ impl BraidClient {
         #[cfg(not(target_arch = "wasm32"))]
         {
             let mut builder = reqwest::Client::builder()
+                // A redirect must never change a queued PUT into a successful
+                // GET acknowledgment or forward a scoped credential elsewhere.
+                .redirect(reqwest::redirect::Policy::none())
                 .connect_timeout(std::time::Duration::from_secs(
                     config.connection_timeout_secs,
                 ))
@@ -60,7 +63,7 @@ impl BraidClient {
             if !config.proxy_url.is_empty() {
                 builder = builder.proxy(
                     reqwest::Proxy::all(&config.proxy_url)
-                        .map_err(|e| BraidError::Config(e.to_string()))?,
+                        .map_err(|_| BraidError::Config("Invalid proxy configuration".into()))?,
                 );
             }
 
@@ -94,6 +97,19 @@ impl BraidClient {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
+    /// Preserve custom TLS/proxy settings while enforcing explicit redirects.
+    pub fn with_client_builder(builder: reqwest::ClientBuilder) -> Result<Self> {
+        let client = builder
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .map_err(|_| BraidError::Config("Unable to build HTTP transport".into()))?;
+        Self::with_client(client)
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    /// Compatibility boundary for a caller-owned transport. Its builder's
+    /// redirect/default-header policies remain the caller's responsibility.
+    /// Use with_client_builder for the library's redirect enforcement.
     pub fn with_client(client: reqwest::Client) -> Result<Self> {
         Ok(BraidClient {
             network: Arc::new(NativeNetwork::new(client)),

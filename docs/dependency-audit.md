@@ -232,3 +232,9 @@ provenance review remains an open release gate.
 Individual fs compilation reproduced undeclared server/client feature needs.
 The fs feature now enables those existing edges and nfs enables fs. The
 13-profile runner checks each profile independently, including library tests.
+
+Origin credentials, configuration migration and control authorization use existing
+URL, HTTP, serde, SHA-256 and async-channel dependencies. No package or lockfile
+version changes are introduced. Existing constructors remain; the additional
+with_client_builder adapter applies library redirect policy while the older
+with_client constructor retains its caller-owned transport contract.

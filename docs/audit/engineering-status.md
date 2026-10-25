@@ -176,3 +176,14 @@ Corpus artifacts and detailed logs are attached to the linked CI run. These are
 bounded smoke campaigns, not exhaustive proofs. The release-work list above
 remains open; passing these gates does not imply support for the explicitly
 unsupported protocols, browser behavior, relay repair or every legacy checkpoint.
+
+## Origin credentials continuation
+
+The all-feature workspace now passes 415 tests, 26 ignored, with final Clippy,
+affected feature profiles and WASM compile checks passing. Actual daemon runtime
+tests cover exact-origin credentials, persistence acknowledgments, rotation,
+failed-publication atomicity and redacted status/logs/journals. App configuration
+requires owner management of control/daemon. See
+[origin credentials](../origin-credentials.md) for the schema-2 migration and
+compatibility boundaries. This checkpoint does not close the browser, Iroh
+repair, binary recovery, extension or final release gates.

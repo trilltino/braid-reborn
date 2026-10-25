@@ -9,11 +9,26 @@ use async_trait::async_trait;
 use futures::{FutureExt, StreamExt};
 pub struct WasmNetwork;
 fn request(url: &str, req: &BraidRequest) -> Result<reqwest::RequestBuilder> {
+    super::validate_resource_url(url)?;
+    if req
+        .extra_headers
+        .keys()
+        .any(|name| name.eq_ignore_ascii_case("cookie") || name.eq_ignore_ascii_case("cookie2"))
+    {
+        return Err(BraidError::CapabilityUnavailable {capability:"direct Cookie headers in browser Fetch; use origin cookies or bearer authentication"});
+    }
     let method = reqwest::Method::from_bytes(req.method.as_bytes())
         .map_err(|e| BraidError::Protocol(e.to_string()))?;
     let (headers, body) = crate::protocol::encode_request(req)?;
-    let mut builder = reqwest::Client::new().request(method, url);
+    let mut builder = reqwest::Client::new()
+        .request(method, url)
+        .fetch_credentials_same_origin();
     for (key, value) in headers {
+        let mut value = http::HeaderValue::from_str(&value)
+            .map_err(|_| BraidError::HeaderParse("Invalid outgoing HTTP header value".into()))?;
+        if crate::protocol::headers::is_credential_header(&key) {
+            value.set_sensitive(true);
+        }
         builder = builder.header(key, value);
     }
     Ok(builder.body(body))

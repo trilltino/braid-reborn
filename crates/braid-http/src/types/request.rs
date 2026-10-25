@@ -3,7 +3,7 @@
 use crate::types::{Patch, Version};
 
 /// Braid-specific request parameters.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 pub struct BraidRequest {
     pub version: Option<Vec<Version>>,
     pub parents: Option<Vec<Version>>,
@@ -19,6 +19,23 @@ pub struct BraidRequest {
     pub body: bytes::Bytes,
     pub extra_headers: std::collections::BTreeMap<String, String>,
     pub retry: Option<crate::client::retry::RetryConfig>,
+}
+impl std::fmt::Debug for BraidRequest {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("BraidRequest")
+            .field("method", &self.method)
+            .field("version", &self.version)
+            .field("parents", &self.parents)
+            .field("subscribe", &self.subscribe)
+            .field("body_bytes", &self.body.len())
+            .field("patch_count", &self.patches.as_ref().map(Vec::len))
+            .field(
+                "header_names",
+                &self.extra_headers.keys().collect::<Vec<_>>(),
+            )
+            .finish()
+    }
 }
 
 impl BraidRequest {

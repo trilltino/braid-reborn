@@ -124,3 +124,13 @@ recheck each frame and every second. Blob authority comes from an existing
 authorized resource or private upload reference. Attachment insertion must
 authorize the reference before it is added to a message. Iroh transport peer
 allowlists and per-resource grants are independent checks.
+
+The daemon applies credentials by exact HTTP origin at the request boundary,
+separate from immutable Update queues. A successful credential update persists
+before publishing the in-memory map and restarts only affected text owners.
+Configuration status/debug/error paths redact secrets. Schema-2 migration keeps
+original bytes and a versioned hash record; later writes block format rollback.
+The application settings bridge holds a Manage-authorized control/daemon policy
+permit during its RPC. It distinguishes persisted and pending outcomes and uses
+a direct loopback transport without proxies or redirects. Native default clients
+also disable redirects so PUT acknowledgments cannot come from redirected GETs.

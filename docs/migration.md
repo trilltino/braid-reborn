@@ -161,3 +161,10 @@ Resource policies and their local assignment commands are documented in
 [resource access](resource-access.md). Existing ownerless data now denies network
 access until an explicit local assignment; names and old created_by fields never
 establish ownership. Back up the whole data root before enabling writers.
+
+Daemon configuration now has schema version 2 with origin-scoped credentials.
+The format-only migration/rollback commands, original-byte backup, unknown-field
+preservation, live-daemon exclusion and status redaction are documented in
+[origin credentials](origin-credentials.md). The app settings bridge requires
+explicit owner management of the control/daemon policy. Legacy cookie routes
+remain HTTPS/default-port adapters and do not grant ordinary users control.

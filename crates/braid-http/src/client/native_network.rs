@@ -39,12 +39,19 @@ impl NativeNetwork {
         url: &str,
         request: &BraidRequest,
     ) -> Result<reqwest::RequestBuilder> {
+        super::validate_resource_url(url)?;
         let method = reqwest::Method::from_bytes(request.method.as_bytes())
             .map_err(|e| BraidError::Protocol(e.to_string()))?;
         let (headers, body) = crate::protocol::encode_request(request)?;
         let mut builder = client.request(method, url);
         for (k, v) in headers {
-            builder = builder.header(k, v);
+            let mut value = http::HeaderValue::from_str(&v).map_err(|_| {
+                BraidError::HeaderParse("Invalid outgoing HTTP header value".into())
+            })?;
+            if crate::protocol::headers::is_credential_header(&k) {
+                value.set_sensitive(true);
+            }
+            builder = builder.header(k, value);
         }
         Ok(builder.body(body))
     }

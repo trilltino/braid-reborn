@@ -239,30 +239,49 @@ pub fn strip_transport_headers(headers: &mut std::collections::BTreeMap<String, 
         .collect();
     headers.retain(|name, _| {
         let name = name.to_ascii_lowercase();
-        !matches!(
-            name.as_str(),
-            "authorization"
-                | "proxy-authorization"
-                | "proxy-authenticate"
-                | "www-authenticate"
-                | "cookie"
-                | "cookie2"
-                | "set-cookie"
-                | "connection"
-                | "keep-alive"
-                | "te"
-                | "trailer"
-                | "transfer-encoding"
-                | "upgrade"
-                | "host"
-                | "user-agent"
-                | "accept"
-                | "accept-encoding"
-                | "origin"
-                | "referer"
-        ) && !name.starts_with("sec-fetch-")
+        !is_credential_header(&name)
+            && !matches!(
+                name.as_str(),
+                "authorization"
+                    | "proxy-authorization"
+                    | "proxy-authenticate"
+                    | "www-authenticate"
+                    | "cookie"
+                    | "cookie2"
+                    | "set-cookie"
+                    | "connection"
+                    | "keep-alive"
+                    | "te"
+                    | "trailer"
+                    | "transfer-encoding"
+                    | "upgrade"
+                    | "host"
+                    | "user-agent"
+                    | "accept"
+                    | "accept-encoding"
+                    | "origin"
+                    | "referer"
+            )
+            && !name.starts_with("sec-fetch-")
             && !nominated.contains(&name)
     });
+}
+
+pub(crate) fn is_credential_header(name: &str) -> bool {
+    [
+        "authorization",
+        "proxy-authorization",
+        "cookie",
+        "cookie2",
+        "set-cookie",
+        "set-cookie2",
+        "authentication-info",
+        "proxy-authentication-info",
+        "www-authenticate",
+        "proxy-authenticate",
+    ]
+    .iter()
+    .any(|header| name.eq_ignore_ascii_case(header))
 }
 
 #[cfg(test)]

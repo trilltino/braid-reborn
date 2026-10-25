@@ -1,7 +1,7 @@
 //! Configuration for the Braid HTTP client.
 
 /// Configuration for the Braid HTTP client.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ClientConfig {
     /// Maximum retries for failed requests.
     pub max_retries: u32,
@@ -23,6 +23,30 @@ pub struct ClientConfig {
     pub request_timeout_ms: u64,
     /// Maximum total connections in the pool.
     pub max_total_connections: u32,
+}
+impl std::fmt::Debug for ClientConfig {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ClientConfig")
+            .field("max_retries", &self.max_retries)
+            .field("retry_delay_ms", &self.retry_delay_ms)
+            .field("connection_timeout_secs", &self.connection_timeout_secs)
+            .field("enable_logging", &self.enable_logging)
+            .field("max_subscriptions", &self.max_subscriptions)
+            .field("auto_multiplex_threshold", &self.auto_multiplex_threshold)
+            .field("enable_multiplex", &self.enable_multiplex)
+            .field(
+                "proxy_url",
+                &if self.proxy_url.is_empty() {
+                    ""
+                } else {
+                    "[configured]"
+                },
+            )
+            .field("request_timeout_ms", &self.request_timeout_ms)
+            .field("max_total_connections", &self.max_total_connections)
+            .finish()
+    }
 }
 
 impl Default for ClientConfig {

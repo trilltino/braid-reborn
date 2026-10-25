@@ -131,7 +131,7 @@ async fn text_session_seeded(
     } else {
         None
     };
-    let request = crate::fs::sync::authenticate(BraidRequest::new(), url, state).await;
+    let request = crate::fs::sync::authenticate(BraidRequest::new(), url, state).await?;
     let session = std::sync::Arc::new(
         crate::simpleton::SimpletonClient::connect_seeded(
             &state.client,

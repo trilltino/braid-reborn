@@ -23,6 +23,8 @@ jobs:
         with:
           node-version: 22
       - run: node scripts/check-feature-profiles.mjs
+      - run: cargo build -p braidfs-daemon --locked
+      - run: node tests/interoperability/credentials.mjs
   wasm:
     runs-on: ubuntu-latest
     steps:

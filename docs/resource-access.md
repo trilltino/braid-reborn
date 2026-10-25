@@ -94,7 +94,8 @@ explicit local migration, retaining their original bytes and uncertain identitie
 Existing token-bearing checkpoints and fingerprint migration still need a complete
 legacy corpus audit; these repairs do not certify arbitrary old deployment data.
 
-The full migration/fault matrix, secret-store integration, per-origin daemon
-credentials, multiplex principal binding and multi-resource attachment indexes
-remain separate release work. Attachment reference scans currently stop above
+Origin-scoped credentials and the owner-managed daemon control policy are
+documented in [origin credentials](origin-credentials.md). The full migration/fault
+matrix, secret-store integration, multiplex principal binding and multi-resource
+attachment indexes remain separate release work. Attachment reference scans currently stop above
 10,000 rooms; list filtering bounds materialized JSON to 32 MiB.

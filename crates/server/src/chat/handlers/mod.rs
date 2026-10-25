@@ -56,5 +56,12 @@ pub fn router() -> Router<AppState> {
             get(typing::get_typing).put(typing::update_typing),
         )
         // Config (Daemon cookie)
-        .route("/config/cookie", post(handler_config::set_daemon_cookie))
+        .route(
+            "/config/cookie",
+            post(handler_config::protected_set_daemon_cookie),
+        )
+        .route(
+            "/config/credentials",
+            post(handler_config::set_daemon_credentials),
+        )
 }

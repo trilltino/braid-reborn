@@ -32,12 +32,32 @@ fn print(value: &impl serde::Serialize) -> Result<(), serde_json::Error> {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args().skip(1).collect();
-    let usage = "braid-admin COMMAND POLICY_ROOT ...\n inventory\n scan chat|wiki|local|v2|iroh DATA_ROOT\n get RESOURCE\n plan ASSIGNMENTS_JSON PLAN_JSON\n apply PLAN_JSON [--apply]\n rollback PLAN_JSON [--apply]\n grant RESOURCE ACTOR_KIND ACTOR_ID SUBJECT_KIND SUBJECT_ID ROLE\n revoke RESOURCE ACTOR_KIND ACTOR_ID SUBJECT_KIND SUBJECT_ID\n public RESOURCE ACTOR_KIND ACTOR_ID true|false\n transfer RESOURCE ACTOR_KIND ACTOR_ID SUBJECT_KIND SUBJECT_ID\nPlans and rollback are dry-run unless --apply is present. Stop application writers before rollback.";
+    let usage = "braid-admin COMMAND POLICY_ROOT ...\n inventory\n scan chat|wiki|local|v2|iroh DATA_ROOT\n get RESOURCE\n plan ASSIGNMENTS_JSON PLAN_JSON\n apply PLAN_JSON [--apply]\n rollback PLAN_JSON [--apply]\n grant RESOURCE ACTOR_KIND ACTOR_ID SUBJECT_KIND SUBJECT_ID ROLE\n revoke RESOURCE ACTOR_KIND ACTOR_ID SUBJECT_KIND SUBJECT_ID\n public RESOURCE ACTOR_KIND ACTOR_ID true|false\n transfer RESOURCE ACTOR_KIND ACTOR_ID SUBJECT_KIND SUBJECT_ID\nPlans and rollback are dry-run unless --apply is present. Stop application writers before rollback.\nWith the fs feature: braid-admin config-preview CONFIG_PATH\n braid-admin config-migrate CONFIG_PATH [--apply]\n braid-admin config-rollback CONFIG_PATH [--apply]";
     if args.len() < 2 {
         return Err(usage.into());
     }
     let policies = PolicyStore::new((&args[1]).into())?;
     match (args[0].as_str(), &args[2..]) {
+        #[cfg(feature = "fs")]
+        ("config-preview", []) => {
+            print(&braid_core::fs::config::Config::migration_info(Path::new(&args[1])).await?)?
+        }
+        #[cfg(feature = "fs")]
+        (command @ ("config-migrate" | "config-rollback"), flags)
+            if flags.is_empty() || (flags.len() == 1 && flags[0] == "--apply") =>
+        {
+            let path = Path::new(&args[1]);
+            let info = if flags.is_empty() && command == "config-rollback" {
+                braid_core::fs::config::Config::rollback_info(path).await?
+            } else if flags.is_empty() {
+                braid_core::fs::config::Config::migration_info(path).await?
+            } else if command == "config-migrate" {
+                braid_core::fs::config::Config::migrate_file(path).await?
+            } else {
+                braid_core::fs::config::Config::rollback_file(path).await?
+            };
+            print(&info)?;
+        }
         ("inventory", []) => print(&policies.inventory().await?)?,
         ("scan", [kind, root]) => print(&policies.scan_data(kind, Path::new(root)).await?)?,
         ("get", [resource]) => print(&policies.get(resource).await?)?,

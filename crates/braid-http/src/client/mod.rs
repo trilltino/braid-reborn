@@ -3,10 +3,12 @@
 #[cfg(not(target_arch = "wasm32"))]
 mod channel;
 mod config;
+mod credentials;
 #[cfg(not(target_arch = "wasm32"))]
 pub use channel::{
     ChannelCheckpoint, ChannelConfig, ChannelJournal, ChannelState, ChannelStatus, ReliableChannel,
 };
+pub use credentials::{http_origin, validate_resource_url, OriginCredentials, ScopedCredentials};
 mod fetch;
 #[cfg(test)]
 mod fuzzer;

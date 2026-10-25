@@ -51,7 +51,19 @@ pub async fn handle_get_file(
         Err(_) => {
             if is_braid_url {
                 tracing::info!("[On-Demand] Fetching {} from remote...", path);
-                let fetch_req = crate::core::BraidRequest::new().with_method("GET");
+                let fetch_req = match super::sync::authenticate(
+                    crate::core::BraidRequest::new().with_method("GET"),
+                    &path,
+                    &state,
+                )
+                .await
+                {
+                    Ok(request) => request,
+                    Err(_) => {
+                        return (StatusCode::BAD_REQUEST, "Invalid resource credentials")
+                            .into_response()
+                    }
+                };
                 match state.client.fetch(&path, fetch_req).await {
                     Ok(res) if (200..300).contains(&res.status) => {
                         let body = String::from_utf8_lossy(&res.body).to_string();

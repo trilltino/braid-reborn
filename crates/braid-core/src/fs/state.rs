@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Command {
     Sync {
         url: String,
@@ -21,6 +21,11 @@ pub enum Command {
     SetCookie {
         domain: String,
         value: String,
+    },
+    SetOriginCredentials {
+        origin: String,
+        credentials: braid_http::client::OriginCredentials,
+        result: async_channel::Sender<crate::core::Result<()>>,
     },
     SetIdentity {
         domain: String,
@@ -33,6 +38,21 @@ pub enum Command {
     },
     #[cfg(feature = "nfs")]
     Unmount,
+}
+impl std::fmt::Debug for Command {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::Sync { .. } => "Sync",
+            Self::Unsync { .. } => "Unsync",
+            Self::SetIdentity { .. } => "SetIdentity",
+            Self::SetCookie { .. } => "SetCookie { credentials: [redacted] }",
+            Self::SetOriginCredentials { .. } => "SetOriginCredentials { credentials: [redacted] }",
+            #[cfg(feature = "nfs")]
+            Self::Mount { .. } => "Mount",
+            #[cfg(feature = "nfs")]
+            Self::Unmount => "Unmount",
+        })
+    }
 }
 
 /// Unified state for the BraidFS daemon.

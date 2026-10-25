@@ -33,6 +33,12 @@ pub struct DaemonIntegration {
     sync_status: Arc<RwLock<HashMap<String, RoomSyncStatus>>>,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum ConfigurationOutcome {
+    Persisted,
+    Pending,
+}
+
 #[derive(Debug, Clone)]
 pub struct FileChangeEvent {
     pub room_id: String,
@@ -59,7 +65,12 @@ impl DaemonIntegration {
         let integration = Self {
             config,
             store,
-            daemon_client: reqwest::Client::new(),
+            daemon_client: reqwest::Client::builder()
+                .no_proxy()
+                .redirect(reqwest::redirect::Policy::none())
+                .timeout(std::time::Duration::from_secs(20))
+                .build()
+                .context("Cannot create local daemon transport")?,
             daemon_url,
             watcher: None,
             file_events: tx,
@@ -355,23 +366,44 @@ impl DaemonIntegration {
     }
     /// Set a cookie for a domain
     pub async fn set_cookie(&self, domain: &str, value: &str) -> anyhow::Result<()> {
-        let url = format!("{}/api/cookie", self.daemon_url);
-        let resp = self
+        let (origin, credentials) =
+            braid_http::client::ScopedCredentials::legacy_cookie(domain, value)?.into_parts();
+        match self.set_origin_credentials(&origin, &credentials).await? {
+            ConfigurationOutcome::Persisted => Ok(()),
+            ConfigurationOutcome::Pending => Err(anyhow::anyhow!(
+                "Cookie configuration persistence is still pending"
+            )),
+        }
+    }
+
+    pub async fn set_origin_credentials(
+        &self,
+        origin: &str,
+        credentials: &braid_http::client::OriginCredentials,
+    ) -> anyhow::Result<ConfigurationOutcome> {
+        let scoped = braid_http::client::ScopedCredentials::new(origin, credentials.clone())?;
+        let response = self
             .daemon_client
-            .put(&url)
-            .json(&serde_json::json!({ "domain": domain, "value": value }))
+            .put(format!("{}/api/credentials", self.daemon_url))
+            .json(&serde_json::json!({"origin":scoped.origin(), "credentials":credentials}))
             .send()
             .await
-            .context("Failed to set cookie")?;
-
-        if resp.status().is_success() {
-            info!("Set cookie for domain: {}", domain);
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!(
-                "Daemon failed to set cookie: {}",
-                resp.status()
-            ))
+            .context("Cannot reach local credential owner")?;
+        match response.status() {
+            reqwest::StatusCode::OK => {
+                let body: serde_json::Value = response
+                    .json()
+                    .await
+                    .context("Invalid local credential acknowledgment")?;
+                if body.get("status").and_then(|value| value.as_str()) != Some("ok") {
+                    anyhow::bail!("Local credential change was not acknowledged");
+                }
+                Ok(ConfigurationOutcome::Persisted)
+            }
+            reqwest::StatusCode::ACCEPTED => Ok(ConfigurationOutcome::Pending),
+            status => Err(anyhow::anyhow!(
+                "Local credential update returned HTTP {status}"
+            )),
         }
     }
 }
