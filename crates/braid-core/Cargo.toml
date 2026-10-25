@@ -108,6 +108,8 @@ braid-blob = { path = "../braid-blob", optional = true }
 
 
 [dev-dependencies]
+# Fault plans are inert unless a test arms one.
+braid-http = { path = "../braid-http", features = ["fault-injection"] }
 lz4_flex = "0.12.0"
 tempfile = "3.10"
 

@@ -39,3 +39,5 @@ default = ["native"]
 native = []
 wasm = ["dep:gloo-timers", "dep:wasm-bindgen-futures", "dep:js-sys"]
 fuzzing = ["dep:arbitrary"]
+# Deterministic persistence fault plans for tests; inert unless a plan is armed.
+fault-injection = []
