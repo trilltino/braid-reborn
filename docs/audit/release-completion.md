@@ -11,6 +11,28 @@ unfinished even when unrelated CI is green. Missing provenance, compatibility
 inputs or runtime evidence stays a named blocker and prevents full sign-off.
 Process-kill tests are never presented as physical power-loss proof.
 
+## Source audit and continuation, 25 October 2026
+
+The shared-contract implementation is committed in `924043b` and `9f5e2d4`.
+The recorded Gate 1 run below covers 444 passing tests; it is historical evidence,
+not a new check of subsequent source changes. `80d769e` identifies requirements;
+`d798f84` and `f89c63e` add provenance measurements and an independent engine oracle.
+
+The current instruction is to continue editing without Cargo commands or builds
+while the user runs `cargo clean`. New source and test definitions remain
+**Prepared**, with compilation, formatting and runtime gates pending. An earlier
+attempt interrupted for the clean is not a failed product test or a passing gate.
+
+| Area | Source already present | Current disposition |
+| --- | --- | --- |
+| Four defects, history, ACLs, credentials | Committed before `22af1e5` | Retain recorded regressions |
+| Shared representations, paging, causal ingress, ACK/payload and text recovery | `924043b`, `9f5e2d4` | Gate 1 recorded; legacy-baseline proof tightened in current source, not rerun |
+| Browser journal, Web Locks and owned Fetch | `completion/browser` worktree | Prepared; harness/runtime evidence still pending |
+| H3 transport and streaming proxy | `completion/reliability` worktree | Prepared; replication ownership/partition gates remain open |
+| Frozen extension fixtures, linked JSON, finite queries and authorized graph adapter | `completion/protocol` worktree | Prepared; deployed multiplex and interoperability gates remain open |
+| File fault injection and SQLite contention | Current source/test definitions | Prepared; no execution under the no-build instruction |
+| Engine comparison and independent oracle | `d798f84`, `f89c63e` | Partial; original-copy attribution and historical project corpus remain open |
+
 ## How to read a row
 
 | Status | Meaning |
@@ -19,6 +41,7 @@ Process-kill tests are never presented as physical power-loss proof.
 | **Claimed** | An earlier checkpoint asserts closure and the suite still passes, but this registry has not yet re-mapped the item to a named test. Re-verification is a release-audit task |
 | **Partial** | Part of the requirement is evidenced; the remainder is listed in *Remaining* |
 | **Open** | Not implemented. *Blocker* names anything external |
+| **Prepared** | Source/test definitions exist; compilation or the required behavioral gate has not run |
 
 Owners: **INT** integrator (shared contracts, compatibility, provenance, CI,
 release evidence), **BRW** browser agent, **REL** reliability agent, **PRO**
@@ -44,7 +67,7 @@ replaces it.
 | F01 | Native PUT serializes `with_patches` (audit §1.1) | braid-http `engineering_wire`, `js_fixtures`; upstream codec runner | INT | Claimed | Map to named test at release audit |
 | F02 | Offline edits are never overwritten by a server copy | core `audit_filesystem`, `audit_shared_channel`; `completion_recoverable_text::digest_failure_on_the_first_snapshot_repairs_without_overwriting_pending_text` | INT | Partial | Filesystem/NFS external-write races (REL-FS-*) |
 | F03 | `Patches: N` framing in every handler | server `release_streams`; `js_fixtures`; pinned upstream runner | INT | Claimed | Real app-route interop for chat (PRO-MUX-*) |
-| F04 | Reproducible build; `braid-common` provenance | Fresh-workspace builds; [dead-code.md](dead-code.md) | INT | **Blocked** | The original `braid-common` gitlink content is unrecoverable; the crate is now a first-party directory helper. Original provenance cannot be reconstructed |
+| F04 | Reproducible build; `braid-common` provenance | Fresh-workspace builds; [dead-code.md](dead-code.md) | INT | Partial | Original helper source is unavailable. The agreed disposition is independently maintained first-party code, without a recovery claim; complete its dependency/API review |
 | F05 | `Version`/`Parents`/`Current-Version` never mixed | core `release_regressions`, braid-http `js_fixtures` | INT | Claimed | |
 | F06 | Diamond wrapper parent rules and Unicode indexes | core `engineering_causality`; `simpleton::tests` | INT | Claimed | Engine provenance blocker: INT-PROV-* |
 | F07 | Durable causal history; reconnect replay | `release_regressions`, `audit_replica`; `completion_shared_contracts::causal_pages_*` (1,100 events) | INT | Partial | Legacy chat event recovery (INT-LEG-1) |
@@ -80,7 +103,7 @@ replaces it.
 | D5 | Crash/fault injection across history, blob/file, SQLite | **Open** | INT-FAULT-* |
 | D6 | Path, secret, exhaustion, unauthenticated access blocked | Partial | `release_access`, `origin_*`; path confinement hardening REL-FS-* |
 | D7 | Production panic/`unsafe` elimination | **Open** | INT-REVIEW-* |
-| Q1 | Fresh checkout reproducible; `braid-common` provenance | **Blocked** | F04 |
+| Q1 | Fresh checkout reproducible; `braid-common` provenance | Partial | F04; independently maintained helper, no claim of original-source recovery |
 | Q2 | Crate directions and public APIs documented | Partial | [architecture.md](../architecture.md); API review INT-REVIEW-* |
 | Q3 | Module/function boundaries | Open | INT-REVIEW-* |
 | Q4 | Every direct dependency audited | Partial | [dependency-audit.md](../dependency-audit.md) |
@@ -166,7 +189,7 @@ and is bounded at 32 MiB.
 | INT-LEG-1 | Recover available legacy chat events without inventing events or parents; snapshot-only boundaries explicit | INT | Open | |
 | INT-REVIEW-1 | Dependency, feature, public-API, task-lifetime, panic, unsafe, dead-code reviews; removal only with caller and compatibility evidence | INT | Open | |
 | INT-FUZZ-1 | Fuzz frontiers, query ranges, multiplex frames, paths, gossip/H3 inputs, checkpoints, remote ingestion | INT | Open | History request/response codecs are new fuzz surfaces |
-| INT-FAULT-1 | Deterministic failure injection at every documented persistence boundary: disk full, permissions, SQLite busy, cancellation, subprocess termination, restart | INT | Open | |
+| INT-FAULT-1 | Deterministic failure injection at every documented persistence boundary: disk full, permissions, SQLite busy, cancellation, subprocess termination, restart | INT | Prepared / partial | `braid-http::durable::fault`, core `failure_injection`, server `failure_injection_sqlite`; execution pending by user instruction. Broader blob, projection, migration, GC and cross-store boundaries remain open |
 | INT-SIM-1 | Reproducible 2/3/10-replica schedules with saved seeds and an independent convergence oracle | INT | **Partial** | Engine level done: seeded SplitMix64 schedules, failures save the exact script under `target/oracle-failures/`, replay with `BRAID_ORACLE_SEED`; the upstream engine is the independent oracle and the test asserts the schedules contain real concurrency. **Remaining:** replica-store level schedules (partition/heal through the replication manager, REL-GATE), which need the replication stream; the test is `#[ignore]` by default because it needs the oracle binary and counts as ignored until run in CI |
 | INT-PERF-1 | Release-build measurements: parsing, Unicode edits, CRDT history, 10,000-file scans, large blobs, fanout, partition recovery, cold start; record hardware, workload, latency distributions, throughput, allocations, peak memory, checkpoint and build size; equivalent workloads and correctness before any improvement claim | INT | **Open** | Baseline not yet captured |
 | INT-REL-1 | Windows+Linux default/all-feature/isolated profiles, warnings-denied, fmt, WASM, preserved examples; upstream suites; three-browser runtime; real relay-only and mounted Linux NFS; populated backup/migration/rollback/privacy/quota/conflict/GC; docs tied to the exact candidate SHA | INT | Open | Depends on all streams |

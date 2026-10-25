@@ -5,8 +5,13 @@ repository; the closest upstream revision and the extent of local changes are
 measured. Treat all of it as evidence to investigate, not proof of origin.**
 
 `crates/braid-core/src/vendor/{diamond_types,rle}` (105 Rust files, about 26,900
-lines) was added in commit `4f5275b` (2026-10-23) with no source revision, patch set
-or license notice recorded. This investigation compares it with the upstream
+lines) reached the current workspace path in commit `4f5275b` (2026-10-23).
+Following that rename finds an earlier copy at
+`47e4f2c` (2026-03-03), under `braid-core/src/vendor/diamond_types` and
+`braid-core/src/vendor/rle`. Neither import records an upstream source revision,
+patch set or license notice. The current-tree comparison below has not yet been
+repeated against that earliest copy; its similarity numbers do not identify the
+original import. This investigation compares the current tree with the upstream
 [diamond-types](https://github.com/josephg/diamond-types) history (1,295 commits
 cloned; 714 touch the engine). The machine-readable per-file result is
 [engine-provenance.json](engine-provenance.json); the method is stored in that file.
