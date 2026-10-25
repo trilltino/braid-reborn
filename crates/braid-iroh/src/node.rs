@@ -70,6 +70,7 @@ pub struct BraidIrohNode {
     router: Router,
     subscription_mgr: Arc<SubscriptionManager>,
     replica: braid_http_rs::replica::ReplicaStore,
+    replication_history: bool,
 }
 
 impl BraidIrohNode {
@@ -125,10 +126,21 @@ impl BraidIrohNode {
         let subscription_mgr = Arc::new(SubscriptionManager::new(gossip.clone()));
         let access = Arc::new(parking_lot::RwLock::new(config.access));
         let (policy_changed, _) = tokio::sync::watch::channel(0);
+        let collisions = replica
+            .replication_namespace_collisions()
+            .await
+            .map_err(|error| anyhow::anyhow!(error))?;
+        if !collisions.is_empty() {
+            tracing::warn!(
+                ?collisions,
+                "Replication history endpoint disabled by legacy namespace collisions"
+            );
+        }
         let app_state = BraidAppState {
             policy_changed: policy_changed.clone(),
             replica: replica.clone(),
             access: access.clone(),
+            replication_history: collisions.is_empty(),
         };
 
         // 4. Mount the Braid protocol handler on the iroh router
@@ -161,6 +173,7 @@ impl BraidIrohNode {
         }
 
         Ok(Self {
+            replication_history: collisions.is_empty(),
             policy_changed,
             proxy_task,
             access,
@@ -169,6 +182,12 @@ impl BraidIrohNode {
             subscription_mgr,
             replica,
         })
+    }
+
+    /// False when a legacy resource or policy occupies the internal replication
+    /// namespace; the history endpoint then answers 503 until it is resolved.
+    pub fn replication_history_enabled(&self) -> bool {
+        self.replication_history
     }
 
     /// This node's public identity (EndpointId / NodeId).

@@ -368,3 +368,59 @@ async fn put_profile(
         Err(e) => error_response(e),
     }
 }
+
+/// `POST /.well-known/braid/replication/v1/history`: authenticated, bounded
+/// original-event pages for ingestion by another replica. Authority is checked
+/// before any history metadata is loaded, and the request cannot name the
+/// reserved replication namespace itself.
+pub async fn history_authorized(
+    store: ReplicaStore,
+    policies: crate::access::PolicyStore,
+    principal: crate::access::Principal,
+    body: Bytes,
+) -> Response {
+    use crate::replica::{HistoryRequest, MAX_HISTORY_REQUEST_BYTES, REPLICATION_NAMESPACE};
+    if body.len() > MAX_HISTORY_REQUEST_BYTES {
+        return error_response(ReplicaError::Limit("History request is too large".into()));
+    }
+    let request: HistoryRequest = match serde_json::from_slice(&body) {
+        Ok(request) => request,
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                format!(
+                    "Invalid history request at line {}, column {}",
+                    error.line(),
+                    error.column()
+                ),
+            )
+                .into_response()
+        }
+    };
+    if !request.resource.starts_with('/') || request.resource.starts_with(REPLICATION_NAMESPACE) {
+        return (StatusCode::BAD_REQUEST, "Invalid history resource").into_response();
+    }
+    match store
+        .history_page_authorized(
+            &request.resource,
+            &request.from,
+            request.target.as_deref(),
+            request.limits.unwrap_or_default(),
+            &policies,
+            Some(&principal),
+        )
+        .await
+    {
+        Ok(Some(page)) => match serde_json::to_vec(&page) {
+            Ok(bytes) => Response::builder()
+                .status(StatusCode::OK)
+                .header("content-type", "application/json")
+                .header("cache-control", "no-store")
+                .body(Body::from(bytes))
+                .unwrap_or_else(crate::core::server::response_error),
+            Err(error) => error_response(error.into()),
+        },
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Err(error) => error_response(error),
+    }
+}

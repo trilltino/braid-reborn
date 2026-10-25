@@ -20,6 +20,13 @@ use std::{
 };
 use tokio::sync::broadcast;
 
+mod history;
+mod representation;
+pub use history::{
+    HistoryLimits, HistoryPage, HistoryRequest, MAX_HISTORY_PAGE_BYTES, MAX_HISTORY_PAGE_EVENTS,
+    MAX_HISTORY_REQUEST_BYTES, REPLICATION_HISTORY_PATH, REPLICATION_NAMESPACE,
+};
+
 #[derive(Debug, thiserror::Error)]
 pub enum ReplicaError {
     #[error("{0}")]
@@ -65,6 +72,16 @@ pub fn same_frontier(a: &[String], b: &[String]) -> bool {
         == b.iter().collect::<std::collections::HashSet<_>>()
 }
 impl ReplicaDocument {
+    /// Original events in dependency order, with a causally closed continuation.
+    pub fn history_page(
+        &self,
+        from: &[Version],
+        target: Option<&[Version]>,
+        limits: HistoryLimits,
+    ) -> Result<HistoryPage, ReplicaError> {
+        let current: Vec<_> = self.heads.iter().map(Version::new).collect();
+        history::page(self, from, target.unwrap_or(&current), limits)
+    }
     pub fn empty(merge_type: &str) -> Self {
         Self {
             resource: None,
@@ -84,13 +101,16 @@ impl ReplicaDocument {
             version: self.heads.iter().map(Version::new).collect(),
             body: Some(self.content.clone().into()),
             merge_type: Some(self.merge_type.clone()),
-            content_type: Some("text/plain; charset=utf-8".into()),
+            content_type: representation::media_type(self),
             ..Update::default()
         }
     }
 
     /// Materialize a known causal frontier without changing current state.
     pub fn snapshot_at(&self, frontier: &[Version]) -> Result<Update, ReplicaError> {
+        if self.merge_type == representation::JSON_SNAPSHOT_PROFILE {
+            return representation::snapshot_at(self, frontier);
+        }
         let ids: Vec<_> = frontier.iter().map(ToString::to_string).collect();
         if same_frontier(&ids, &self.heads) {
             return Ok(self.snapshot());
@@ -108,7 +128,7 @@ impl ReplicaDocument {
             version: frontier.to_vec(),
             body: Some(content.into()),
             merge_type: Some(self.merge_type.clone()),
-            content_type: Some("text/plain; charset=utf-8".into()),
+            content_type: representation::media_type(self),
             ..Update::default()
         })
     }
@@ -210,11 +230,13 @@ impl ReplicaDocument {
                 "Empty or self-parented version".into(),
             ));
         }
-        if !matches!(self.merge_type.as_str(), "simpleton" | "diamond")
-            || update
-                .merge_type
-                .as_ref()
-                .is_some_and(|m| *m != self.merge_type)
+        if !matches!(
+            self.merge_type.as_str(),
+            "simpleton" | "diamond" | "json-snapshot"
+        ) || update
+            .merge_type
+            .as_ref()
+            .is_some_and(|m| *m != self.merge_type)
         {
             return Err(ReplicaError::Conflict("Merge type mismatch".into()));
         }
@@ -264,6 +286,15 @@ impl ReplicaDocument {
                 return Err(ReplicaError::Conflict(format!("Unknown parent: {parent}")));
             }
         }
+        if self.merge_type == representation::JSON_SNAPSHOT_PROFILE {
+            representation::apply_snapshot(self, update)?;
+            self.heads = vec![id.clone()];
+            self.version_graph.insert(id.clone(), parents);
+            self.fingerprints.insert(id, fingerprint);
+            self.history.push(update.clone());
+            self.modified_at = now();
+            return Ok(true);
+        }
         if self.merge_type == "simpleton" && !transforming && !same_frontier(&self.heads, &parents)
         {
             return Err(ReplicaError::Conflict(
@@ -298,16 +329,7 @@ impl ReplicaDocument {
                 .map_err(|e| ReplicaError::Invalid(e.to_string()))?,
             _ => return Err(ReplicaError::Invalid("Expected snapshot or patches".into())),
         };
-        if let Some(digest) = update.extra_headers.get("repr-digest") {
-            use base64::Engine;
-            let actual = base64::engine::general_purpose::STANDARD
-                .encode(Sha256::digest(content.as_bytes()));
-            if digest.trim() != format!("sha-256=:{actual}:") {
-                return Err(ReplicaError::Invalid(
-                    "Representation digest mismatch or unsupported digest algorithm".into(),
-                ));
-            }
-        }
+        validate_digest(&content, update)?;
         crdt.apply_wire_event(update)
             .map_err(ReplicaError::Invalid)?;
         let checkpoint = crdt.durable_checkpoint().map_err(ReplicaError::Invalid)?;
@@ -361,6 +383,86 @@ pub struct ReplicaStore {
     lease: Arc<tokio::sync::OnceCell<Arc<std::fs::File>>>,
 }
 impl ReplicaStore {
+    pub async fn representation_at(
+        &self,
+        resource: &str,
+        frontier: Option<&[Version]>,
+    ) -> Result<Option<braid_http::types::RepresentationAt>, ReplicaError> {
+        self.load(resource)
+            .await?
+            .map(|document| representation::representation_at(&document, frontier))
+            .transpose()
+    }
+
+    pub async fn representation_at_authorized(
+        &self,
+        resource: &str,
+        frontier: Option<&[Version]>,
+        policies: &crate::access::PolicyStore,
+        principal: Option<&crate::access::Principal>,
+    ) -> Result<Option<braid_http::types::RepresentationAt>, ReplicaError> {
+        policies
+            .authorize(resource, principal, crate::access::Action::Read)
+            .await?;
+        let representation = self.representation_at(resource, frontier).await?;
+        policies
+            .authorize(resource, principal, crate::access::Action::Read)
+            .await?;
+        Ok(representation)
+    }
+    pub async fn history_page(
+        &self,
+        resource: &str,
+        from: &[Version],
+        target: Option<&[Version]>,
+        limits: HistoryLimits,
+    ) -> Result<Option<HistoryPage>, ReplicaError> {
+        self.load(resource)
+            .await?
+            .map(|document| document.history_page(from, target, limits))
+            .transpose()
+    }
+
+    /// Authorize before reading or revealing any history metadata.
+    pub async fn history_page_authorized(
+        &self,
+        resource: &str,
+        from: &[Version],
+        target: Option<&[Version]>,
+        limits: HistoryLimits,
+        policies: &crate::access::PolicyStore,
+        principal: Option<&crate::access::Principal>,
+    ) -> Result<Option<HistoryPage>, ReplicaError> {
+        policies
+            .authorize(resource, principal, crate::access::Action::Read)
+            .await?;
+        let page = self.history_page(resource, from, target, limits).await?;
+        policies
+            .authorize(resource, principal, crate::access::Action::Read)
+            .await?;
+        Ok(page)
+    }
+
+    /// Authenticated causal events are not subscriber-relative projections.
+    /// This profile preserves their parents and identity without manufacturing
+    /// a Peer header merely to opt into historical-parent transformation.
+    pub async fn commit_causal_authorized(
+        &self,
+        resource: &str,
+        update: &Update,
+        merge_type: &str,
+        policies: &crate::access::PolicyStore,
+        principal: &crate::access::Principal,
+    ) -> Result<ReplicaDocument, ReplicaError> {
+        self.commit_profile(
+            resource,
+            update,
+            merge_type,
+            true,
+            Some((policies, principal)),
+        )
+        .await
+    }
     pub async fn snapshot_at(
         &self,
         resource: &str,
@@ -388,6 +490,47 @@ impl ReplicaStore {
             })
             .await?;
         Ok(())
+    }
+    /// Existing resources or policies that the internal replication namespace
+    /// would shadow. The endpoint stays disabled until this list is empty;
+    /// nothing is renamed, deleted, or adopted implicitly.
+    pub async fn replication_namespace_collisions(&self) -> Result<Vec<String>, ReplicaError> {
+        #[derive(Deserialize)]
+        struct Named {
+            resource: Option<String>,
+        }
+        let mut collisions = std::collections::BTreeSet::new();
+        let legacy_prefix = REPLICATION_NAMESPACE.replace(['/', '\\'], "_");
+        match tokio::fs::read_dir(&self.base_dir).await {
+            Ok(mut directory) => {
+                while let Some(entry) = directory.next_entry().await? {
+                    let name = entry.file_name().to_string_lossy().into_owned();
+                    if name.starts_with(&legacy_prefix) {
+                        collisions.insert(name);
+                    } else if name.starts_with("p-")
+                        && name.ends_with(".json")
+                        && entry.file_type().await?.is_file()
+                    {
+                        let named: Named =
+                            serde_json::from_slice(&tokio::fs::read(entry.path()).await?)?;
+                        if let Some(resource) = named
+                            .resource
+                            .filter(|resource| resource.starts_with(REPLICATION_NAMESPACE))
+                        {
+                            collisions.insert(resource);
+                        }
+                    }
+                }
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
+        for policy in self.policy_store()?.inventory().await? {
+            if policy.resource.starts_with(REPLICATION_NAMESPACE) {
+                collisions.insert(policy.resource);
+            }
+        }
+        Ok(collisions.into_iter().collect())
     }
     pub fn path(&self, resource: &str) -> PathBuf {
         self.base_dir
@@ -495,6 +638,11 @@ impl ReplicaStore {
     ) -> Result<ReplicaDocument, ReplicaError> {
         let _guard = document_lock(self.path(resource)).await;
         let stored = self.load(resource).await?;
+        if stored.is_none() && resource.starts_with(REPLICATION_NAMESPACE) {
+            return Err(ReplicaError::Invalid(
+                "The replication namespace is reserved for internal protocol endpoints".into(),
+            ));
+        }
         let mut permit = match authority {
             Some((policies, principal)) => Some(
                 policies
@@ -504,6 +652,11 @@ impl ReplicaStore {
             None => None,
         };
         let mut document = stored.unwrap_or_else(|| ReplicaDocument::empty(merge_type));
+        if document.merge_type != merge_type {
+            return Err(ReplicaError::Conflict(
+                "Resource merge profile does not match the requested profile".into(),
+            ));
+        }
         if document.apply_profile(update, transforming)? {
             document.resource = Some(resource.to_owned());
             if let (Some(permit), Some((policies, _))) = (&mut permit, authority) {
@@ -538,4 +691,18 @@ impl ReplicaStore {
             .unwrap_or_else(|| ReplicaDocument::empty(merge_type));
         Ok((document, receiver, channel))
     }
+}
+
+fn validate_digest(content: &str, update: &Update) -> Result<(), ReplicaError> {
+    if let Some(digest) = update.extra_headers.get("repr-digest") {
+        use base64::Engine;
+        let actual =
+            base64::engine::general_purpose::STANDARD.encode(Sha256::digest(content.as_bytes()));
+        if digest.trim() != format!("sha-256=:{actual}:") {
+            return Err(ReplicaError::Invalid(
+                "Representation digest mismatch or unsupported digest algorithm".into(),
+            ));
+        }
+    }
+    Ok(())
 }

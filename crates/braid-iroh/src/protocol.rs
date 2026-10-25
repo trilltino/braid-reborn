@@ -3,7 +3,7 @@ use axum::{
     extract::{Path, State},
     http::HeaderMap,
     response::{IntoResponse, Response},
-    routing::get,
+    routing::{get, post},
     Router,
 };
 use braid_http_rs::{replica::ReplicaStore, server::replica_http};
@@ -39,10 +39,17 @@ pub struct BraidAppState {
     pub policy_changed: tokio::sync::watch::Sender<u64>,
     pub replica: ReplicaStore,
     pub access: Arc<RwLock<AccessPolicy>>,
+    /// False when legacy resources or policies already occupy the internal
+    /// replication namespace. The endpoint then refuses with 503; nothing is renamed.
+    pub replication_history: bool,
 }
 pub fn build_protocol_handler(state: BraidAppState) -> IrohAxum {
     IrohAxum::new(
         Router::new()
+            .route(
+                braid_http_rs::replica::REPLICATION_HISTORY_PATH,
+                post(handle_history),
+            )
             .route("/{*resource}", get(handle_get).put(handle_put))
             .with_state(state),
     )
@@ -113,6 +120,34 @@ async fn handle_put(
         headers,
         body,
         "simpleton",
+    )
+    .await
+}
+
+async fn handle_history(
+    State(state): State<BraidAppState>,
+    RemoteId(peer): RemoteId,
+    body: Bytes,
+) -> Response {
+    if !state.access.read().permits(peer) {
+        return axum::http::StatusCode::FORBIDDEN.into_response();
+    }
+    if !state.replication_history {
+        return (
+            axum::http::StatusCode::SERVICE_UNAVAILABLE,
+            "Replication history is disabled by a legacy namespace collision",
+        )
+            .into_response();
+    }
+    let policies = match state.replica.policy_store() {
+        Ok(policies) => policies,
+        Err(error) => return replica_http::error_response(error.into()),
+    };
+    replica_http::history_authorized(
+        state.replica,
+        policies,
+        braid_http_rs::access::Principal::Peer(peer.to_string()),
+        body,
     )
     .await
 }
