@@ -72,6 +72,61 @@ fn config() -> ChannelConfig {
     }
 }
 
+#[tokio::test]
+async fn sender_only_channel_commits_puts_without_opening_or_faking_a_subscription() {
+    let network = Arc::new(Network::default());
+    let sender = ReliableChannel::start_sender(network.clone(), "http://test/new-resource".into(), BraidRequest::new(), ChannelJournal::memory(), config()).unwrap();
+    sender.queue(Update::snapshot(Version::new("created"), "content"), None).await.unwrap();
+    wait_for(|| !network.puts.lock().unwrap().is_empty() && sender.status().borrow().outstanding_puts == 0).await;
+    assert!(network.subscriptions.lock().unwrap().is_empty());
+    assert_eq!(network.puts.lock().unwrap()[0].version, Some(vec![Version::new("created")]));
+    sender.close().await;
+}
+
+#[tokio::test]
+async fn sender_receive_progress_and_application_are_one_fallible_transaction() {
+    let store = Arc::new(Mutex::new(FaultStore::default()));
+    let journal = ChannelJournal::from_backend(FaultJournal(store.clone())).await.unwrap();
+    let network = Arc::new(Network::default());
+    let sender = ReliableChannel::start_sender(network, "http://test/doc".into(), BraidRequest::new(), journal, config()).unwrap();
+    wait_for(|| sender.status().borrow().state == ChannelState::Connecting).await;
+    sender.checkpoint_received(vec![Version::new("accepted")], serde_json::json!({"through":"accepted"})).await.unwrap();
+    let original = store.lock().unwrap().bytes.clone();
+    store.lock().unwrap().fail_next = true;
+    assert!(sender.checkpoint_received(vec![Version::new("not-persisted")], serde_json::json!({"through":"not-persisted"})).await.is_err());
+    assert_eq!(store.lock().unwrap().bytes, original);
+    assert_eq!(sender.diagnostics().borrow().receive_frontier, vec![Version::new("accepted")]);
+    sender.close().await;
+    let journal = ChannelJournal::from_backend(FaultJournal(store)).await.unwrap();
+    assert_eq!(journal.checkpoint().receive_frontier, vec![Version::new("accepted")]);
+    assert_eq!(journal.checkpoint().application, Some(serde_json::json!({"through":"accepted"})));
+}
+
+#[tokio::test]
+async fn sender_only_manual_ack_replays_the_same_identity_after_restart() {
+    use braid_http::client::ChannelEvent;
+    let store = Arc::new(Mutex::new(FaultStore::default()));
+    let network = Arc::new(Network::default());
+    let options = ChannelConfig { application_acknowledgments: true, ..config() };
+    let journal = ChannelJournal::from_backend(FaultJournal(store.clone())).await.unwrap();
+    let sender = ReliableChannel::start_sender(network.clone(), "http://test/doc".into(), BraidRequest::new(), journal, options.clone()).unwrap();
+    sender.queue(Update::snapshot(Version::new("uncertain"), "exact bytes"), None).await.unwrap();
+    let event = sender.next_event().await.unwrap().unwrap();
+    assert!(matches!(event, ChannelEvent::PutAcknowledged { version, .. } if version == vec![Version::new("uncertain")]));
+    assert_eq!(sender.status().borrow().outstanding_puts, 1);
+    sender.close().await;
+    let journal = ChannelJournal::from_backend(FaultJournal(store.clone())).await.unwrap();
+    let sender = ReliableChannel::start_sender(network.clone(), "http://test/doc".into(), BraidRequest::new(), journal, options).unwrap();
+    let event = sender.next_event().await.unwrap().unwrap();
+    assert!(matches!(event, ChannelEvent::PutAcknowledged { version, .. } if version == vec![Version::new("uncertain")]));
+    sender.commit_ack(vec![Version::new("uncertain")], Some(serde_json::json!({"ack":"uncertain"}))).await.unwrap();
+    sender.close().await;
+    assert!(network.subscriptions.lock().unwrap().is_empty());
+    let puts = network.puts.lock().unwrap();
+    assert_eq!(puts.len(), 2);
+    assert_eq!(braid_http::protocol::encode_request(&puts[0]).unwrap(), braid_http::protocol::encode_request(&puts[1]).unwrap());
+}
+
 #[derive(Default)]
 struct FaultStore {
     bytes: Option<Vec<u8>>,

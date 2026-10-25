@@ -155,6 +155,7 @@ enum Command {
     Save(serde_json::Value, oneshot::Sender<Result<()>>),
     Pending(oneshot::Sender<Vec<Update>>),
     ResetCursor(serde_json::Value, oneshot::Sender<Result<()>>),
+    CheckpointReceived(Vec<Version>, serde_json::Value, oneshot::Sender<Result<()>>),
     Reconnect,
     Stop(oneshot::Sender<()>),
 }
@@ -167,6 +168,15 @@ pub struct ReliableChannel {
     task: OwnedTask,
 }
 impl ReliableChannel {
+    /// Sender-only replication owners call this only after validating and
+    /// durably storing the referenced causal events. Cursor and progress commit
+    /// in one record; this never acknowledges an outgoing mutation.
+    pub async fn checkpoint_received(&self, frontier: Vec<Version>, application: serde_json::Value) -> Result<()> {
+        let (tx, rx) = oneshot::channel();
+        self.commands.send(Command::CheckpointReceived(frontier, application, tx)).await
+            .map_err(|_| BraidError::SubscriptionClosed)?;
+        rx.await.map_err(|_| BraidError::SubscriptionClosed)?
+    }
     pub fn status(&self) -> watch::Receiver<ChannelStatus> {
         self.status.clone()
     }
@@ -309,6 +319,11 @@ impl Drop for ReliableChannel {
 }
 
 impl BraidClient {
+    /// A durable serial sender for resources whose causal receive path is owned
+    /// by an authenticated replication worker. No subscription is synthesized.
+    pub fn reliable_sender(&self, url: &str, request: BraidRequest, journal: ChannelJournal, config: ChannelConfig) -> Result<ReliableChannel> {
+        ReliableChannel::start_sender(self.network.clone(), url.to_owned(), request, journal, config)
+    }
     pub fn reliable_channel_authenticated(
         &self,
         url: &str,
@@ -376,6 +391,22 @@ impl ReliableChannel {
         config: ChannelConfig,
         payloads: Option<Arc<dyn PayloadSource>>,
     ) -> Result<Self> {
+        Self::start_profile(network, url, request, journal, config, payloads, false)
+    }
+
+    pub fn start_sender(network: Arc<dyn BraidNetwork>, url: String, request: BraidRequest, journal: ChannelJournal, config: ChannelConfig) -> Result<Self> {
+        Self::start_profile(network, url, request, journal, config, None, true)
+    }
+
+    pub fn start_sender_with_payloads(network: Arc<dyn BraidNetwork>, url: String, request: BraidRequest, journal: ChannelJournal, config: ChannelConfig, payloads: Arc<dyn PayloadSource>) -> Result<Self> {
+        Self::start_profile(network, url, request, journal, config, Some(payloads), true)
+    }
+
+    fn start_profile(
+        network: Arc<dyn BraidNetwork>, url: String, request: BraidRequest,
+        journal: ChannelJournal, config: ChannelConfig,
+        payloads: Option<Arc<dyn PayloadSource>>, sender_only: bool,
+    ) -> Result<Self> {
         super::validate_resource_url(&url)?;
         if !journal.checkpoint.payloads.is_empty() && payloads.is_none() {
             return Err(BraidError::Config(
@@ -436,6 +467,7 @@ impl ReliableChannel {
                 payloads,
                 awaiting_apply: None,
                 awaiting_ack: None,
+                sender_only,
             };
             if let Err(error) = driver.run().await {
                 driver
@@ -480,6 +512,7 @@ struct Driver {
     payloads: Option<Arc<dyn PayloadSource>>,
     awaiting_apply: Option<Vec<Version>>,
     awaiting_ack: Option<Vec<Version>>,
+    sender_only: bool,
 }
 impl Driver {
     fn state(&self, state: ChannelState) {
@@ -517,6 +550,17 @@ impl Driver {
     }
     async fn command(&mut self, command: Option<Command>) -> Result<bool> {
         match command {
+            Some(Command::CheckpointReceived(frontier, application, done)) => {
+                let result = if self.sender_only {
+                    let mut next = self.journal.checkpoint.clone();
+                    next.receive_frontier = frontier;
+                    next.application = Some(application);
+                    self.journal.commit(next).await
+                } else {
+                    Err(BraidError::Config("External receive checkpoints require a sender-only channel".into()))
+                };
+                let _ = done.send(result);
+            }
             None => return Err(BraidError::Aborted),
             Some(Command::Stop(done)) => {
                 let _ = done.send(());
@@ -752,6 +796,13 @@ impl Driver {
         let mut retries = RetryState::new(self.config.retry.clone());
         loop {
             self.state(ChannelState::Connecting);
+            let error = if self.sender_only {
+                match self.session(None).await {
+                    Ok(()) => { retries.reset(); continue; },
+                    Err(BraidError::Aborted) => return Ok(()),
+                    Err(error) => error,
+                }
+            } else {
             let mut request = self.request.clone();
             // The newest optimistic version may never have reached the server.
             // FIFO parents are known before its first unacknowledged mutation;
@@ -777,11 +828,11 @@ impl Driver {
                     command = self.commands.recv() => match self.command(command).await { Ok(_) => {}, Err(BraidError::Aborted) => return Ok(()), Err(e) => return Err(e) },
                 }
             };
-            let error = match connected {
+            match connected {
                 Ok(receiver) => {
                     self.state(ChannelState::CatchingUp);
                     self.state(ChannelState::Online);
-                    match self.session(receiver).await {
+                    match self.session(Some(receiver)).await {
                         Ok(()) => {
                             retries.reset();
                             continue;
@@ -791,6 +842,7 @@ impl Driver {
                     }
                 }
                 Err(error) => error,
+            }
             };
             let retry_after = match &error {
                 BraidError::Http(_) | BraidError::Timeout | BraidError::SubscriptionClosed => None,
@@ -828,7 +880,7 @@ impl Driver {
             }
         }
     }
-    async fn session(&mut self, receiver: async_channel::Receiver<Result<Update>>) -> Result<()> {
+    async fn session(&mut self, receiver: Option<async_channel::Receiver<Result<Update>>>) -> Result<()> {
         let mut inflight: Option<PutFuture> = None;
         loop {
             if inflight.is_none() && self.awaiting_ack.is_none() {
@@ -913,7 +965,7 @@ impl Driver {
                         self.state(ChannelState::Online);
                     }
                 }
-                update = receiver.recv(), if self.awaiting_apply.is_none() => {
+                update = async { match &receiver { Some(receiver) => receiver.recv().await, None => std::future::pending().await } }, if self.awaiting_apply.is_none() => {
                     let update = update.map_err(|_| BraidError::SubscriptionClosed)??;
                     if let Some(repr) = update.extra_headers.get("repr-type") { self.request.extra_headers.insert("repr-type".into(), repr.clone()); }
                     self.awaiting_apply = Some(update.version.clone());
