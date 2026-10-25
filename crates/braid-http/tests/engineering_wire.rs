@@ -6,6 +6,47 @@ use braid_http::{
 use http::{HeaderMap, HeaderValue};
 
 #[test]
+fn transport_credentials_are_not_replication_metadata() {
+    use braid_http::{
+        client::message_to_update,
+        protocol::{encode_request, encode_update_entity, WireCodec},
+        types::BraidRequest,
+    };
+    let request = BraidRequest::new()
+        .with_version(Version::new("v1"))
+        .with_header("Authorization", "Bearer private-token")
+        .with_header("Cookie", "private=cookie")
+        .with_header("x-metadata", "keep-this");
+    let (headers, body) = encode_request(&request).unwrap();
+    assert_eq!(
+        headers["authorization"], "Bearer private-token",
+        "credentials must still reach the HTTP authentication boundary"
+    );
+    let update = WireCodec::decode_entity(headers, body).unwrap();
+    assert!(!update.extra_headers.contains_key("authorization"));
+    assert!(!update.extra_headers.contains_key("cookie"));
+    assert_eq!(update.extra_headers["x-metadata"], "keep-this");
+    let mut legacy = update;
+    legacy
+        .extra_headers
+        .insert("Authorization".into(), "Bearer old-token".into());
+    legacy
+        .extra_headers
+        .insert("connection".into(), "x-private".into());
+    legacy
+        .extra_headers
+        .insert("x-private".into(), "hop-secret".into());
+    let (headers, _) = encode_update_entity(&legacy).unwrap();
+    assert!(!headers.contains_key("authorization"));
+    assert!(!headers.contains_key("connection"));
+    assert!(!headers.contains_key("x-private"));
+    let frames = b"Version: \"v2\"\r\nAuthorization: Bearer token\r\nSet-Cookie: token=private\r\nContent-Length: 1\r\n\r\nx";
+    let message = MessageParser::new().feed(frames).unwrap().remove(0);
+    let update = message_to_update(message).unwrap();
+    assert!(update.extra_headers.is_empty());
+}
+
+#[test]
 fn http_adapters_reject_ambiguous_or_nontext_protocol_headers() {
     for name in [
         "patches",

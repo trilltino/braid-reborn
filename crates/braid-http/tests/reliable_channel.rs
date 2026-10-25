@@ -68,6 +68,41 @@ fn config() -> ChannelConfig {
         ..Default::default()
     }
 }
+
+#[tokio::test]
+async fn transport_headers_cannot_enter_an_outbox_and_old_bytes_are_retained_for_migration() {
+    let path = std::env::temp_dir().join(format!(
+        "braid-secret-boundary-{}.json",
+        uuid::Uuid::new_v4()
+    ));
+    let network = Arc::new(Network::default());
+    let (_sender, receiver) = async_channel::bounded(1);
+    network.receivers.lock().unwrap().push_back(receiver);
+    let journal = ChannelJournal::open(&path).await.unwrap();
+    let channel = start(network.clone(), journal, config());
+    let mut update = Update::snapshot(Version::new("uncertain"), "content");
+    update
+        .extra_headers
+        .insert("authorization".into(), "Bearer private-value".into());
+    assert!(channel.queue(update.clone(), None).await.is_err());
+    channel.close().await;
+    assert!(network.puts.lock().unwrap().is_empty());
+    let mut checkpoint = braid_http::client::ChannelCheckpoint::default();
+    checkpoint.outbox.push_back(update);
+    let original = serde_json::to_vec(&checkpoint).unwrap();
+    std::fs::write(&path, &original).unwrap();
+    assert!(matches!(
+        ChannelJournal::open(&path).await,
+        Err(BraidError::Config(_))
+    ));
+    assert_eq!(
+        std::fs::read(&path).unwrap(),
+        original,
+        "never silently rewrite an uncertain PUT during recovery"
+    );
+    std::fs::remove_file(&path).unwrap();
+    std::fs::remove_file(path.with_extension("lock")).unwrap();
+}
 fn start(network: Arc<Network>, journal: ChannelJournal, config: ChannelConfig) -> ReliableChannel {
     ReliableChannel::start(
         network,

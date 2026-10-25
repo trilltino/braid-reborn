@@ -224,6 +224,47 @@ pub fn parse_tunneled_response(
     }
 }
 
+/// Remove HTTP credentials, hop-by-hop fields and request transport metadata
+/// before turning an HTTP entity into a persisted/replicated event. Unknown
+/// application metadata is retained unless Connection explicitly nominates it.
+pub fn strip_transport_headers(headers: &mut std::collections::BTreeMap<String, String>) {
+    let nominated: Vec<_> = headers
+        .iter()
+        .filter(|(name, _)| name.eq_ignore_ascii_case("connection"))
+        .flat_map(|(_, value)| {
+            value
+                .split(',')
+                .map(|name| name.trim().to_ascii_lowercase())
+        })
+        .collect();
+    headers.retain(|name, _| {
+        let name = name.to_ascii_lowercase();
+        !matches!(
+            name.as_str(),
+            "authorization"
+                | "proxy-authorization"
+                | "proxy-authenticate"
+                | "www-authenticate"
+                | "cookie"
+                | "cookie2"
+                | "set-cookie"
+                | "connection"
+                | "keep-alive"
+                | "te"
+                | "trailer"
+                | "transfer-encoding"
+                | "upgrade"
+                | "host"
+                | "user-agent"
+                | "accept"
+                | "accept-encoding"
+                | "origin"
+                | "referer"
+        ) && !name.starts_with("sec-fetch-")
+            && !nominated.contains(&name)
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

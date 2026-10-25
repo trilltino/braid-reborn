@@ -10,6 +10,7 @@ impl WireCodec {
         format_update(update)
     }
     pub fn decode_entity(mut headers: BTreeMap<String, String>, body: Bytes) -> Result<Update> {
+        crate::protocol::strip_transport_headers(&mut headers);
         // HTTP Content-Length describes the entire entity, not an individual patch.
         headers.remove("transfer-encoding");
         if headers.contains_key("patches") {
@@ -34,7 +35,7 @@ impl WireCodec {
 }
 
 pub fn format_update(update: &Update) -> Result<Bytes> {
-    let (headers, body) = encode_parts(update)?;
+    let (headers, body) = encode_parts(update, false)?;
     let mut frame = BytesMut::new();
     for (k, v) in headers {
         write_header(&mut frame, &k, &v)?;
@@ -45,7 +46,7 @@ pub fn format_update(update: &Update) -> Result<Bytes> {
 }
 
 pub fn encode_update_entity(update: &Update) -> Result<(BTreeMap<String, String>, Bytes)> {
-    encode_parts(update)
+    encode_parts(update, false)
 }
 
 pub fn encode_request(request: &BraidRequest) -> Result<(BTreeMap<String, String>, Bytes)> {
@@ -101,7 +102,7 @@ pub fn encode_request(request: &BraidRequest) -> Result<(BTreeMap<String, String
         extra_headers: extra,
         ..Update::default()
     };
-    let (mut headers, body) = encode_parts(&update)?;
+    let (mut headers, body) = encode_parts(&update, true)?;
     if !has_parents {
         headers.remove("parents");
     }
@@ -128,7 +129,10 @@ pub fn encode_request(request: &BraidRequest) -> Result<(BTreeMap<String, String
     Ok((headers, body))
 }
 
-fn encode_parts(update: &Update) -> Result<(BTreeMap<String, String>, Bytes)> {
+fn encode_parts(
+    update: &Update,
+    request_transport: bool,
+) -> Result<(BTreeMap<String, String>, Bytes)> {
     if update.body.is_some() && update.patches.is_some() {
         return Err(BraidError::Protocol(
             "Update contains both snapshot and patches".into(),
@@ -152,6 +156,9 @@ fn encode_parts(update: &Update) -> Result<(BTreeMap<String, String>, Bytes)> {
             )));
         }
         headers.insert(name, v.clone());
+    }
+    if !request_transport {
+        crate::protocol::strip_transport_headers(&mut headers);
     }
     if !update.version.is_empty() {
         crate::protocol::parse_version_header(&crate::protocol::format_version_header(

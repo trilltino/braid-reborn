@@ -68,7 +68,7 @@ impl ChannelJournal {
             .ok_or_else(|| BraidError::Config("Journal needs a parent directory".into()))?;
         tokio::fs::create_dir_all(parent).await?;
         let lease = crate::durable::writer_lease(&path.with_extension("lock")).await?;
-        let checkpoint = match tokio::fs::metadata(&path).await {
+        let checkpoint: ChannelCheckpoint = match tokio::fs::metadata(&path).await {
             Ok(meta) if meta.len() > 32 * 1024 * 1024 => {
                 return Err(BraidError::ResourceLimit {
                     resource: "channel journal",
@@ -79,6 +79,13 @@ impl ChannelJournal {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => ChannelCheckpoint::default(),
             Err(e) => return Err(e.into()),
         };
+        for update in &checkpoint.outbox {
+            let mut metadata = update.extra_headers.clone();
+            crate::protocol::strip_transport_headers(&mut metadata);
+            if metadata != update.extra_headers {
+                return Err(BraidError::Config("Legacy outbox contains transport headers; preserve it for explicit local migration".into()));
+            }
+        }
         Ok(Self {
             checkpoint,
             path: Some(path),
@@ -419,6 +426,14 @@ impl Driver {
         update: Update,
         application: Option<serde_json::Value>,
     ) -> Result<()> {
+        let mut metadata = update.extra_headers.clone();
+        crate::protocol::strip_transport_headers(&mut metadata);
+        if metadata != update.extra_headers {
+            return Err(BraidError::Config(
+                "Transport credentials/headers belong on the channel request, not a durable update"
+                    .into(),
+            ));
+        }
         if update.version.is_empty() {
             return Err(BraidError::InvalidVersion(
                 "Queued updates require a stable version".into(),

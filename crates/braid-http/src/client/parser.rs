@@ -360,7 +360,9 @@ impl Message {
             "content-range",
             ":status",
         ];
-        self.headers
+        let mut metadata = self.headers.clone();
+        crate::protocol::strip_transport_headers(&mut metadata);
+        metadata
             .iter()
             .filter(|(k, _)| !KNOWN_HEADERS.contains(&k.as_str()))
             .map(|(k, v)| (k.clone(), v.clone()))
