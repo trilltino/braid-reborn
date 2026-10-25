@@ -65,6 +65,15 @@ test('network: accepted PUT with lost ACK replays exactly the same identity', as
   assert.ok(!persisted.includes(t.fixture.tokens.alice), 'transport credentials are absent from recovery data');
 });
 
+test('network: production Fetch rejects redirects before the target is requested', async t => {
+  const context = await t.newContext();
+  const page = await t.openPage(context);
+  const before = (await t.fixture.control('metrics')).redirect_hits;
+  const response = await page.evaluate(url => window.attempt(() => braid.FetchHarness.anonymous(url)), t.fixture.origin + '/_fixture/redirect');
+  assert.ok(response.error, 'redirect is an explicit transport failure');
+  assert.equal((await t.fixture.control('metrics')).redirect_hits, before, 'redirect target was never requested');
+});
+
 test('network: offline text survives reload and repairs over the production route', async t => {
   const item = await seed(t, 'offline');
   const context = await t.newContext();
@@ -112,6 +121,34 @@ test('network: two browser clients converge after forced same-base Unicode edits
   await Promise.all([settled(left, 'aX😀Yb'), settled(right, 'aX😀Yb')]);
   assert.equal((await t.fixture.read(item.name)).text, 'aX😀Yb');
   ok(await simpleton.close(left)); ok(await simpleton.close(right));
+});
+
+test('network: a persistent browser restart retains Simpleton identity, pending edits and receive frontier', async t => {
+  const item = await seed(t, 'restart');
+  const profile = await t.persistentProfile();
+  let context = await profile.launch();
+  let page = await t.openPage(context);
+  ok(await simpleton.open(page, item.url, 'user:alice', t.fixture.tokens.alice));
+  await initialized(page);
+  const initial = ok(await simpleton.status(page));
+  assert.deepEqual(initial.receive_frontier, [`seed-${item.name}`]);
+  await context.setOffline(true);
+  const edited = 'survives browser restart 😀';
+  ok(await simpleton.changed(page, edited));
+  const before = ok(await simpleton.status(page));
+  ok(await simpleton.close(page));
+  const saved = (await page.evaluate(() => window.raw.dump())).stores.journals[0].value.payload;
+  assert.ok(saved.bytes > 0);
+  await profile.close();
+  context = await profile.launch();
+  page = await t.openPage(context);
+  ok(await simpleton.open(page, item.url, 'user:alice', t.fixture.tokens.alice));
+  await settled(page, edited);
+  const after = ok(await simpleton.status(page));
+  assert.equal(after.recovery, 'Verified');
+  if (before.version[0] !== initial.version[0]) assert.equal(after.version[0], before.version[0], 'uncertain queued identity survives full browser restart');
+  assert.equal((await t.fixture.read(item.name)).text, edited);
+  ok(await simpleton.close(page));
 });
 
 test('network: dropping a full slow-reader subscription cancels the actual server body', async t => {

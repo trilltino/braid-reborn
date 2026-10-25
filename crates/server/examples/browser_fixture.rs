@@ -2,7 +2,7 @@
 //! Bootstrap tokens are generated only inside a caller-supplied empty test root.
 use axum::{
     body::Body, extract::{Request, State}, http::StatusCode, middleware::{self, Next},
-    response::{IntoResponse, Response}, routing::post, Json, Router,
+    response::{IntoResponse, Response}, routing::{get, post}, Json, Router,
 };
 use braid_core::{access::{PolicyChange, Principal, Role}, replica::ReplicaStore, types::{Update, Version}};
 use local_link_server::{
@@ -16,6 +16,7 @@ use std::{collections::BTreeSet, sync::{Arc, Mutex, atomic::{AtomicUsize, Orderi
 struct Metrics {
     active: AtomicUsize,
     starts: AtomicUsize,
+    redirect_hits: AtomicUsize,
     puts: Mutex<Vec<serde_json::Value>>,
     lose_ack: Mutex<BTreeSet<String>>,
 }
@@ -29,6 +30,7 @@ struct Fixture {
     alice: Principal,
     bob: Principal,
     metrics: Arc<Metrics>,
+    allowed_origin: String,
 }
 #[derive(Deserialize)]
 struct Control {
@@ -48,6 +50,7 @@ async fn control_result(fixture: Fixture, input: Control) -> anyhow::Result<serd
         return Ok(serde_json::json!({
             "active": fixture.metrics.active.load(Ordering::SeqCst),
             "starts": fixture.metrics.starts.load(Ordering::SeqCst),
+            "redirect_hits": fixture.metrics.redirect_hits.load(Ordering::SeqCst),
             "puts": fixture.metrics.puts.lock().unwrap_or_else(|e| e.into_inner()).clone(),
         }));
     }
@@ -69,6 +72,19 @@ async fn control_result(fixture: Fixture, input: Control) -> anyhow::Result<serd
         _ => anyhow::bail!("Unknown fixture action"),
     }
     Ok(serde_json::json!({"ok": true}))
+}
+
+async fn redirect(State(fixture): State<Fixture>) -> Response {
+    // Fault-only route: this makes following a redirect observable. Ordinary
+    // protocol/CORS scenarios still call the production application router.
+    (StatusCode::TEMPORARY_REDIRECT, [
+        (axum::http::header::LOCATION, "/_fixture/redirect-target".to_owned()),
+        (axum::http::header::ACCESS_CONTROL_ALLOW_ORIGIN, fixture.allowed_origin),
+    ]).into_response()
+}
+async fn redirect_target(State(fixture): State<Fixture>) -> Response {
+    fixture.metrics.redirect_hits.fetch_add(1, Ordering::SeqCst);
+    ([(axum::http::header::ACCESS_CONTROL_ALLOW_ORIGIN, fixture.allowed_origin)], "followed").into_response()
 }
 
 async fn observe(State(metrics): State<Arc<Metrics>>, request: Request, next: Next) -> Response {
@@ -132,8 +148,10 @@ async fn main() -> anyhow::Result<()> {
         local_org_manager: Arc::new(LocalOrgManager::new(&root.to_string_lossy())),
     };
     let metrics = Arc::new(Metrics::default());
-    let fixture = Fixture { state: state.clone(), alice: principals[0].clone(), bob: principals[1].clone(), metrics: metrics.clone() };
-    let control = Router::new().route("/_fixture/control", post(control)).with_state(fixture);
+    let fixture = Fixture { state: state.clone(), alice: principals[0].clone(), bob: principals[1].clone(), metrics: metrics.clone(), allowed_origin: args[2].clone() };
+    let control = Router::new().route("/_fixture/control", post(control))
+        .route("/_fixture/redirect", get(redirect)).route("/_fixture/redirect-target", get(redirect_target))
+        .with_state(fixture);
     let app = local_link_server::router_with_cors(state, &args[2..])?
         .merge(control).layer(middleware::from_fn_with_state(metrics, observe));
     let listener = tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, port)).await?;

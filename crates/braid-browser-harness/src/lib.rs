@@ -186,6 +186,11 @@ pub struct FetchHarness {
 }
 #[wasm_bindgen]
 impl FetchHarness {
+    pub async fn anonymous(resource: String) -> Result<u16, JsValue> {
+        use braid_http::traits::BraidNetwork;
+        braid_http::client::wasm_network::WasmNetwork.fetch(&resource, braid_http::BraidRequest::new())
+            .await.map(|response| response.status).map_err(js_error)
+    }
     pub async fn subscribe(resource: String, bearer: String) -> Result<FetchHarness, JsValue> {
         use braid_http::traits::BraidNetwork;
         let credentials = braid_http::client::ScopedCredentials::new(&braid_http::client::http_origin(&resource).map_err(js_error)?,
