@@ -1,0 +1,14 @@
+[package]
+name = "engine-oracle"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "Independent oracle: the upstream CRDT engine at a pinned revision, driven by the same scripts as the copied engine."
+
+[dependencies]
+# Pinned to the closest upstream revision identified in docs/audit/engine-provenance.md.
+diamond-types = { git = "https://github.com/josephg/diamond-types", rev = "90227908e8271786c49d30f10ef0e41ede207109", default-features = false, features = ["lz4"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[workspace]

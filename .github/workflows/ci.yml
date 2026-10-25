@@ -66,6 +66,7 @@ jobs:
       - run: node tests/interoperability/codec.mjs
       - run: cargo build -p braid-core --locked --example simpleton_interop_server
       - run: node tests/interoperability/simpleton-server.mjs
+      - run: node scripts/run-engine-oracle.mjs 60
   fuzz:
     runs-on: ubuntu-latest
     timeout-minutes: 15

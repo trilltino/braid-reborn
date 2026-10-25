@@ -5,6 +5,7 @@ target/
 **/Cargo.lock
 !/Cargo.lock
 !/tests/fuzz/Cargo.lock
+!/tests/oracle/Cargo.lock
 /tests/fuzz/target/
 /tests/fuzz/artifacts/
 /tests/fuzz/corpus/
