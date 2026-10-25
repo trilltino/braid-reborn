@@ -20,6 +20,8 @@ extern "C" {
     async fn journal_load(state: &JsValue) -> std::result::Result<JsValue, JsValue>;
     #[wasm_bindgen(catch, js_name = browserJournalStore)]
     async fn journal_store(state: &JsValue, payload: &[u8]) -> std::result::Result<JsValue, JsValue>;
+    #[wasm_bindgen(catch, js_name = browserJournalBackup)]
+    async fn journal_backup(state: &JsValue, label: &str, payload: &[u8]) -> std::result::Result<JsValue, JsValue>;
     #[wasm_bindgen(catch, js_name = browserJournalClose)]
     fn journal_close(state: &JsValue) -> std::result::Result<(), JsValue>;
 }
@@ -88,6 +90,12 @@ impl JournalBackend for BrowserJournal {
         journal_store(&self.state, bytes).await.map_err(browser_error)?;
         Ok(())
     }
+    /// Write-once: the first backup of a label is the original and is never replaced.
+    async fn backup(&mut self, label: &str, bytes: &[u8]) -> Result<()> {
+        if bytes.len() > MAX_JOURNAL_BYTES { return Err(journal_limit()); }
+        journal_backup(&self.state, label, bytes).await.map_err(browser_error)?;
+        Ok(())
+    }
 }
 impl ChannelJournal {
     pub async fn open_browser(options: &BrowserJournalOptions) -> Result<Self> {
@@ -109,13 +117,16 @@ pub(super) fn browser_error(error: JsValue) -> BraidError {
         "readable-stream" => BraidError::CapabilityUnavailable { capability: "browser ReadableStream" },
         "crypto" => BraidError::CapabilityUnavailable { capability: "browser crypto" },
         "text-encoder" => BraidError::CapabilityUnavailable { capability: "browser UTF-8 encoder" },
+        "promise" => BraidError::CapabilityUnavailable { capability: "browser Promise" },
+        "microtasks" => BraidError::CapabilityUnavailable { capability: "browser microtasks" },
         "timers" => BraidError::CapabilityUnavailable { capability: "browser timers" },
         "indexed-db" => BraidError::CapabilityUnavailable { capability: "IndexedDB" },
         "web-locks" => BraidError::CapabilityUnavailable { capability: "Web Locks" },
-        "journal-busy" => std::io::Error::new(std::io::ErrorKind::WouldBlock, "Another writer owns this browser journal").into(),
+        "journal-busy" => std::io::Error::new(std::io::ErrorKind::WouldBlock, "Another writer owns this browser journal (competing writer)").into(),
         "database-blocked" => std::io::Error::new(std::io::ErrorKind::WouldBlock, "IndexedDB schema opening is blocked").into(),
         "quota" => std::io::Error::new(std::io::ErrorKind::StorageFull, "IndexedDB quota exceeded").into(),
         "aborted" => BraidError::Aborted,
+        "transaction-aborted" => std::io::Error::other("IndexedDB transaction aborted before commit").into(),
         "timeout" => BraidError::Timeout,
         "journal-schema" => BraidError::Config("Unsupported or invalid browser journal schema".into()),
         "journal-binding" => BraidError::Config("Browser journal authorization/resource binding mismatch".into()),

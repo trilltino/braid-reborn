@@ -3,7 +3,7 @@ use super::{browser::{browser_error, error_code}, HeartbeatConfig, MessageParser
 use crate::{error::{BraidError, Result}, traits::BraidNetwork, types::{BraidRequest, BraidResponse, Update}};
 use async_trait::async_trait;
 use futures::FutureExt;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use wasm_bindgen::prelude::*;
 
 pub struct WasmNetwork;
@@ -28,8 +28,8 @@ struct FetchOwner { state: JsValue }
 impl FetchOwner {
     async fn open(url: &str, request: &BraidRequest) -> Result<Self> {
         let parsed = super::validate_resource_url(url)?;
-        if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() {
-            return Err(BraidError::Config("Browser Fetch requires HTTP(S)".into()));
+        if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() || parsed.fragment().is_some() {
+            return Err(BraidError::Config("Browser Fetch requires HTTP(S) without a fragment".into()));
         }
         let method = http::Method::from_bytes(request.method.as_bytes())
             .map_err(|_| BraidError::Protocol("Invalid outgoing HTTP method".into()))?;
@@ -46,7 +46,7 @@ impl FetchOwner {
         Ok(owner)
     }
     fn status(&self) -> u16 { fetch_status(&self.state) }
-    fn headers(&self) -> Result<HashMap<String, String>> {
+    fn headers(&self) -> Result<BTreeMap<String, String>> {
         serde_json::from_str(&fetch_headers(&self.state)).map_err(|_| BraidError::HeaderParse("Invalid browser response headers".into()))
     }
     async fn read(&self) -> Result<Option<Vec<u8>>> {

@@ -6,6 +6,13 @@ import { webcrypto } from 'node:crypto';
 import * as runtime from '../../crates/braid-http/src/client/browser_runtime.js';
 
 const turn = () => new Promise(resolve => setTimeout(resolve, 0));
+async function waitFor(check) {
+  const until = Date.now() + 5000;
+  while (!check()) {
+    assert.ok(Date.now() < until, 'controlled source fixture did not reach its intended boundary');
+    await turn();
+  }
+}
 const resource = 'https://example.test/doc';
 
 class Transaction {
@@ -148,7 +155,7 @@ test('abandoned opening releases its lock and closes a late DB result', async ()
   try {
     env.idb.delayed = true;
     journal = runtime.browserJournalStart(resource, 'user:alice');
-    await turn();
+    await waitFor(() => env.idb.pending.length === 1);
     const ready = runtime.browserJournalReady(journal);
     runtime.browserJournalClose(journal);
     await assert.rejects(ready, error => runtime.browserErrorCode(error) === 'aborted');
@@ -166,6 +173,36 @@ test('envelope metadata counts against the 32MiB bound before a transaction', as
     await assert.rejects(runtime.browserJournalStore(journal, new Uint8Array(32 * 1024 * 1024)), error => runtime.browserErrorCode(error) === 'journal-limit');
     assert.equal(env.database.transactions.length, 0);
   } finally { if (journal) runtime.browserJournalClose(journal); await turn(); env.restore(); }
+});
+
+test('an abandoned database opening cannot run a late schema upgrade', async () => {
+  const env = environment(); let journal;
+  try {
+    let request, aborted = 0, created = 0;
+    env.idb.open = () => {
+      request = {
+        result: { objectStoreNames: { contains: () => false }, createObjectStore() { created++; }, close() {} },
+        transaction: { abort() { aborted++; } },
+      };
+      return request;
+    };
+    journal = runtime.browserJournalStart(resource, 'user:alice');
+    await waitFor(() => request !== undefined);
+    runtime.browserJournalClose(journal);
+    await assert.rejects(runtime.browserJournalReady(journal));
+    request.onupgradeneeded();
+    assert.equal(aborted, 1);
+    assert.equal(created, 0, 'a cancelled open never mutates schema after releasing writer ownership');
+  } finally { if (journal) runtime.browserJournalClose(journal); await turn(); env.restore(); }
+});
+
+test('missing microtask scheduling is an explicit capability error', () => {
+  const env = environment(); const schedule = globalThis.queueMicrotask;
+  try {
+    globalThis.queueMicrotask = undefined;
+    assert.throws(() => runtime.browserCheckCapabilities(false), error => runtime.browserErrorCode(error) === 'microtasks');
+    assert.equal(env.database.transactions.length, 0);
+  } finally { globalThis.queueMicrotask = schedule; env.restore(); }
 });
 
 test('capabilities and journal identities fail explicitly before opening', () => {
