@@ -18,6 +18,10 @@ pub struct ChannelCheckpoint {
     pub local_frontier: Vec<Version>,
     pub outbox: VecDeque<Update>,
     pub application: Option<serde_json::Value>,
+    /// Immutable payload references keyed by the outbox entry's Version header.
+    /// Absent in older journals, which therefore round-trip unchanged.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub payloads: std::collections::BTreeMap<String, super::PayloadRef>,
 }
 
 /// A backend owns exclusive writing and commits the entire record atomically.
@@ -27,6 +31,11 @@ pub struct ChannelCheckpoint {
 pub trait JournalBackend: Send + Sync + 'static {
     async fn load(&mut self) -> Result<Option<Vec<u8>>>;
     async fn store(&mut self, bytes: &[u8]) -> Result<()>;
+    /// Preserve the exact bytes about to be migrated. Durable backends must
+    /// override this; the default is for volatile test and in-memory journals.
+    async fn backup(&mut self, _label: &str, _bytes: &[u8]) -> Result<()> {
+        Ok(())
+    }
 }
 /// Browser database handles and transaction futures stay on their local executor.
 #[cfg(target_arch = "wasm32")]
@@ -35,6 +44,9 @@ pub trait JournalBackend: Send + Sync + 'static {
 pub trait JournalBackend: 'static {
     async fn load(&mut self) -> Result<Option<Vec<u8>>>;
     async fn store(&mut self, bytes: &[u8]) -> Result<()>;
+    async fn backup(&mut self, _label: &str, _bytes: &[u8]) -> Result<()> {
+        Ok(())
+    }
 }
 
 struct MemoryJournal;
@@ -89,6 +101,21 @@ impl ChannelJournal {
     pub fn checkpoint(&self) -> &ChannelCheckpoint {
         &self.checkpoint
     }
+    /// Copy the stored bytes aside before a migration rewrites them. Call before
+    /// the first commit of the session; an existing backup is never overwritten.
+    pub async fn backup_original(&mut self, label: &str) -> Result<()> {
+        if label.is_empty()
+            || !label
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
+        {
+            return Err(BraidError::Config("Invalid journal backup label".into()));
+        }
+        match self.backend.load().await? {
+            Some(bytes) => self.backend.backup(label, &bytes).await,
+            None => Ok(()),
+        }
+    }
     pub async fn initialize_application(
         &mut self,
         frontier: Vec<Version>,
@@ -119,6 +146,18 @@ impl ChannelJournal {
 fn validate_checkpoint(checkpoint: &ChannelCheckpoint) -> Result<()> {
     if let Some(url) = &checkpoint.resource_url {
         super::validate_resource_url(url)?;
+    }
+    for (key, payload) in &checkpoint.payloads {
+        payload.validate()?;
+        if !checkpoint
+            .outbox
+            .iter()
+            .any(|update| crate::protocol::format_version_header(&update.version) == *key)
+        {
+            return Err(BraidError::Config(
+                "Payload reference has no matching outbox entry".into(),
+            ));
+        }
     }
     for update in &checkpoint.outbox {
         let mut metadata = update.extra_headers.clone();
@@ -177,5 +216,22 @@ impl JournalBackend for FileJournal {
     }
     async fn store(&mut self, bytes: &[u8]) -> Result<()> {
         Ok(crate::durable::atomic_write(&self.path, bytes).await?)
+    }
+    async fn backup(&mut self, label: &str, bytes: &[u8]) -> Result<()> {
+        let mut name = self
+            .path
+            .file_name()
+            .ok_or_else(|| BraidError::Config("Journal path has no file name".into()))?
+            .to_os_string();
+        name.push(format!(".{label}.bak"));
+        let target = self.path.with_file_name(name);
+        match tokio::fs::metadata(&target).await {
+            // The first backup is the original; later attempts must not replace it.
+            Ok(_) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                Ok(crate::durable::atomic_write(&target, bytes).await?)
+            }
+            Err(error) => Err(error.into()),
+        }
     }
 }

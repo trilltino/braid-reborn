@@ -29,6 +29,27 @@ pub trait BraidNetwork: Send + Sync + 'static {
         url: &str,
         req: BraidRequest,
     ) -> Result<async_channel::Receiver<Result<Update>>>;
+
+    /// Send a request whose body is supplied as a verified stream of exactly
+    /// `length` bytes. The default adapter buffers up to 32 MiB; native
+    /// transports override it to stream without holding the payload in memory.
+    async fn put_stream(
+        &self,
+        url: &str,
+        mut req: BraidRequest,
+        body: crate::client::PayloadStream,
+        length: u64,
+    ) -> Result<BraidResponse> {
+        const BUFFER_LIMIT: u64 = 32 * 1024 * 1024;
+        if length > BUFFER_LIMIT {
+            return Err(crate::BraidError::ResourceLimit {
+                resource: "buffered payload",
+                limit: BUFFER_LIMIT,
+            });
+        }
+        req.body = crate::client::collect_payload(body, BUFFER_LIMIT as usize).await?;
+        self.fetch(url, req).await
+    }
 }
 
 /// Abstraction for persistent storage.

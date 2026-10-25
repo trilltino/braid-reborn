@@ -3,7 +3,10 @@
 //! This is a coordinated client, not a general multi-writer merge engine.
 use base64::Engine;
 use braid_http::{
-    client::{ChannelConfig, ChannelJournal, ChannelState, OwnedTask, ReliableChannel},
+    client::{
+        ChannelConfig, ChannelDiagnostics, ChannelEvent, ChannelJournal, ChannelState, OwnedTask,
+        ReliableChannel,
+    },
     protocol::text::apply_text_patches,
     types::{BraidRequest, Patch, Update, Version},
     BraidClient, BraidError, Result,
@@ -13,9 +16,44 @@ use sha2::{Digest, Sha256};
 use tokio::sync::{mpsc, oneshot, watch};
 
 const MAX_TEXT_BYTES: usize = 8 * 1024 * 1024;
+/// Version 2 adds the verified acknowledged base. Older states have no schema field.
+const STATE_SCHEMA: u32 = 2;
+const MAX_CONSECUTIVE_REPAIRS: u32 = 2;
+
+/// Text at a causal frontier that the server has acknowledged, with its digest.
+/// Pending intent and immutable outbox entries are always relative to this anchor.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct VerifiedBase {
+    text: String,
+    frontier: Vec<Version>,
+    digest: String,
+}
+impl VerifiedBase {
+    fn of(text: &str, frontier: &[Version]) -> Self {
+        Self {
+            text: text.to_owned(),
+            frontier: frontier.to_vec(),
+            digest: digest(text),
+        }
+    }
+}
+
+/// Whether the persisted acknowledged base can be proven.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RecoveryState {
+    Verified,
+    /// A pre-recovery journal has queued edits but no recorded acknowledged base.
+    /// The original bytes are preserved and behavior is unchanged until the
+    /// baseline is materialized from the server or the queue drains.
+    NeedsLegacyBaseline,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct TextState {
+    #[serde(default)]
+    schema: u32,
+    #[serde(default)]
+    base: Option<VerifiedBase>,
     peer: String,
     version: Vec<Version>,
     text: String,
@@ -30,6 +68,8 @@ struct TextState {
 impl Default for TextState {
     fn default() -> Self {
         Self {
+            schema: STATE_SCHEMA,
+            base: None,
             peer: uuid::Uuid::new_v4().to_string(),
             version: vec![],
             text: String::new(),
@@ -53,6 +93,7 @@ pub struct SimpletonStatus {
     pub error: Option<String>,
     pub last_operation: u64,
     pub revision: u64,
+    pub recovery: RecoveryState,
 }
 
 enum Command {
@@ -68,6 +109,7 @@ enum Command {
 pub struct SimpletonClient {
     commands: mpsc::Sender<Command>,
     status: watch::Receiver<SimpletonStatus>,
+    diagnostics: watch::Receiver<ChannelDiagnostics>,
     task: OwnedTask,
 }
 /// A previously persisted text replica, with an optional dirty local file.
@@ -109,6 +151,9 @@ impl SimpletonClient {
                     check_size(pending)?;
                 }
                 let state = TextState {
+                    base: base
+                        .initialized
+                        .then(|| VerifiedBase::of(&base.text, &base.version)),
                     text: base.text,
                     version: base.version,
                     pending: base.pending,
@@ -121,14 +166,29 @@ impl SimpletonClient {
                     .await?;
             }
         }
-        let state: TextState = match &journal.checkpoint().application {
+        let mut state: TextState = match &journal.checkpoint().application {
             Some(value) => serde_json::from_value(value.clone())?,
             None => TextState::default(),
         };
+        let mut recovery = RecoveryState::Verified;
+        if state.schema < STATE_SCHEMA && journal.checkpoint().application.is_some() {
+            // Keep the exact pre-migration bytes before anything is rewritten.
+            journal.backup_original("pre-recovery-v2").await?;
+            if !state.initialized || journal.checkpoint().outbox.is_empty() {
+                // With no unacknowledged entries the recorded state is the acknowledged state.
+                if state.initialized {
+                    state.base = Some(VerifiedBase::of(&state.text, &state.version));
+                }
+                state.schema = STATE_SCHEMA;
+            } else {
+                recovery = RecoveryState::NeedsLegacyBaseline;
+            }
+        }
         check_size(&state.text)?;
         if let Some(pending) = &state.pending {
             check_size(pending)?;
         }
+        let credentials = request.extra_headers.clone();
         let request = request
             .with_merge_type("simpleton")
             .with_peer(&state.peer)
@@ -139,14 +199,18 @@ impl SimpletonClient {
             journal,
             ChannelConfig {
                 resume_local_frontier: true,
+                application_acknowledgments: true,
                 ..Default::default()
             },
         )?;
+        let diagnostics = channel.diagnostics();
         channel
             .save_application(serde_json::to_value(&state)?)
             .await?;
         let (commands, rx) = mpsc::channel(16);
-        let (tx, status) = watch::channel(status_of(&state, false, 0, None));
+        let (tx, status) = watch::channel(status_of(&state, recovery, false, 0, None));
+        let client = client.clone();
+        let url = url.to_owned();
         let task = OwnedTask::spawn(async move {
             let mut driver = Driver {
                 state,
@@ -155,10 +219,17 @@ impl SimpletonClient {
                 status: tx,
                 online: false,
                 outstanding: 0,
+                recovery,
+                repairs: 0,
+                recovery_attempted: false,
+                client,
+                url,
+                credentials,
             };
             if let Err(error) = driver.run().await {
                 let status = status_of(
                     &driver.state,
+                    driver.recovery,
                     false,
                     driver.outstanding,
                     Some(error.to_string()),
@@ -170,11 +241,16 @@ impl SimpletonClient {
         Ok(Self {
             commands,
             status,
+            diagnostics,
             task,
         })
     }
     pub fn status(&self) -> watch::Receiver<SimpletonStatus> {
         self.status.clone()
+    }
+    /// Channel state, pending count, receive frontier, retry reason and repair cause.
+    pub fn diagnostics(&self) -> watch::Receiver<ChannelDiagnostics> {
+        self.diagnostics.clone()
     }
     /// Returns only after the edit is durable, whether online or offline.
     pub async fn changed(&self, text: String) -> Result<()> {
@@ -223,6 +299,7 @@ impl SimpletonClient {
 
 fn status_of(
     state: &TextState,
+    recovery: RecoveryState,
     online: bool,
     outstanding_puts: usize,
     error: Option<String>,
@@ -237,6 +314,7 @@ fn status_of(
         error,
         last_operation: state.last_operation,
         revision: state.revision,
+        recovery,
     }
 }
 fn check_size(text: &str) -> Result<()> {
@@ -272,11 +350,22 @@ struct Driver {
     status: watch::Sender<SimpletonStatus>,
     online: bool,
     outstanding: usize,
+    recovery: RecoveryState,
+    repairs: u32,
+    recovery_attempted: bool,
+    client: BraidClient,
+    url: String,
+    credentials: std::collections::BTreeMap<String, String>,
 }
 impl Driver {
     fn publish(&self) {
-        self.status
-            .send_replace(status_of(&self.state, self.online, self.outstanding, None));
+        self.status.send_replace(status_of(
+            &self.state,
+            self.recovery,
+            self.online,
+            self.outstanding,
+            None,
+        ));
     }
     async fn run(&mut self) -> Result<()> {
         let mut channel_status = self.channel.status();
@@ -285,6 +374,14 @@ impl Driver {
             let current = channel_status.borrow_and_update().clone();
             self.online = current.state == ChannelState::Online;
             self.outstanding = current.outstanding_puts;
+            if !self.online {
+                self.recovery_attempted = false;
+            } else if self.recovery == RecoveryState::NeedsLegacyBaseline
+                && !self.recovery_attempted
+            {
+                self.recovery_attempted = true;
+                self.recover_legacy_baseline().await?;
+            }
             if self.online && self.state.initialized && self.outstanding < 10 {
                 if let Some(pending) = self.state.pending.clone() {
                     if pending == self.state.text {
@@ -308,7 +405,10 @@ impl Driver {
                         return Err(BraidError::Subscription(channel_status.borrow().last_error.clone().unwrap_or_else(|| "Channel requires repair".into())));
                     }
                 }
-                update = self.channel.next() => self.receive(update.ok_or(BraidError::SubscriptionClosed)??).await?,
+                event = self.channel.next_event() => match event.ok_or(BraidError::SubscriptionClosed)?? {
+                    ChannelEvent::Update(update) => self.receive(*update).await?,
+                    ChannelEvent::PutAcknowledged { update, .. } => self.acknowledge(*update).await?,
+                },
                 command = self.commands.recv() => match command {
                     None => return Ok(()),
                     Some(Command::Stop(done)) => { let _ = done.send(()); return Ok(()); },
@@ -403,7 +503,7 @@ impl Driver {
             check_size(&text)?;
             if let Some(expected) = update.extra_headers.get("repr-digest") {
                 if expected != &digest(&text) {
-                    return Err(BraidError::Protocol("Repr-Digest mismatch".into()));
+                    return self.repair().await;
                 }
             }
             if update.version.is_empty() && update.body.is_none() {
@@ -414,6 +514,14 @@ impl Driver {
             next.text = text;
             next.version = update.version;
             next.initialized = true;
+            // With nothing awaiting acknowledgment the received state is the acknowledged state.
+            if self.outstanding == 0 {
+                next.base = Some(VerifiedBase::of(&next.text, &next.version));
+                if next.schema < STATE_SCHEMA {
+                    next.schema = STATE_SCHEMA;
+                    self.recovery = RecoveryState::Verified;
+                }
+            }
         }
         // Ignored updates cannot advance the application's known frontier.
         if accepted {
@@ -423,7 +531,157 @@ impl Driver {
         } else {
             self.channel.ignored().await?;
         }
+        if accepted {
+            self.repairs = 0;
+        }
         self.state = next;
+        Ok(())
+    }
+    /// Advance the verified base with the accepted edit, atomically with removal
+    /// of its outbox entry. The edit must reproduce its own recorded digest.
+    async fn acknowledge(&mut self, update: Update) -> Result<()> {
+        let mut next = self.state.clone();
+        let remaining = self.outstanding.saturating_sub(1);
+        if let Some(base) = &next.base {
+            let patches = update.patches.as_ref().ok_or_else(|| {
+                BraidError::Protocol("Acknowledged Simpleton edit has no patches".into())
+            })?;
+            if !versions_eq(&base.frontier, &update.parents) {
+                return Err(BraidError::Protocol(
+                    "Acknowledged edit does not continue the verified base".into(),
+                ));
+            }
+            let text = apply_text_patches(&base.text, patches)?;
+            let actual = digest(&text);
+            if update.extra_headers.get("repr-digest") != Some(&actual) {
+                return Err(BraidError::Protocol(
+                    "Acknowledged edit does not reproduce its recorded digest".into(),
+                ));
+            }
+            next.base = Some(VerifiedBase {
+                text,
+                frontier: update.version.clone(),
+                digest: actual,
+            });
+        } else if next.initialized
+            && remaining == 0
+            && versions_eq(&next.version, &update.version)
+            && update.extra_headers.get("repr-digest") == Some(&digest(&next.text))
+        {
+            // A legacy queue drained completely: its final state is the acknowledged state.
+            next.base = Some(VerifiedBase::of(&next.text, &next.version));
+            next.schema = STATE_SCHEMA;
+            self.recovery = RecoveryState::Verified;
+        }
+        self.channel
+            .commit_ack(update.version.clone(), Some(serde_json::to_value(&next)?))
+            .await?;
+        self.state = next;
+        Ok(())
+    }
+    /// Rebuild text at an acknowledged frontier plus the immutable queued edits.
+    /// Every edit must continue the previous frontier and reproduce its digest.
+    fn replay(base: &VerifiedBase, outbox: &[Update]) -> Result<(String, Vec<Version>)> {
+        let mut text = base.text.clone();
+        let mut frontier = base.frontier.clone();
+        for entry in outbox {
+            let patches = entry.patches.as_ref().ok_or_else(|| {
+                BraidError::Protocol("Queued Simpleton edit has no patches".into())
+            })?;
+            if !versions_eq(&frontier, &entry.parents) {
+                return Err(BraidError::Protocol(
+                    "Queued edits do not continue the verified base".into(),
+                ));
+            }
+            text = apply_text_patches(&text, patches)?;
+            if entry.extra_headers.get("repr-digest") != Some(&digest(&text)) {
+                return Err(BraidError::Protocol(
+                    "Queued edit does not reproduce its recorded digest".into(),
+                ));
+            }
+            frontier = entry.version.clone();
+        }
+        Ok((text, frontier))
+    }
+    /// A delivered update failed its digest. Discard it without moving the receive
+    /// cursor and restore text from verified state. Pending intent and immutable
+    /// queued edits are never replaced by a newer snapshot.
+    async fn repair(&mut self) -> Result<()> {
+        self.repairs += 1;
+        if self.repairs > MAX_CONSECUTIVE_REPAIRS {
+            return Err(BraidError::Protocol(
+                "Repr-Digest mismatch persisted after repair".into(),
+            ));
+        }
+        self.channel.ignored().await?;
+        let outbox = self.channel.pending_updates().await?;
+        let mut next = self.state.clone();
+        next.revision = next_revision(next.revision)?;
+        if outbox.is_empty() {
+            next.initialized = false;
+            next.text.clear();
+            next.version.clear();
+            next.base = None;
+            self.channel
+                .reset_cursor(serde_json::to_value(&next)?)
+                .await?;
+        } else {
+            let base = next.base.clone().ok_or_else(|| {
+                BraidError::Protocol(
+                    "Repr-Digest mismatch with queued edits and no verified base".into(),
+                )
+            })?;
+            let (text, frontier) = Self::replay(&base, &outbox)?;
+            next.text = text;
+            next.version = frontier;
+            self.channel
+                .save_application(serde_json::to_value(&next)?)
+                .await?;
+        }
+        self.state = next;
+        self.channel.reconnect().await?;
+        Ok(())
+    }
+    /// Materialize the acknowledged text at the first queued edit's parents and
+    /// accept it only if replaying every recorded edit reproduces each recorded
+    /// digest and the persisted optimistic text. Failure keeps the legacy state.
+    async fn recover_legacy_baseline(&mut self) -> Result<()> {
+        let outbox = self.channel.pending_updates().await?;
+        let Some(first) = outbox.first() else {
+            return Ok(());
+        };
+        let frontier = first.parents.clone();
+        let text = if frontier.is_empty() {
+            String::new()
+        } else {
+            let mut request = BraidRequest::new().with_versions(frontier.clone());
+            request.extra_headers = self.credentials.clone();
+            match self.client.fetch(&self.url, request).await {
+                Ok(response) if response.is_success() => {
+                    match String::from_utf8(response.body.to_vec()) {
+                        Ok(text) => text,
+                        Err(_) => return Ok(()),
+                    }
+                }
+                _ => return Ok(()),
+            }
+        };
+        let candidate = VerifiedBase::of(&text, &frontier);
+        match Self::replay(&candidate, &outbox) {
+            Ok((replayed, at))
+                if replayed == self.state.text && versions_eq(&at, &self.state.version) =>
+            {
+                let mut next = self.state.clone();
+                next.base = Some(candidate);
+                next.schema = STATE_SCHEMA;
+                self.channel
+                    .save_application(serde_json::to_value(&next)?)
+                    .await?;
+                self.state = next;
+                self.recovery = RecoveryState::Verified;
+            }
+            _ => tracing::warn!(url = %self.url, "Legacy Simpleton baseline could not be verified"),
+        }
         Ok(())
     }
 }

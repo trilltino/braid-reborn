@@ -19,6 +19,7 @@ futures = "0.3"
 http = "1"
 httpdate = "1"
 sfv = "0.14"
+sha2 = "0.10"
 arbitrary = { version = "1.4", features = ["derive"], optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

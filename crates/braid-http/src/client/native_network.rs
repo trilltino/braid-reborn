@@ -84,6 +84,46 @@ impl BraidNetwork for NativeNetwork {
             is_subscription: status == 209,
         })
     }
+    /// Streams the verified payload; memory use stays bounded by the chunk size.
+    async fn put_stream(
+        &self,
+        url: &str,
+        mut request: BraidRequest,
+        body: crate::client::PayloadStream,
+        length: u64,
+    ) -> Result<BraidResponse> {
+        request.body = bytes::Bytes::new();
+        request.patches = None;
+        let builder = self.request(&self.client, url, &request)?;
+        // Streams are not retried by reqwest; the channel replays the whole immutable PUT.
+        let timeout = self
+            .request_timeout
+            .saturating_add(std::time::Duration::from_secs(length / (1024 * 1024)));
+        let response = builder
+            .header(http::header::CONTENT_LENGTH, length)
+            .body(reqwest::Body::wrap_stream(body))
+            .timeout(timeout)
+            .send()
+            .await
+            .map_err(|e| BraidError::Http(e.to_string()))?;
+        let status = response.status().as_u16();
+        let headers = crate::protocol::headers_from_http(response.headers())?;
+        let mut chunks = response.bytes_stream();
+        let mut response_body = bytes::BytesMut::new();
+        while let Some(chunk) = chunks.next().await {
+            let chunk = chunk.map_err(|e| BraidError::Http(e.to_string()))?;
+            if response_body.len().saturating_add(chunk.len()) > 1024 * 1024 {
+                return Err(BraidError::Protocol("PUT response limit exceeded".into()));
+            }
+            response_body.extend_from_slice(&chunk);
+        }
+        Ok(BraidResponse {
+            status,
+            headers,
+            body: response_body.freeze(),
+            is_subscription: false,
+        })
+    }
     async fn subscribe(
         &self,
         url: &str,

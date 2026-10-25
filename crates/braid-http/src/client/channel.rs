@@ -1,5 +1,8 @@
 //! One owner for a subscription, immutable outgoing updates and their durable cursor.
-use super::{parse_retry_after, ChannelJournal, OwnedTask, RetryConfig, RetryDecision, RetryState};
+use super::{
+    parse_retry_after, ChannelJournal, OwnedTask, PayloadRef, PayloadSource, RetryConfig,
+    RetryDecision, RetryState, VerifiedPayload,
+};
 use crate::{
     traits::BraidNetwork,
     types::{BraidRequest, Update, Version},
@@ -17,6 +20,77 @@ pub enum ChannelState {
     Backoff,
     RepairRequired,
     Stopped,
+}
+
+/// Everything an application can receive from a channel.
+#[derive(Clone, Debug)]
+pub enum ChannelEvent {
+    /// A delivered update; answer with `applied` or `ignored`.
+    Update(Box<Update>),
+    /// The server accepted this PUT. Emitted only with
+    /// [`ChannelConfig::application_acknowledgments`]. The outbox entry stays durable
+    /// until the application calls [`ReliableChannel::commit_ack`].
+    PutAcknowledged {
+        version: Vec<Version>,
+        status: u16,
+        /// The immutable accepted outbox entry, so the application can advance
+        /// its own verified state in the same transaction as `commit_ack`.
+        update: Box<Update>,
+    },
+}
+
+/// Why the channel is waiting to reconnect.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RetryReason {
+    Transport(String),
+    Timeout,
+    Status {
+        status: u16,
+        retry_after: Option<Duration>,
+    },
+    SubscriptionClosed,
+    TruncatedFrame,
+}
+
+/// Why the channel stopped and requires an operator or application repair.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RepairCause {
+    Storage(String),
+    Protocol(String),
+    Authorization { status: u16 },
+    Payload(String),
+    Other(String),
+}
+impl RepairCause {
+    fn classify(error: &BraidError) -> Self {
+        match error {
+            BraidError::Io(_) | BraidError::Fs(_) | BraidError::Json(_) => {
+                Self::Storage(error.to_string())
+            }
+            BraidError::Protocol(_)
+            | BraidError::HeaderParse(_)
+            | BraidError::BodyParse(_)
+            | BraidError::InvalidVersion(_) => Self::Protocol(error.to_string()),
+            BraidError::SubscriptionStatus {
+                status: status @ (401 | 403),
+                ..
+            } => Self::Authorization { status: *status },
+            BraidError::Payload(_) => Self::Payload(error.to_string()),
+            _ => Self::Other(error.to_string()),
+        }
+    }
+}
+
+/// Machine-readable diagnostics. `ChannelStatus` remains the compatibility API.
+#[derive(Clone, Debug)]
+pub struct ChannelDiagnostics {
+    pub state: ChannelState,
+    pub pending_count: usize,
+    pub receive_frontier: Vec<Version>,
+    pub retry_reason: Option<RetryReason>,
+    pub repair_cause: Option<RepairCause>,
+    /// The accepted PUT awaiting an application `commit_ack`.
+    pub awaiting_acknowledgment: Option<Vec<Version>>,
 }
 
 #[derive(Clone, Debug)]
@@ -37,6 +111,11 @@ pub struct ChannelConfig {
     /// Simpleton resumes from its durably materialized optimistic state, separately
     /// from the receive cursor. Generic consumers resume only acknowledged receives.
     pub resume_local_frontier: bool,
+    /// Opt in to application-owned acknowledgments. A successful PUT then emits
+    /// [`ChannelEvent::PutAcknowledged`] and the entry is removed only by
+    /// [`ReliableChannel::commit_ack`], atomically with application state.
+    /// Off by default: generic callers keep automatic acknowledgment.
+    pub application_acknowledgments: bool,
 }
 impl Default for ChannelConfig {
     fn default() -> Self {
@@ -46,6 +125,7 @@ impl Default for ChannelConfig {
             put_timeout: Duration::from_secs(20),
             retry: RetryConfig::default(),
             resume_local_frontier: false,
+            application_acknowledgments: false,
         }
     }
 }
@@ -61,23 +141,107 @@ enum Command {
         Option<serde_json::Value>,
         oneshot::Sender<Result<()>>,
     ),
+    QueuePayload(
+        Box<Update>,
+        PayloadRef,
+        Option<serde_json::Value>,
+        oneshot::Sender<Result<()>>,
+    ),
+    CommitAck(
+        Vec<Version>,
+        Option<serde_json::Value>,
+        oneshot::Sender<Result<()>>,
+    ),
     Save(serde_json::Value, oneshot::Sender<Result<()>>),
+    Pending(oneshot::Sender<Vec<Update>>),
+    ResetCursor(serde_json::Value, oneshot::Sender<Result<()>>),
     Reconnect,
     Stop(oneshot::Sender<()>),
 }
 
 pub struct ReliableChannel {
     commands: mpsc::Sender<Command>,
-    updates: async_channel::Receiver<Result<Update>>,
+    updates: async_channel::Receiver<Result<ChannelEvent>>,
     status: watch::Receiver<ChannelStatus>,
+    diagnostics: watch::Receiver<ChannelDiagnostics>,
     task: OwnedTask,
 }
 impl ReliableChannel {
     pub fn status(&self) -> watch::Receiver<ChannelStatus> {
         self.status.clone()
     }
+    pub fn diagnostics(&self) -> watch::Receiver<ChannelDiagnostics> {
+        self.diagnostics.clone()
+    }
+    /// Next delivered update. With application acknowledgments enabled, use
+    /// [`Self::next_event`]; an acknowledgment event here is a usage error.
     pub async fn next(&self) -> Option<Result<Update>> {
+        match self.updates.recv().await.ok()? {
+            Ok(ChannelEvent::Update(update)) => Some(Ok(*update)),
+            Ok(ChannelEvent::PutAcknowledged { .. }) => Some(Err(BraidError::Config(
+                "Application acknowledgments require next_event()".into(),
+            ))),
+            Err(error) => Some(Err(error)),
+        }
+    }
+    pub async fn next_event(&self) -> Option<Result<ChannelEvent>> {
         self.updates.recv().await.ok()
+    }
+    /// A copy of the immutable unacknowledged entries, oldest first.
+    pub async fn pending_updates(&self) -> Result<Vec<Update>> {
+        let (tx, rx) = oneshot::channel();
+        self.commands
+            .send(Command::Pending(tx))
+            .await
+            .map_err(|_| BraidError::SubscriptionClosed)?;
+        rx.await.map_err(|_| BraidError::SubscriptionClosed)
+    }
+    /// Forget both frontier cursors and persist `application`, so the next
+    /// subscription starts from a fresh snapshot. Refused while any immutable
+    /// outgoing entry exists, because those entries name their parents.
+    pub async fn reset_cursor(&self, application: serde_json::Value) -> Result<()> {
+        let (tx, rx) = oneshot::channel();
+        self.commands
+            .send(Command::ResetCursor(application, tx))
+            .await
+            .map_err(|_| BraidError::SubscriptionClosed)?;
+        rx.await.map_err(|_| BraidError::SubscriptionClosed)?
+    }
+    /// Atomically persist `application` and remove the acknowledged outbox entry.
+    /// Idempotent for an entry that was already removed. On failure the entry and
+    /// previous application state remain and the call may be retried.
+    pub async fn commit_ack(
+        &self,
+        version: Vec<Version>,
+        application: Option<serde_json::Value>,
+    ) -> Result<()> {
+        let (tx, rx) = oneshot::channel();
+        self.commands
+            .send(Command::CommitAck(version, application, tx))
+            .await
+            .map_err(|_| BraidError::SubscriptionClosed)?;
+        rx.await.map_err(|_| BraidError::SubscriptionClosed)?
+    }
+    /// Queue metadata plus an immutable payload reference. The update must carry
+    /// neither a body nor patches; the bytes are streamed from the configured
+    /// [`PayloadSource`] and verified against the reference on every attempt.
+    pub async fn queue_payload(
+        &self,
+        update: Update,
+        payload: PayloadRef,
+        application: Option<serde_json::Value>,
+    ) -> Result<()> {
+        let (tx, rx) = oneshot::channel();
+        self.commands
+            .send(Command::QueuePayload(
+                Box::new(update),
+                payload,
+                application,
+                tx,
+            ))
+            .await
+            .map_err(|_| BraidError::SubscriptionClosed)?;
+        rx.await.map_err(|_| BraidError::SubscriptionClosed)?
     }
     /// Returns after the immutable update and application state are committed locally.
     pub async fn queue(
@@ -175,6 +339,23 @@ impl BraidClient {
             config,
         )
     }
+    pub fn reliable_channel_with_payloads(
+        &self,
+        url: &str,
+        request: BraidRequest,
+        journal: ChannelJournal,
+        config: ChannelConfig,
+        payloads: Arc<dyn PayloadSource>,
+    ) -> Result<ReliableChannel> {
+        ReliableChannel::start_with_payloads(
+            self.network.clone(),
+            url.to_owned(),
+            request,
+            journal,
+            config,
+            Some(payloads),
+        )
+    }
 }
 
 impl ReliableChannel {
@@ -185,7 +366,22 @@ impl ReliableChannel {
         journal: ChannelJournal,
         config: ChannelConfig,
     ) -> Result<Self> {
+        Self::start_with_payloads(network, url, request, journal, config, None)
+    }
+    pub fn start_with_payloads(
+        network: Arc<dyn BraidNetwork>,
+        url: String,
+        request: BraidRequest,
+        journal: ChannelJournal,
+        config: ChannelConfig,
+        payloads: Option<Arc<dyn PayloadSource>>,
+    ) -> Result<Self> {
         super::validate_resource_url(&url)?;
+        if !journal.checkpoint.payloads.is_empty() && payloads.is_none() {
+            return Err(BraidError::Config(
+                "Journal references immutable payloads; configure a payload source".into(),
+            ));
+        }
         if journal
             .checkpoint
             .resource_url
@@ -209,13 +405,22 @@ impl ReliableChannel {
             });
         }
         let (commands, rx) = mpsc::channel(16);
-        let (tx, updates) = async_channel::bounded(1);
+        // At most one delivered update and one pending acknowledgment exist at a time.
+        let (tx, updates) = async_channel::bounded(2);
         let (status_tx, status) = watch::channel(ChannelStatus {
             state: ChannelState::Disconnected,
             outstanding_puts: journal.checkpoint.outbox.len(),
             durable_receive_frontier: journal.checkpoint.receive_frontier.clone(),
             reconnects: 0,
             last_error: None,
+        });
+        let (diagnostics_tx, diagnostics) = watch::channel(ChannelDiagnostics {
+            state: ChannelState::Disconnected,
+            pending_count: journal.checkpoint.outbox.len(),
+            receive_frontier: journal.checkpoint.receive_frontier.clone(),
+            retry_reason: None,
+            repair_cause: None,
+            awaiting_acknowledgment: None,
         });
         let task = OwnedTask::spawn(async move {
             let mut driver = Driver {
@@ -227,9 +432,15 @@ impl ReliableChannel {
                 commands: rx,
                 updates: tx,
                 status: status_tx,
+                diagnostics: diagnostics_tx,
+                payloads,
                 awaiting_apply: None,
+                awaiting_ack: None,
             };
             if let Err(error) = driver.run().await {
+                driver
+                    .diagnostics
+                    .send_modify(|d| d.repair_cause = Some(RepairCause::classify(&error)));
                 driver.state(ChannelState::RepairRequired);
                 driver
                     .status
@@ -245,6 +456,7 @@ impl ReliableChannel {
             commands,
             updates,
             status,
+            diagnostics,
             task,
         })
     }
@@ -262,9 +474,12 @@ struct Driver {
     journal: ChannelJournal,
     config: ChannelConfig,
     commands: mpsc::Receiver<Command>,
-    updates: async_channel::Sender<Result<Update>>,
+    updates: async_channel::Sender<Result<ChannelEvent>>,
     status: watch::Sender<ChannelStatus>,
+    diagnostics: watch::Sender<ChannelDiagnostics>,
+    payloads: Option<Arc<dyn PayloadSource>>,
     awaiting_apply: Option<Vec<Version>>,
+    awaiting_ack: Option<Vec<Version>>,
 }
 impl Driver {
     fn state(&self, state: ChannelState) {
@@ -273,6 +488,32 @@ impl Driver {
             s.outstanding_puts = self.journal.checkpoint.outbox.len();
             s.durable_receive_frontier = self.journal.checkpoint.receive_frontier.clone();
         });
+        self.diagnostics.send_modify(|d| {
+            d.state = state;
+            d.pending_count = self.journal.checkpoint.outbox.len();
+            d.receive_frontier = self.journal.checkpoint.receive_frontier.clone();
+            d.awaiting_acknowledgment = self.awaiting_ack.clone();
+            if state == ChannelState::Online {
+                d.retry_reason = None;
+            }
+        });
+    }
+    fn retry_reason(error: &BraidError) -> RetryReason {
+        match error {
+            BraidError::Timeout => RetryReason::Timeout,
+            BraidError::SubscriptionClosed => RetryReason::SubscriptionClosed,
+            BraidError::SubscriptionStatus {
+                status,
+                retry_after,
+            } => RetryReason::Status {
+                status: *status,
+                retry_after: *retry_after,
+            },
+            BraidError::Protocol(message) if message.starts_with("Truncated Braid frame") => {
+                RetryReason::TruncatedFrame
+            }
+            other => RetryReason::Transport(other.to_string()),
+        }
     }
     async fn command(&mut self, command: Option<Command>) -> Result<bool> {
         match command {
@@ -328,6 +569,37 @@ impl Driver {
                     }
                 }
             }
+            Some(Command::Pending(done)) => {
+                let _ = done.send(self.journal.checkpoint.outbox.iter().cloned().collect());
+            }
+            Some(Command::ResetCursor(application, done)) => {
+                let result = if self.journal.checkpoint.outbox.is_empty() {
+                    let mut next = self.journal.checkpoint.clone();
+                    next.receive_frontier.clear();
+                    next.local_frontier.clear();
+                    next.application = Some(application);
+                    self.journal.commit(next).await
+                } else {
+                    Err(BraidError::Config(
+                        "Cannot reset cursors while outgoing entries are pending".into(),
+                    ))
+                };
+                let state = self.status.borrow().state;
+                self.state(state);
+                let _ = done.send(result);
+            }
+            Some(Command::CommitAck(version, application, done)) => {
+                let result = self.commit_ack(version, application).await;
+                let state = self.status.borrow().state;
+                self.state(state);
+                let _ = done.send(result);
+            }
+            Some(Command::QueuePayload(update, payload, application, done)) => {
+                let result = self.enqueue_payload(*update, payload, application).await;
+                let state = self.status.borrow().state;
+                self.state(state);
+                let _ = done.send(result);
+            }
             Some(Command::Queue(update, application, done)) => {
                 let result = self.enqueue(*update, application).await;
                 let state = self.status.borrow().state;
@@ -340,9 +612,73 @@ impl Driver {
         self.state(state);
         Ok(false)
     }
+    async fn commit_ack(
+        &mut self,
+        version: Vec<Version>,
+        application: Option<serde_json::Value>,
+    ) -> Result<()> {
+        if !self.config.application_acknowledgments {
+            return Err(BraidError::Config(
+                "Application acknowledgments are not enabled for this channel".into(),
+            ));
+        }
+        let Some(position) = self
+            .journal
+            .checkpoint
+            .outbox
+            .iter()
+            .position(|entry| entry.version == version)
+        else {
+            // Already committed; the earlier transaction carried the application state.
+            return Ok(());
+        };
+        if position != 0 || self.awaiting_ack.as_ref() != Some(&version) {
+            return Err(BraidError::Protocol(
+                "Only the accepted head of the outbox can be acknowledged".into(),
+            ));
+        }
+        let mut next = self.journal.checkpoint.clone();
+        next.outbox.pop_front();
+        next.payloads.remove(&payload_key(&version));
+        if let Some(application) = application {
+            next.application = Some(application);
+        }
+        self.journal.commit(next).await?;
+        self.awaiting_ack = None;
+        Ok(())
+    }
+    async fn enqueue_payload(
+        &mut self,
+        update: Update,
+        payload: PayloadRef,
+        application: Option<serde_json::Value>,
+    ) -> Result<()> {
+        payload.validate()?;
+        let Some(source) = self.payloads.clone() else {
+            return Err(BraidError::Config(
+                "No immutable payload source is configured".into(),
+            ));
+        };
+        if update.body.is_some() || update.patches.is_some() || update.content_range.is_some() {
+            return Err(BraidError::Config(
+                "A payload update carries neither a body nor patches".into(),
+            ));
+        }
+        // Prove the content is reachable before promising to send it later.
+        drop(source.open(&payload).await?);
+        self.enqueue_entry(update, Some(payload), application).await
+    }
     async fn enqueue(
         &mut self,
         update: Update,
+        application: Option<serde_json::Value>,
+    ) -> Result<()> {
+        self.enqueue_entry(update, None, application).await
+    }
+    async fn enqueue_entry(
+        &mut self,
+        update: Update,
+        payload: Option<PayloadRef>,
         application: Option<serde_json::Value>,
     ) -> Result<()> {
         let mut metadata = update.extra_headers.clone();
@@ -359,7 +695,13 @@ impl Driver {
             ));
         }
         // Reject invalid framing/identities before acknowledging local queuing.
-        crate::protocol::format_update(&update)?;
+        if payload.is_some() {
+            let mut framed = update.clone();
+            framed.body = Some(bytes::Bytes::new());
+            crate::protocol::format_update(&framed)?;
+        } else {
+            crate::protocol::format_update(&update)?;
+        }
         if let Some(old) = self
             .journal
             .checkpoint
@@ -367,7 +709,14 @@ impl Driver {
             .iter()
             .find(|old| old.version == update.version)
         {
-            if serde_json::to_vec(old)? == serde_json::to_vec(&update)? {
+            if serde_json::to_vec(old)? == serde_json::to_vec(&update)?
+                && self
+                    .journal
+                    .checkpoint
+                    .payloads
+                    .get(&payload_key(&update.version))
+                    == payload.as_ref()
+            {
                 return Ok(());
             }
             return Err(BraidError::Protocol(
@@ -376,9 +725,13 @@ impl Driver {
         }
         let mut next = self.journal.checkpoint.clone();
         next.local_frontier = update.version.clone();
+        if let Some(payload) = payload {
+            next.payloads.insert(payload_key(&update.version), payload);
+        }
         next.outbox.push_back(update);
         if next.outbox.len() > self.config.max_pending
-            || serde_json::to_vec(&next.outbox)?.len() > self.config.max_pending_bytes
+            || serde_json::to_vec(&next.outbox)?.len() + serde_json::to_vec(&next.payloads)?.len()
+                > self.config.max_pending_bytes
         {
             return Err(BraidError::ResourceLimit {
                 resource: "outbox",
@@ -457,6 +810,8 @@ impl Driver {
                 RetryDecision::DontRetry => return Err(error),
             };
             self.state(ChannelState::Backoff);
+            self.diagnostics
+                .send_modify(|d| d.retry_reason = Some(Self::retry_reason(&error)));
             self.status.send_modify(|s| {
                 s.reconnects = s.reconnects.saturating_add(1);
                 s.last_error = Some(error.to_string());
@@ -476,8 +831,14 @@ impl Driver {
     async fn session(&mut self, receiver: async_channel::Receiver<Result<Update>>) -> Result<()> {
         let mut inflight: Option<PutFuture> = None;
         loop {
-            if inflight.is_none() {
+            if inflight.is_none() && self.awaiting_ack.is_none() {
                 if let Some(update) = self.journal.checkpoint.outbox.front() {
+                    let payload = self
+                        .journal
+                        .checkpoint
+                        .payloads
+                        .get(&payload_key(&update.version))
+                        .cloned();
                     let mut request = self.request.clone();
                     request.method = "PUT".into();
                     request.subscribe = false;
@@ -490,10 +851,32 @@ impl Driver {
                     request.extra_headers.extend(update.extra_headers.clone());
                     let network = self.network.clone();
                     let url = self.url.clone();
-                    let timeout = self.config.put_timeout;
-                    inflight = Some(Box::pin(async move {
-                        super::runtime::timeout(timeout, network.fetch(&url, request)).await?
-                    }));
+                    let mut timeout = self.config.put_timeout;
+                    if let Some(payload) = payload {
+                        let source = self.payloads.clone().ok_or_else(|| {
+                            BraidError::Config("No immutable payload source is configured".into())
+                        })?;
+                        request
+                            .content_type
+                            .get_or_insert_with(|| payload.media_type.clone());
+                        timeout = timeout
+                            .saturating_add(Duration::from_secs(payload.length / (1024 * 1024)));
+                        inflight = Some(Box::pin(async move {
+                            let stream = source.open(&payload).await?;
+                            let length = payload.length;
+                            let body: super::PayloadStream =
+                                Box::pin(VerifiedPayload::new(stream, payload));
+                            super::runtime::timeout(
+                                timeout,
+                                network.put_stream(&url, request, body, length),
+                            )
+                            .await?
+                        }));
+                    } else {
+                        inflight = Some(Box::pin(async move {
+                            super::runtime::timeout(timeout, network.fetch(&url, request)).await?
+                        }));
+                    }
                 }
             }
             tokio::select! {
@@ -501,19 +884,46 @@ impl Driver {
                 result = async { match &mut inflight { Some(future) => future.await, None => std::future::pending().await } } => {
                     let response = result?;
                     if !response.is_success() { return Err(BraidError::SubscriptionStatus { status: response.status, retry_after: response.header("retry-after").and_then(parse_retry_after) }); }
-                    let mut next = self.journal.checkpoint.clone();
-                    next.outbox.pop_front();
-                    self.journal.commit(next).await?;
                     inflight = None;
-                    self.state(ChannelState::Online);
+                    if self.config.application_acknowledgments {
+                        let update = self
+                            .journal
+                            .checkpoint
+                            .outbox
+                            .front()
+                            .cloned()
+                            .ok_or_else(|| {
+                                BraidError::Protocol("PUT acknowledged with an empty outbox".into())
+                            })?;
+                        let version = update.version.clone();
+                        self.awaiting_ack = Some(version.clone());
+                        self.state(ChannelState::Online);
+                        self.updates
+                            .send(Ok(ChannelEvent::PutAcknowledged {
+                                version,
+                                status: response.status,
+                                update: Box::new(update),
+                            }))
+                            .await
+                            .map_err(|_| BraidError::Aborted)?;
+                    } else {
+                        let mut next = self.journal.checkpoint.clone();
+                        next.outbox.pop_front();
+                        self.journal.commit(next).await?;
+                        self.state(ChannelState::Online);
+                    }
                 }
                 update = receiver.recv(), if self.awaiting_apply.is_none() => {
                     let update = update.map_err(|_| BraidError::SubscriptionClosed)??;
                     if let Some(repr) = update.extra_headers.get("repr-type") { self.request.extra_headers.insert("repr-type".into(), repr.clone()); }
                     self.awaiting_apply = Some(update.version.clone());
-                    self.updates.send(Ok(update)).await.map_err(|_| BraidError::Aborted)?;
+                    self.updates.send(Ok(ChannelEvent::Update(Box::new(update)))).await.map_err(|_| BraidError::Aborted)?;
                 }
             }
         }
     }
+}
+
+fn payload_key(version: &[Version]) -> String {
+    crate::protocol::format_version_header(version)
 }

@@ -76,6 +76,10 @@ pub enum BraidError {
 
     #[error("Anyhow error: {0}")]
     Anyhow(String),
+
+    /// An outgoing immutable payload was missing, truncated, or no longer matched its reference.
+    #[error("Payload error: {0}")]
+    Payload(String),
 }
 
 impl BraidError {

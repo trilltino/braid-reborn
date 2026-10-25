@@ -4,12 +4,18 @@ mod channel;
 mod config;
 mod credentials;
 mod journal;
+mod payload;
 mod runtime;
-pub use channel::{ChannelConfig, ChannelState, ChannelStatus, ReliableChannel};
+pub use channel::{
+    ChannelConfig, ChannelDiagnostics, ChannelEvent, ChannelState, ChannelStatus, ReliableChannel,
+    RepairCause, RetryReason,
+};
 pub use credentials::{http_origin, validate_resource_url, OriginCredentials, ScopedCredentials};
 #[cfg(not(target_arch = "wasm32"))]
 pub use journal::FileJournal;
 pub use journal::{ChannelCheckpoint, ChannelJournal, JournalBackend, MAX_JOURNAL_BYTES};
+pub(crate) use payload::VerifiedPayload;
+pub use payload::{collect_payload, PayloadRef, PayloadSource, PayloadStream};
 pub use runtime::OwnedTask;
 mod fetch;
 #[cfg(test)]
