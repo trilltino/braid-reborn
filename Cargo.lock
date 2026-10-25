@@ -456,6 +456,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "braid-browser-harness"
+version = "0.1.0"
+dependencies = [
+ "async-channel",
+ "async-trait",
+ "braid-core",
+ "braid-http",
+ "js-sys",
+ "serde_json",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
 name = "braid-common"
 version = "0.1.0"
 
@@ -531,6 +545,7 @@ dependencies = [
  "tracing",
  "url",
  "uuid",
+ "wasm-bindgen",
  "wasm-bindgen-futures",
 ]
 

@@ -1,0 +1,81 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Braid browser harness</title>
+<script type="module">
+  import init, * as braid from '/pkg/harness.js';
+
+  // Wasm errors are JS Errors carrying a stable `code`; tests receive plain data.
+  window.attempt = async (action) => {
+    try { return { ok: await action() }; }
+    catch (error) { return { error: { code: error && error.code, name: error && error.name, message: String(error && error.message || error) } }; }
+  };
+  window.slots = {};
+
+  // Raw IndexedDB access for assertions and for staging legacy records. It never
+  // goes through the library, so what it reads is exactly what is on disk.
+  const DB = 'braid-http.channels';
+  const openRaw = (version) => new Promise((resolve, reject) => {
+    const request = version ? indexedDB.open(DB, version) : indexedDB.open(DB);
+    request.onupgradeneeded = () => {
+      for (const name of ['journals']) if (!request.result.objectStoreNames.contains(name)) request.result.createObjectStore(name);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  const sha = async (bytes) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2, '0')).join('');
+  window.raw = {
+    exists: async () => (await indexedDB.databases()).some(d => d.name === DB),
+    dump: async () => {
+      if (!(await indexedDB.databases()).some(d => d.name === DB)) return null;
+      const db = await openRaw();
+      const out = { version: db.version, stores: {} };
+      for (const name of db.objectStoreNames) {
+        out.stores[name] = await new Promise((resolve, reject) => {
+          const items = [];
+          const cursor = db.transaction(name, 'readonly').objectStore(name).openCursor();
+          cursor.onsuccess = async () => {
+            const at = cursor.result;
+            if (!at) { resolve(items); return; }
+            const value = at.value, item = { key: at.key, value: { ...value } };
+            if (value && value.payload instanceof Uint8Array) {
+              item.value.payload = { bytes: value.payload.length, sha256: null, head: new TextDecoder().decode(value.payload.slice(0, 4096)) };
+              item.pendingSha = value.payload;
+            }
+            items.push(item);
+            at.continue();
+          };
+          cursor.onerror = () => reject(cursor.error);
+        });
+        for (const item of out.stores[name]) {
+          if (item.pendingSha) { item.value.payload.sha256 = await sha(item.pendingSha); delete item.pendingSha; }
+        }
+      }
+      db.close();
+      return out;
+    },
+    // Stage a record exactly as an older release or another writer would have.
+    write: async ({ store, key, value, payloadText, version }) => {
+      const db = await openRaw(version);
+      if (payloadText !== undefined) value = { ...value, payload: new TextEncoder().encode(payloadText) };
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction(store, 'readwrite');
+        tx.objectStore(store).put(value, key);
+        tx.oncomplete = resolve; tx.onabort = () => reject(tx.error);
+      });
+      db.close();
+    },
+    destroy: () => new Promise((resolve, reject) => {
+      const request = indexedDB.deleteDatabase(DB);
+      request.onsuccess = resolve; request.onerror = () => reject(request.error); request.onblocked = () => reject(new Error('blocked'));
+    }),
+    sha256Hex: async (text) => sha(new TextEncoder().encode(text)),
+  };
+
+  try {
+    await init();
+    window.braid = braid;
+    window.__ready = true;
+  } catch (error) {
+    window.__initError = String(error && error.stack || error);
+  }
+</script>
