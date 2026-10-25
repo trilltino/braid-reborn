@@ -1,0 +1,864 @@
+{
+ "schema_version": 1,
+ "method": "Whitespace-sensitive line diff of CRLF-normalized files against each sampled upstream revision; the revision with the smallest whole-tree diff is recorded. Similarity is evidence to investigate, not proof of origin.",
+ "upstream_repository": "https://github.com/josephg/diamond-types",
+ "upstream_head_examined": "89ae3a0ab8d941a2885e6ec89d094bc9ce9d2922",
+ "closest_sampled_revision": {
+  "commit": "90227908e8271786c49d30f10ef0e41ede207109",
+  "committer_date": "2024-10-01T18:51:05+10:00",
+  "subject": "Added SerializedOpsOwned"
+ },
+ "sampling": "714 upstream commits touch the engine; 40 evenly spaced commits and the neighbourhood of the minimum were scored, so a closer revision between samples is possible.",
+ "introduced_locally": "4f5275b (2026-10-23) in this repository; no earlier recorded source revision or patch set",
+ "summary": {
+  "identical": 1,
+  "modified": 102,
+  "local-only": 2
+ },
+ "upstream_files_not_copied": [
+  "src/lib.rs",
+  "crates/rle/src/lib.rs"
+ ],
+ "files": [
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/branch.rs",
+   "local_sha256": "ae05daaf1a79b1caa065053ef067c3156908f9aa3cd9f53e1fac48218a2dfde2",
+   "upstream": "src/branch.rs",
+   "upstream_sha256": "62b2f69b7d8f16438256f1e896aa29116058f3ab93b588d1a612878390b4645a",
+   "status": "modified",
+   "changed_lines": 14
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/causalgraph/agent_assignment/mod.rs",
+   "local_sha256": "f8c25675bbbc1ffd1529e183402d6ce57a36917b89557d42178a75c78280e5d1",
+   "upstream": "src/causalgraph/agent_assignment/mod.rs",
+   "upstream_sha256": "55d26e3ba19acfc355334d72d7a5e1398d7d266293a2183b5f859004897f3dbf",
+   "status": "modified",
+   "changed_lines": 10
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/causalgraph/agent_assignment/remote_ids.rs",
+   "local_sha256": "093cb9c350979040168b2e4a2f60b8273f06b4a1d78a3171eb56b7c9d04775a4",
+   "upstream": "src/causalgraph/agent_assignment/remote_ids.rs",
+   "upstream_sha256": "f6723110ccd327feb2ba7468a6c6334e18644aae96fc56bb47b6dcb51cebc4fb",
+   "status": "modified",
+   "changed_lines": 30
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/causalgraph/agent_span.rs",
+   "local_sha256": "9216f30c463dd671abfdef87c3725635dca509fbcfe04d86d219ab82faf4a97e",
+   "upstream": "src/causalgraph/agent_span.rs",
+   "upstream_sha256": "25e108164a11d26213c3bf98e75f053eff8f022dc88f9e3ddff319ff9a80e53d",
+   "status": "modified",
+   "changed_lines": 6
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/causalgraph/causalgraph.rs",
+   "local_sha256": "5c90e50dc1bc817669fb1f5897935f5f1a102e24ab3ddc12a4ba247e300f1a16",
+   "upstream": "src/causalgraph/causalgraph.rs",
+   "upstream_sha256": "49fe30e0ef4e1e90690e5e5787fbedf24cabd903207b70fa742496130d645374",
+   "status": "modified",
+   "changed_lines": 37
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/causalgraph/check.rs",
+   "local_sha256": "769571f5ac290d42e2d899c104b0fe818b500f92a9925daf3d8b721728358466",
+   "upstream": "src/causalgraph/check.rs",
+   "upstream_sha256": "098aa89c66f6a897de6d63ccdb4150544307b252bc98b954b7c0040397cb32ab",
+   "status": "modified",
+   "changed_lines": 4
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/causalgraph/dot.rs",
+   "local_sha256": "50d2d120f90cdf255e19f4ba63fbbae3c08792cde58bc7464f6102b149de5c40",
+   "upstream": "src/causalgraph/dot.rs",
+   "upstream_sha256": "01c788eddf2e90e9eeccd91891b983db6dfd30594e07e6c6cfad16404ffea87f",
+   "status": "modified",
+   "changed_lines": 4
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/causalgraph/enc_fuzzer.rs",
+   "local_sha256": "53c98f5b8e784334b63776c3aa42be067c91eed4d7eb0a13f8753b049f1f3457",
+   "upstream": "src/causalgraph/enc_fuzzer.rs",
+   "upstream_sha256": "facf492ad105a4f761084c2b7adef9db7689a026334460932316fd1003d46642",
+   "status": "modified",
+   "changed_lines": 12
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/causalgraph/entry.rs",
+   "local_sha256": "9a0a508b49182c8da76cc66a2e45885c5ecdbf4fe14fc7bd70ebab204132757f",
+   "upstream": "src/causalgraph/entry.rs",
+   "upstream_sha256": "e2d7347b4adb9d8b7b86ea516ca915a6034bae419da204121afb1465c4689035",
+   "status": "modified",
+   "changed_lines": 8
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/causalgraph/eq.rs",
+   "local_sha256": "d2dbe81a3959ab47624f583b14303e87b86640f87e616ffe2dd0952a12b2672a",
+   "upstream": "src/causalgraph/eq.rs",
+   "upstream_sha256": "7159c84c328663c21acb6bb7f4009188776f9d614656ebf752aec63979b2e356",
+   "status": "modified",
+   "changed_lines": 12
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/causalgraph/graph/check.rs",
+   "local_sha256": "9a02bb0819b7d0e93e95cbb11bf444dce0775a1495e37139cac7b91c11ee5ee6",
+   "upstream": "src/causalgraph/graph/check.rs",
+   "upstream_sha256": "72255b0d83ebadad9b479b5e7d091c2d4a2e43b3540ed1c0433d8806a997cc6a",
+   "status": "modified",
+   "changed_lines": 6
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/causalgraph/graph/conflict_subgraph.rs",
+   "local_sha256": "a7fde2407bd466c82e5de99f978d691abb6a679bf30821c3b481284308e661ec",
+   "upstream": "src/causalgraph/graph/conflict_subgraph.rs",
+   "upstream_sha256": "fdb0f88c38bf7a4a2415afd2ea17736ee2038f04c9015a4c8918a7f9412e05f0",
+   "status": "modified",
+   "changed_lines": 36
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/causalgraph/graph/mod.rs",
+   "local_sha256": "5228263fff8b6df6407786784f8761fc25fe8671b3f73e9d777dcf4aeeb1d38b",
+   "upstream": "src/causalgraph/graph/mod.rs",
+   "upstream_sha256": "291681c54502524d127390252411c5c5a5486fb8786a4bc7863110598840591d",
+   "status": "modified",
+   "changed_lines": 22
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/causalgraph/graph/random_graphs.rs",
+   "local_sha256": "6ebf618a25691acada268cb0d93cc164a116c7379a32b8d1a7a7a2bf673550b4",
+   "upstream": "src/causalgraph/graph/random_graphs.rs",
+   "upstream_sha256": "a0aea733b4bdb2abc0a344922bdd0f662b60120a029310ded1d8107cc8f6a44c",
+   "status": "modified",
+   "changed_lines": 8
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/causalgraph/graph/scope.rs",
+   "local_sha256": "a7450f3fbf7d29fd13b5252a2fdb322ef5cc4774808f6d9a41beca5ab86bf030",
+   "upstream": "src/causalgraph/graph/scope.rs",
+   "upstream_sha256": "fd50fb7197ba35380f373a142d88bcdd37c474581db25111f56041f4175e86c4",
+   "status": "modified",
+   "changed_lines": 10
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/causalgraph/graph/simple.rs",
+   "local_sha256": "b38898bc103a7ecfc31b512c3b3bbfa56f3954ca81da8fe5157b56f9f6b158f4",
+   "upstream": "src/causalgraph/graph/simple.rs",
+   "upstream_sha256": "756bbda0e68d0cff827411eca54bb1a95dd1d0f10e1ca82f5b99ad915dced837",
+   "status": "modified",
+   "changed_lines": 12
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/causalgraph/graph/subgraph.rs",
+   "local_sha256": "ea86be4d64f440222ad35c6bd639a00fe24d2f86483e339bba8209e8fd14a261",
+   "upstream": "src/causalgraph/graph/subgraph.rs",
+   "upstream_sha256": "81bf431885f842a6b74b4f6e3799c7695b10b2e2443725772b74459d234ded08",
+   "status": "modified",
+   "changed_lines": 26
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/causalgraph/graph/tools.rs",
+   "local_sha256": "f0c1a3ae36126bf621401834bc3e0cb0c61972de75371e76ad2a04d156c4e6f3",
+   "upstream": "src/causalgraph/graph/tools.rs",
+   "upstream_sha256": "9f35e67ea00534b98c680c03abf7ad37029d0f84037c848f94cf0feccb321b94",
+   "status": "modified",
+   "changed_lines": 550
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/causalgraph/mod.rs",
+   "local_sha256": "4835146a635ef3c41df7800b69f23061b29d1886ac771537d310a64519b11e2a",
+   "upstream": "src/causalgraph/mod.rs",
+   "upstream_sha256": "bbadd889f2c5907e163128c1d5dcafdd72f62d33c581b4ce8c14d3efb3057e12",
+   "status": "modified",
+   "changed_lines": 4
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/causalgraph/storage.rs",
+   "local_sha256": "6630744dd5d6b7cb278d9fdb2fe868815c210ce972a427b742b54aa1135eba50",
+   "upstream": "src/causalgraph/storage.rs",
+   "upstream_sha256": "18205e033dbd5ebaa9c11043925b1d8d13717f21ea5a6c56ab3b6685bfd9b24a",
+   "status": "modified",
+   "changed_lines": 148
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/causalgraph/summary.rs",
+   "local_sha256": "cf324c403be6e7a42b18dcc9347b77df17c0b53c29c63322b30322ea0385413e",
+   "upstream": "src/causalgraph/summary.rs",
+   "upstream_sha256": "254509971be147575af41f0e45200c5feb2da827ff341f6b2420aa6f17a8e229",
+   "status": "modified",
+   "changed_lines": 36
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/check.rs",
+   "local_sha256": "8d4dd7d7c4895acd4acc7f9bb6e0e1a3a4b2c88af845c4944e8d97414b9cc296",
+   "upstream": "src/check.rs",
+   "upstream_sha256": "70a8c4788f3a415823a48bc5ec641e1183378c365c0575b4096bfccb59c4e517",
+   "status": "modified",
+   "changed_lines": 6
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/dtrange.rs",
+   "local_sha256": "dd59270cfcc546958b71da0be58dd67688db5b9c55b9f0f32c9e71c2431c3f21",
+   "upstream": "src/dtrange.rs",
+   "upstream_sha256": "e646c8850856afe8fbae315c25ee6fe076b38992d83834451b7dcbaee73f6042",
+   "status": "modified",
+   "changed_lines": 12
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/encoding/bufparser.rs",
+   "local_sha256": "2ff6413f66128eebf3d3cb0166de6a83d9d90dbe01925938301db7be2df41894",
+   "upstream": "src/encoding/bufparser.rs",
+   "upstream_sha256": "9f38c02b1d2e2ad6531b5bac75256ca1fb72e59d7cf3dc2d0090bed210bed752",
+   "status": "modified",
+   "changed_lines": 6
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/encoding/cg_entry.rs",
+   "local_sha256": "04f71c5e2958b65cd94efa0ed50788dbb3c7363ffee8d693eec7abb8b5be28fd",
+   "upstream": "src/encoding/cg_entry.rs",
+   "upstream_sha256": "020abf0411867d82139c6ddf1bbf17d789a1f9093674ae1152dbbc91164e458e",
+   "status": "modified",
+   "changed_lines": 26
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/encoding/chunk_reader.rs",
+   "local_sha256": "5fdbfa578ee5714b76d8947a2453ac2535a5a99f1f77299783fa8fcf3e49b3f7",
+   "upstream": "src/encoding/chunk_reader.rs",
+   "upstream_sha256": "d59bf4bea729b9f604c964d76293244caa7734b584b279c8142bf100db91e965",
+   "status": "modified",
+   "changed_lines": 8
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/encoding/map.rs",
+   "local_sha256": "62b919ebd930abbfd937536718c6868393a8b753efea9773e0a7a30d10a7a208",
+   "upstream": "src/encoding/map.rs",
+   "upstream_sha256": "6a6e853fdbba996b78678dca22022fe2d00a36924df4d4d5dc06821eac4dd9c0",
+   "status": "modified",
+   "changed_lines": 10
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/encoding/mod.rs",
+   "local_sha256": "0d12af361af14212aed24c32916934dc0ebb32ff743b67551af00a793a196240",
+   "upstream": "src/encoding/mod.rs",
+   "upstream_sha256": "3a563fc63fb02b3ba8c83880b41ae2a01e26292f5f256c7bedbcb6da73d89e3c",
+   "status": "modified",
+   "changed_lines": 2
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/encoding/op.rs",
+   "local_sha256": "fba458eeda7a6bd4864e17d05fdf179add5b5b60c007f7119fe6c050fc7fb912",
+   "upstream": "src/encoding/op.rs",
+   "upstream_sha256": "62ba97f4e65c0bc1df47793088021de8cc367250d0275e344d81065e4e61821a",
+   "status": "modified",
+   "changed_lines": 16
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/encoding/op_contents.rs",
+   "local_sha256": "72c18485cd8c73014161e9c26cf167268116be20ee0255f3305a1b8bd21feea6",
+   "upstream": "src/encoding/op_contents.rs",
+   "upstream_sha256": "d65fe84801bd81c87d9a8c0b8d183d4f1f6e2c0f5058bc217951cc42b2dc818c",
+   "status": "modified",
+   "changed_lines": 6
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/encoding/parents.rs",
+   "local_sha256": "5c9c7b13a6547d37026fb3ff2265d4d502fa1fb137894edf16e62828e912a74d",
+   "upstream": "src/encoding/parents.rs",
+   "upstream_sha256": "60d532a061c3e954dee42ac3deac65c894844451ce3652136fd82c6d5eed52fa",
+   "status": "modified",
+   "changed_lines": 32
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/encoding/parseerror.rs",
+   "local_sha256": "5beeb4cbfa895ab5dfd6a712a3ed8d27e144b2bf0c64082efa11a99f111af12c",
+   "upstream": "src/encoding/parseerror.rs",
+   "upstream_sha256": "189df4eb601c78fb728dfef7c8820ca528d180178824fc96c88ba51d6d6b0fa5",
+   "status": "modified",
+   "changed_lines": 2
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/encoding/tools.rs",
+   "local_sha256": "95677012047e2486c2d989753f9cc18e4bdbde224422a2fc3a39a7f4946bccde",
+   "upstream": "src/encoding/tools.rs",
+   "upstream_sha256": "14ea6a3475408ae27564e53b2ec8df032341095a044dd125bab59f9ec65d88ea",
+   "status": "modified",
+   "changed_lines": 4
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/encoding/varint.rs",
+   "local_sha256": "cb6bb70e200b4b132d28bf17c170873424dfde3d1748d41635a0d132432ac0bf",
+   "upstream": "src/encoding/varint.rs",
+   "upstream_sha256": "e6a0946781a6970937b79c2e0c444a960fbacc2bd386f94933ace220cd624b85",
+   "status": "modified",
+   "changed_lines": 8
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/frontier.rs",
+   "local_sha256": "bf0f86cad2290705ba8219f18f11471ea57972eb42400abb9fdf050277cf0044",
+   "upstream": "src/frontier.rs",
+   "upstream_sha256": "9532a4225650e324df6718d8b70a8a044a805c01159ed5ccc4be0b23f9d9984c",
+   "status": "modified",
+   "changed_lines": 155
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/fuzzer.rs",
+   "local_sha256": "fa0082e497fba0723c6f32045ed7c9ecdac4fd5c5149129b0ddea54bc8e94df1",
+   "upstream": "src/fuzzer.rs",
+   "upstream_sha256": "956f06fe4772c656823ba8f13f2f1e2198d7ef0fc27878ff20783dd34abc9b91",
+   "status": "modified",
+   "changed_lines": 4
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/branch.rs",
+   "local_sha256": "7638faae9edb7f70b64a3399df71716bafab3035abe2dc0ba9a002a2b182c780",
+   "upstream": "src/list/branch.rs",
+   "upstream_sha256": "4f76e968886cc37045fd54770b687ad88fa5f722ab7e8ac9ec5e3de2e35cfc2c",
+   "status": "modified",
+   "changed_lines": 34
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/buffered_iter.rs",
+   "local_sha256": "7c99c90e9606f64a732df8b7ac087fdfe61be10082dc32cd82e03fce7ef7b919",
+   "upstream": "src/list/buffered_iter.rs",
+   "upstream_sha256": "4ae6208d2546ec75a0fd50c4f3d4887e360e265a186e1f3c8f6b9e4e2f514527",
+   "status": "modified",
+   "changed_lines": 2
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/check.rs",
+   "local_sha256": "1969a6affab9fe8090908e1a70f98864cfa3be4203744b29e2f1dd6c250b7710",
+   "upstream": "src/list/check.rs",
+   "upstream_sha256": "2270322c8ac803e63645e9f8978703468b60a61139d870057c69dca0c2011de1",
+   "status": "modified",
+   "changed_lines": 4
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/encoding/decode_oplog.rs",
+   "local_sha256": "d1cf6acac536385bb40b868c74e40b3ca12e11d7896ff713a127573b230fffe0",
+   "upstream": "src/list/encoding/decode_oplog.rs",
+   "upstream_sha256": "6e54eaaa321353e846c88706e372b9ba8b55b9497638a1a71439d05bb0ea3749",
+   "status": "modified",
+   "changed_lines": 44
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/encoding/decode_tools.rs",
+   "local_sha256": "0e05360bd584458eaba09394d9b202ca36164f1e4f8a2c45ca48ea140599cf0e",
+   "upstream": "src/list/encoding/decode_tools.rs",
+   "upstream_sha256": "58222f1d3bbc5eb3a3dc621a1354e3efcc150338c74b5a9acb4096533b7d0b7e",
+   "status": "modified",
+   "changed_lines": 10
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/encoding/encode_oplog.rs",
+   "local_sha256": "8af9ac893e9109a6424bdd0eb00b2080a4025ce1661959e80ccfaaf076d5e262",
+   "upstream": "src/list/encoding/encode_oplog.rs",
+   "upstream_sha256": "a2a80c6860d69973109aec3c84bb582938ce62e300a703c6d0f010570ae53770",
+   "status": "modified",
+   "changed_lines": 40
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/encoding/encode_options.rs",
+   "local_sha256": "0babae0482b0ffe0e43de64bce479427b2ba09fa2f147c9455857418614f5e17",
+   "upstream": "src/list/encoding/encode_options.rs",
+   "upstream_sha256": "d4f0af90de5eb1fb30b59cdb49b9c5541a15744ad49f3494c611ec3e9b33d4a8",
+   "status": "modified",
+   "changed_lines": 6
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/encoding/encode_tools.rs",
+   "local_sha256": "e0a01e9eb19f1ade7e211b68861bb4425843cbea25812e0f2295a24e58dcfb9f",
+   "upstream": "src/list/encoding/encode_tools.rs",
+   "upstream_sha256": "46e5eeb1154bb532ee521ef1890934cc319203b2ab1615e66ca26f14c4505c1f",
+   "status": "modified",
+   "changed_lines": 8
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/encoding/fuzzer.rs",
+   "local_sha256": "76a0a5e42d77748497d472f7f2cc990a10303f5929d4cb31ac06a1a932f20fce",
+   "upstream": "src/list/encoding/fuzzer.rs",
+   "upstream_sha256": "38acc2eb97593f87e7ad0f11f6b204f5f22aa8c3cdd96087e5bb3aabe77cddd4",
+   "status": "modified",
+   "changed_lines": 10
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/encoding/leb.rs",
+   "local_sha256": "4dc5c3275453c9546ff7f612e95b2c2cd562a2ee5357d7cf987ccec837e12306",
+   "upstream": "src/list/encoding/leb.rs",
+   "upstream_sha256": "0473271ae4bfd79690120cc6287a005170e63fdf978c996deb235dd3b9df5dda",
+   "status": "modified",
+   "changed_lines": 4
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/encoding/mod.rs",
+   "local_sha256": "ef61fb0a833fb06d13e6152ed18092c630556f819e30317a9c3ba1335ed5dda6",
+   "upstream": "src/list/encoding/mod.rs",
+   "upstream_sha256": "ea81d3b8af0b152520875a0aceac04cd69c0f37316d912f851e8e1609d5585c0",
+   "status": "modified",
+   "changed_lines": 4
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/encoding/save_transformed.rs",
+   "local_sha256": "cfa8f62ad0558b2eda861deb2d1142f1d742c14082e6f8544ac895f50f9ddbb7",
+   "upstream": "src/list/encoding/save_transformed.rs",
+   "upstream_sha256": "8a4c919149a5283c91c8e3983afa004841477e3afbd1ebfc265254d97303c527",
+   "status": "modified",
+   "changed_lines": 14
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/encoding/tests.rs",
+   "local_sha256": "b5353d321df6ec4f2d9b66bc01b6249de2743279b9b4386d38ee772d893382c6",
+   "upstream": "src/list/encoding/tests.rs",
+   "upstream_sha256": "d3e10e0d7e77b28ad54d39f56ef37776f1b829449244e130bf1c4e64cc57298f",
+   "status": "modified",
+   "changed_lines": 10
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/encoding/txn_trace.rs",
+   "local_sha256": "5d886855b4895367072a9bc9aa2868490c9e00b4f88b0a9572a36c719602b9aa",
+   "upstream": "src/list/encoding/txn_trace.rs",
+   "upstream_sha256": "31a1df58a9267a09b53a0b4df2d7ed62a2288727aaf8a667d41c5ee12189e11f",
+   "status": "modified",
+   "changed_lines": 40
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/eq.rs",
+   "local_sha256": "e2b7bd61ef86b697a575476fddf0bae53f4dcc8a5afcb5a76f4f76f22bf55fd3",
+   "upstream": "src/list/eq.rs",
+   "upstream_sha256": "903700e6f66301ca6c349a45f48021aa532fae47338eeae562a2d7aea4cd2a7a",
+   "status": "modified",
+   "changed_lines": 18
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/gen_random.rs",
+   "local_sha256": "924ef8780cb1ce0549ec7e6e48a67bd281d316810731cc869175654a22f298c5",
+   "upstream": "src/list/gen_random.rs",
+   "upstream_sha256": "bd484cf53bad123dde83500abd3d00335784259bbb422f383ce578e81ede5d50",
+   "status": "modified",
+   "changed_lines": 10
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/list.rs",
+   "local_sha256": "9112b7bc19cb60d7a48125d051263bd92d58efccf7830fa04a74a8b8816605b8",
+   "upstream": "src/list/list.rs",
+   "upstream_sha256": "4bc7f0a2798ff99e6796503c9096cc369574820821ff89608e23d1aba6266b66",
+   "status": "modified",
+   "changed_lines": 20
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/merge.rs",
+   "local_sha256": "a338d54d2b8a1f68fc050ac7d0d8d53107113a099f52a6483d9b666e4306776d",
+   "upstream": "src/list/merge.rs",
+   "upstream_sha256": "0364677d52d580df899252236e7bd3e05304f32a8b16622fefd717cf52f0a501",
+   "status": "modified",
+   "changed_lines": 26
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/mod.rs",
+   "local_sha256": "7a8a441f0a0b48bbb2fe2fec87e32e341d0135b7af72d52eb2ae4277b25d1d7f",
+   "upstream": "src/list/mod.rs",
+   "upstream_sha256": "605824f131eed5ff14500df8580535a02fbb3c55727be80a93915bc9ba8dcbf3",
+   "status": "modified",
+   "changed_lines": 12
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/old_fuzzer_tools.rs",
+   "local_sha256": "dc0f5381ecd66c73a9a52f56c9f25cb19f7a78ec984b94d7d72049055701212e",
+   "upstream": "src/list/old_fuzzer_tools.rs",
+   "upstream_sha256": "ffacda3cace52e92f0c9a9084c523b332cfcb3f37ab0444b7c00f90463391105",
+   "status": "modified",
+   "changed_lines": 10
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/op_iter.rs",
+   "local_sha256": "c96fbcbae3ae658d0cfea3605dd3562d1414f46c13eeb224ea289ccaf423bc1f",
+   "upstream": "src/list/op_iter.rs",
+   "upstream_sha256": "870331f5bee9dec73d850aad581e6f4c385f89686f94b4c048021268a64ec9c3",
+   "status": "modified",
+   "changed_lines": 50
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/op_metrics.rs",
+   "local_sha256": "f70c74dec48ce46c789eb5a3124035cf794c677ab84b7e04e94168b1c670581f",
+   "upstream": "src/list/op_metrics.rs",
+   "upstream_sha256": "5cd28325f1318e11fbe2e6d24cefd61f8218ca34a2d7bded8c7d1fd28a8f95fa",
+   "status": "modified",
+   "changed_lines": 26
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/operation.rs",
+   "local_sha256": "585edf0e4ddaf05855c0818c00ef7d5e32d0b27212045ac3fafcb73465456fe3",
+   "upstream": "src/list/operation.rs",
+   "upstream_sha256": "34f7e05ad9545607605560b668e7c9d4a0781fcf1d3fb23dbf112f5ff22cb530",
+   "status": "modified",
+   "changed_lines": 18
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/oplog.rs",
+   "local_sha256": "9b364bb267806f6fa0ba01b0d95fad4a214e13d0ac5b494943d14decadfac501",
+   "upstream": "src/list/oplog.rs",
+   "upstream_sha256": "0261e52b4c674e4ae9e101166447456eea656526b38df16f74737137597f7756",
+   "status": "modified",
+   "changed_lines": 32
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/oplog_merge.rs",
+   "local_sha256": "3e7acbdb51fefb3fffd18cdf48ebd7bab0ca1f8a54c351f3d7cb82a8042aca39",
+   "upstream": "src/list/oplog_merge.rs",
+   "upstream_sha256": "f50233292384c77f4a5e2571f9edec3df91c270ece4c9f162235999a92aed88c",
+   "status": "modified",
+   "changed_lines": 20
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/oplog_merge_fuzzer.rs",
+   "local_sha256": "7bd5a635bfbd2e69520e99bf990f094f93e98757b43a78e8d09673c3d2ee5b4e",
+   "upstream": "src/list/oplog_merge_fuzzer.rs",
+   "upstream_sha256": "c090dbc04e34086002144d7cf0b9ede92017ebe3d34d2a0a2059d6a302f85a84",
+   "status": "modified",
+   "changed_lines": 8
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list/stochastic_summary.rs",
+   "local_sha256": "b2340b91142f73b523f3fe9db58f425a877980a719d7696a039394ffb3bafe17",
+   "upstream": "src/list/stochastic_summary.rs",
+   "upstream_sha256": "1d974626dd2226b42c4d974a7e37e861922c3f244026e329c205632648cb43e1",
+   "status": "modified",
+   "changed_lines": 10
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/list_fuzzer_tools.rs",
+   "local_sha256": "b976d1de2d90d563864bbc590e9646ea89033957577254a30fca365fab4aa738",
+   "upstream": "src/list_fuzzer_tools.rs",
+   "upstream_sha256": "5fdb41cd2609f34da71f9d2692b7164f1fb00d796c78961fdff813cba7413267",
+   "status": "modified",
+   "changed_lines": 8
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/listmerge/advance_retreat.rs",
+   "local_sha256": "f8c147255d8e2fa3ba71568578dc199a7ba7db15528a1f5783900bc197b93c36",
+   "upstream": "src/listmerge/advance_retreat.rs",
+   "upstream_sha256": "356472ce70c475e2422d8d7731555fa19801376269f6ac8120e9850554cf90db",
+   "status": "modified",
+   "changed_lines": 26
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/listmerge/dot.rs",
+   "local_sha256": "3027448760e9787a5ceff6ccd2f6e52f691313970e7f698cb03c3c628dc0314b",
+   "upstream": "src/listmerge/dot.rs",
+   "upstream_sha256": "29248c350435b5a754d026732c6e468c504e31a82e01e2185c3b1ceffc08d6fc",
+   "status": "modified",
+   "changed_lines": 20
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/listmerge/fuzzer.rs",
+   "local_sha256": "6c4d911381edaac87c4f00209efe3fbaae8bdb87955728c09dd292f81bfbaaaf",
+   "upstream": "src/listmerge/fuzzer.rs",
+   "upstream_sha256": "444d1ef007741cfc9d8adc9e859fabd5bbb7d35e1dedd8f1aa20facca487599b",
+   "status": "modified",
+   "changed_lines": 10
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/listmerge/markers.rs",
+   "local_sha256": "6fe179e17c81a82c7fac7f9044225fb19fd06e5e48097359349d21d2087c5891",
+   "upstream": "src/listmerge/markers.rs",
+   "upstream_sha256": "2c590ce24dfebf20ec2244200a8349d5ed3cc43d5e1451360622f1e815b08f55",
+   "status": "modified",
+   "changed_lines": 10
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/listmerge/merge.rs",
+   "local_sha256": "7e9067c3fb1573be47f873f59039bbec0adec0afad0df14fba02d525b4da1b99",
+   "upstream": "src/listmerge/merge.rs",
+   "upstream_sha256": "76078f6c689a5169de5ab397a51956a5ff3041dc3aa1f4d59ee58666cba2d006",
+   "status": "modified",
+   "changed_lines": 558
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/listmerge/mod.rs",
+   "local_sha256": "27d05aaba4a2a97785b7ff65ed4a78b9b47228f02b8709dac3cab0241c719e64",
+   "upstream": "src/listmerge/mod.rs",
+   "upstream_sha256": "1c529a09b72607bc67f2746ed19a584d31e34b1dda410fb4a22d235b6ebe2462",
+   "status": "modified",
+   "changed_lines": 8
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/listmerge/plan.rs",
+   "local_sha256": "edd465666603778b111658d4a82372f7d53860f9e7b00f26fe26d64bffdba711",
+   "upstream": "src/listmerge/plan.rs",
+   "upstream_sha256": "aa76069d5f962d8541f92622f2208d37af4bd43157a832cdcd24cc9f7b9e8306",
+   "status": "modified",
+   "changed_lines": 30
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/listmerge/simple_oplog.rs",
+   "local_sha256": "3d8690de2018307afece62d758d732f78b79fa79005788208eaf9632e76b1e57",
+   "upstream": "src/listmerge/simple_oplog.rs",
+   "upstream_sha256": "410546d4f0ad6a42d1b005e88ad8c69430cd5b4b6f60e3afa395679185014921",
+   "status": "modified",
+   "changed_lines": 28
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/listmerge/xf_old.rs",
+   "local_sha256": "69011c43540dbe7d6299bcf0f2549f94ed4e663a96002607f0912b54f0acd5cf",
+   "upstream": "src/listmerge/xf_old.rs",
+   "upstream_sha256": "8bf9e93ae3af83c95b46395fc9ded31df040d3b9b245c4a79c14b1f05ade540f",
+   "status": "modified",
+   "changed_lines": 38
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/listmerge/yjsspan.rs",
+   "local_sha256": "d8bcefc9d378e5dca7482001ccfab3c81b9a9ffbe356ce0f90adea7078ae807b",
+   "upstream": "src/listmerge/yjsspan.rs",
+   "upstream_sha256": "53656edb82e8111031e12ab69330b883f9b09e590dac3f2e28d7975fa03eb62a",
+   "status": "modified",
+   "changed_lines": 12
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/listmerge2/action_plan.rs",
+   "local_sha256": "fbc1370e5a6b393793e75cce97108c8e83cb8bbedaf4063472066623b78e019a",
+   "upstream": "src/listmerge2/action_plan.rs",
+   "upstream_sha256": "361fa11db491a447c00e2fbf0d9d6e34c24c75eaeda0c9219e8d054c7bba59b5",
+   "status": "modified",
+   "changed_lines": 46
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/listmerge2/dot.rs",
+   "local_sha256": "894cbd27c03a02915cc54b33e86c875fe439d7c4f32c553bd79b37da30f9ef2f",
+   "upstream": "src/listmerge2/dot.rs",
+   "upstream_sha256": "d6c75c46f651be4afecaa38dda488afff2936a4a0c83e6f4c4ef1972033a17d2",
+   "status": "modified",
+   "changed_lines": 16
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/listmerge2/index_gap_buffer.rs",
+   "local_sha256": "8a7821726cc708c21511f6c687774eafc0fef2241746beb18d3c6b4997e12cff",
+   "upstream": "src/listmerge2/index_gap_buffer.rs",
+   "upstream_sha256": "44747f5d077d1bdebd3c04d6dcc7b9ce4d393d6c1664641dcf6c4e075bdaf437",
+   "status": "modified",
+   "changed_lines": 18
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/listmerge2/mod.rs",
+   "local_sha256": "61022e5049a435c421783aa30b05756cab65754d674f72b72664693f9c88933f",
+   "upstream": "src/listmerge2/mod.rs",
+   "upstream_sha256": "bae747d24f6de23772710cecaa0e0f40e5902c699c654bfaae24450ec1fd374f",
+   "status": "modified",
+   "changed_lines": 6
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/listmerge2/test_conversion.rs",
+   "local_sha256": "6c564bde089417b46cbcbb8de4668921456084d3753226d2d9f4d9f2c4449f3d",
+   "upstream": "src/listmerge2/test_conversion.rs",
+   "upstream_sha256": "9453c0f211571f81a4a9a54e684a75894e0d38bb684a7cedfedb973845d36e59",
+   "status": "modified",
+   "changed_lines": 36
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/listmerge2/yjsspan.rs",
+   "local_sha256": "e62cd8a484dc34f0930f86944526139c85a10b8cfd9b6df41f037688f027f449",
+   "upstream": "src/listmerge2/yjsspan.rs",
+   "upstream_sha256": "7d7191fba1724e1083df8ed4751532b47b1fd755b9c1c42fe407b852660fdefc",
+   "status": "modified",
+   "changed_lines": 8
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/mod.rs",
+   "local_sha256": "53d7e8e78fcbfbaae738eb98a99e4e3ffc5ad6a6a71de026f695741b5c7f181e",
+   "upstream": null,
+   "upstream_sha256": null,
+   "status": "local-only",
+   "changed_lines": null
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/oplog.rs",
+   "local_sha256": "e041afa117ace38eca00bb2cb7bc28f92eacfd88e9d2bbee74c19641a9865e59",
+   "upstream": "src/oplog.rs",
+   "upstream_sha256": "4ace9bc441e2c1f948238009e2785a5be4bee46ac57b2bb25c79a23ad9ac0101",
+   "status": "modified",
+   "changed_lines": 56
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/ost/content_tree.rs",
+   "local_sha256": "b8c30061b8521ff782c66ce764c3a11c11ac34940b225d1a33a9b44067407539",
+   "upstream": "src/ost/content_tree.rs",
+   "upstream_sha256": "3fb87452efbedabf27e3d7b2a173a2a1dfbbd5abdf3cddc37a2617e6ef90eabb",
+   "status": "modified",
+   "changed_lines": 14
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/ost/index_tree.rs",
+   "local_sha256": "18624343ee35e4081bf98c4335b88a099213c56f8291407d38fee120ecf08947",
+   "upstream": "src/ost/index_tree.rs",
+   "upstream_sha256": "7e837ddff5f756f1167510f7791bf230293a38ed8bc3e0eea3f53c7ff71016ac",
+   "status": "modified",
+   "changed_lines": 10
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/ost/mod.rs",
+   "local_sha256": "5a5fbae14145fa09ffa1a0f87365fd8c5d6650657345d529d6c4b37a230fbe25",
+   "upstream": "src/ost/mod.rs",
+   "upstream_sha256": "28ae7a1a254b3b09030121c037bb75832eef84acfd9c20ff8356c4573bd9299e",
+   "status": "modified",
+   "changed_lines": 2
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/rev_range.rs",
+   "local_sha256": "40f17b399b6fe6221e5afa617b2ce553ede203d2138c1715a6a2aff0a36687f5",
+   "upstream": "src/rev_range.rs",
+   "upstream_sha256": "0c589378a07106798ad3fa923c78eb44b8394261ccd48b6f6982ae1746a67840",
+   "status": "modified",
+   "changed_lines": 8
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/rle/mod.rs",
+   "local_sha256": "06a244af227fc0f3fcf48e92cb8950afaa52b927fbce254c0b17aea68ba3e853",
+   "upstream": "src/rle/mod.rs",
+   "upstream_sha256": "9d6275bfd8e4c8db42bec736bf07f6d449d21f5b3c446dc5364b37cf301aae0e",
+   "status": "modified",
+   "changed_lines": 12
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/rle/rle_vec.rs",
+   "local_sha256": "774b8dece4439fed6ed912d2c236a0b912ac2614ad950693e08695c3aeb06439",
+   "upstream": "src/rle/rle_vec.rs",
+   "upstream_sha256": "1c5a46326d148b327d33cde64c87f6806cd2aa3ca95f8973eb1ee53ee27baa03",
+   "status": "modified",
+   "changed_lines": 24
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/serde_helpers.rs",
+   "local_sha256": "bf9cfb0f6ca3666e9e4f351adea9b485aae8139363cc1df99b2d50647d467d80",
+   "upstream": "src/serde_helpers.rs",
+   "upstream_sha256": "3ece9c5bff118fcd399c6c0528507c232e38d4fa57ac922dfbb64b6a4e39887f",
+   "status": "modified",
+   "changed_lines": 6
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/simple_checkout.rs",
+   "local_sha256": "07df57edd89d4693a986358ce7e1c826f34508d3225a7f0cec8c8a2f92dee52b",
+   "upstream": "src/simple_checkout.rs",
+   "upstream_sha256": "5a057add0d3a90397f5ca8fc966bf0367d4fd9c751b034d902d47aa4455faef4",
+   "status": "modified",
+   "changed_lines": 6
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/stats.rs",
+   "local_sha256": "d064322464a5a2ce42d50b192fcf3b5d70a010d987f851d37c03823f87ea6d96",
+   "upstream": "src/stats.rs",
+   "upstream_sha256": "7a7f098b6c0a1498ee87c23dd182317a0db741b14382b36eef6a9f55adf0b67e",
+   "status": "modified",
+   "changed_lines": 2
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/storage/file.rs",
+   "local_sha256": "75ad51b775b79dbbfd1edb252efbe4fe2cdb538b39175987212835b45ee85d2b",
+   "upstream": "src/storage/file.rs",
+   "upstream_sha256": "75ad51b775b79dbbfd1edb252efbe4fe2cdb538b39175987212835b45ee85d2b",
+   "status": "identical",
+   "changed_lines": 0
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/storage/mod.rs",
+   "local_sha256": "e1ff66a644b8ea55359add1c8e288969f1ea6507a2f15d0f079b99b8f3e39e93",
+   "upstream": "src/storage/mod.rs",
+   "upstream_sha256": "f3ab03cff15603d922e3402b8a2aa871ee7b7a914bf8838c5983096ec65b2a17",
+   "status": "modified",
+   "changed_lines": 20
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/storage/page.rs",
+   "local_sha256": "065eecb3871ca51ad2f35aaf5e19adf0ec5d38bf71e88e59452d89f09b5ad9a3",
+   "upstream": "src/storage/page.rs",
+   "upstream_sha256": "579248dc0d090a1697e816774096c6e290a47698a89da330051a298feddc68b5",
+   "status": "modified",
+   "changed_lines": 18
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/textinfo.rs",
+   "local_sha256": "d1a6e3b7626cc02372087f9be600b42420f4e50fe6cab17de1a3b54b92a6b859",
+   "upstream": "src/textinfo.rs",
+   "upstream_sha256": "eb0a48301b5f67ac65518b57f0a414412a6a5e2b4b20e5b2e4e7e0866676542f",
+   "status": "modified",
+   "changed_lines": 34
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/unicount.rs",
+   "local_sha256": "20841e12fccb5cc38d6a0fc814c2faca180d3b69387e27625d082eded8725f9f",
+   "upstream": "src/unicount.rs",
+   "upstream_sha256": "53995a7b0e9e67eff0ca99ba71f694bdfc2d2cf792cf1abb0bda761db1ad1721",
+   "status": "modified",
+   "changed_lines": 2
+  },
+  {
+   "local": "crates/braid-core/src/vendor/diamond_types/wal.rs",
+   "local_sha256": "2982e92c4c501f832bdcf6df26bdefe06e0f66bdb2277c8ceddc647db6d7af90",
+   "upstream": "src/wal.rs",
+   "upstream_sha256": "ba63292c32f7dfe205dec1a8dfeaad17ec983fda4b08951bff800d5b01a108f0",
+   "status": "modified",
+   "changed_lines": 24
+  },
+  {
+   "local": "crates/braid-core/src/vendor/rle/append_rle.rs",
+   "local_sha256": "b5f65ef222ebcd2dd2d9576df6f6900f1e20c1bd304631ab25258669659fa819",
+   "upstream": "crates/rle/src/append_rle.rs",
+   "upstream_sha256": "728fe3fd4ad364ea81413b8191671e7bb84c4ffbaebdff5e6de8bd00cd5a5ddb",
+   "status": "modified",
+   "changed_lines": 4
+  },
+  {
+   "local": "crates/braid-core/src/vendor/rle/intersect.rs",
+   "local_sha256": "74ec03ec5a036f2883106898dac633a3dee918c53379fdbc538833c54a48ec06",
+   "upstream": "crates/rle/src/intersect.rs",
+   "upstream_sha256": "0e24babefe25dbf4c33cac3a8ffa0874cb2da0cd98f55ec9c2b5c5c0d5d590a1",
+   "status": "modified",
+   "changed_lines": 8
+  },
+  {
+   "local": "crates/braid-core/src/vendor/rle/merge_iter.rs",
+   "local_sha256": "4ead4494fb234c44abf1ec7544d330afbd67f798a921b97ef4a89ab499c1e6d4",
+   "upstream": "crates/rle/src/merge_iter.rs",
+   "upstream_sha256": "8bc51427a1cde5b5b0c020c9cc7194a84acda19a598aee53455b7c7f64c30193",
+   "status": "modified",
+   "changed_lines": 6
+  },
+  {
+   "local": "crates/braid-core/src/vendor/rle/mod.rs",
+   "local_sha256": "693e6815a8c1f1f60b72e8766b964c24a6b78906320c8eb0caa08450347b0d3f",
+   "upstream": null,
+   "upstream_sha256": null,
+   "status": "local-only",
+   "changed_lines": null
+  },
+  {
+   "local": "crates/braid-core/src/vendor/rle/rlerun.rs",
+   "local_sha256": "008ce8261f862ef7502b8aed284cab7f7287ff1729c92fd8a1752c7b3667addc",
+   "upstream": "crates/rle/src/rlerun.rs",
+   "upstream_sha256": "399695606fa5beb28aee3b19201009f9800c49264a4a0d0ad0ab5f1d8813cb6f",
+   "status": "modified",
+   "changed_lines": 2
+  },
+  {
+   "local": "crates/braid-core/src/vendor/rle/splitable_span.rs",
+   "local_sha256": "5086ca416242e17d3703276dc38ee9f2d88758efccad0407a5f5f3c6af6016b2",
+   "upstream": "crates/rle/src/splitable_span.rs",
+   "upstream_sha256": "f1915f0b39fe9d9e1d23720521defa567b3520af480d1dd285365a1e11959c33",
+   "status": "modified",
+   "changed_lines": 6
+  },
+  {
+   "local": "crates/braid-core/src/vendor/rle/take_max_iter.rs",
+   "local_sha256": "bc2b6dc4d7b519ae741c131c40f27ee8eceba9403ec76a481476852cfdeb9664",
+   "upstream": "crates/rle/src/take_max_iter.rs",
+   "upstream_sha256": "991f9519a331e6875b765731570bb3e0d1c687c7b455eb9d04ce4c9cab3b5096",
+   "status": "modified",
+   "changed_lines": 8
+  },
+  {
+   "local": "crates/braid-core/src/vendor/rle/zip.rs",
+   "local_sha256": "311d8863e9f49cdec05f436904d45592911810ab2bc773698e8904ff1aaef1ce",
+   "upstream": "crates/rle/src/zip.rs",
+   "upstream_sha256": "3bcac6d642fa1071fb4f0d856a4cfb0caa358d23271d5fa7c29948ca914dba94",
+   "status": "modified",
+   "changed_lines": 6
+  }
+ ]
+}

@@ -161,7 +161,7 @@ and is bounded at 32 MiB.
 
 | ID | Requirement | Owner | Status | Remaining / blocker |
 | --- | --- | --- | --- | --- |
-| INT-PROV-1 | Copied-engine source revisions, licenses, file hashes, reproducible patches; similarity to upstream is evidence to investigate, not proof | INT | **Open / Blocked** | Origin of the copied Diamond engine is unestablished ([upstream-compatibility.md](../upstream-compatibility.md)); needs an upstream oracle checkout |
+| INT-PROV-1 | Copied-engine source revisions, licenses, file hashes, reproducible patches; similarity to upstream is evidence to investigate, not proof | INT | **Partial / Blocked** | Measured in [engine-provenance.md](engine-provenance.md): closest sampled upstream revision `90227908`, 102 of 105 files edited (2,938 lines), no byte-identical tree, so a reproducible patch set against a pinned revision cannot be reconstructed. **License gap:** upstream is ISC and the copy carried no notice; [NOTICE.md](../../crates/braid-core/src/vendor/NOTICE.md) added, but the upstream copyright line is unavailable and must be obtained from the author |
 | INT-PROV-2 | Preserved historical checkpoint corpus and separately pinned upstream oracle; compare decoding, checkout, migration, merges; freeze engine storage format until compatible | INT | Open | |
 | INT-LEG-1 | Recover available legacy chat events without inventing events or parents; snapshot-only boundaries explicit | INT | Open | |
 | INT-REVIEW-1 | Dependency, feature, public-API, task-lifetime, panic, unsafe, dead-code reviews; removal only with caller and compatibility evidence | INT | Open | |
