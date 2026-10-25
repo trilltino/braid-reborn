@@ -176,3 +176,51 @@ stored values. The public `JournalBackend` boundary requires atomic whole-record
 publication and exclusive writing; an implementation must not report success on
 an IndexedDB request before its enclosing transaction completes. The browser
 storage adapter and its separate schema are not yet implemented.
+
+## Shared-contract gate (recoverable text, acknowledgments, replication ingestion)
+
+Everything below is additive; no existing API or stored field is removed.
+
+**Journal and Simpleton state.** `ChannelCheckpoint` gains an optional `payloads`
+map that is omitted when empty, so existing journals round-trip byte for byte.
+The Simpleton application state gains `schema` and `base` (a verified base: text,
+frontier and SHA-256 digest of the last acknowledged state). A state without
+`schema` is legacy (schema 0). On first open:
+
+1. The exact stored bytes are copied beside the journal as
+   `<journal>.pre-recovery-v2.bak`. The first backup is never overwritten, and a
+   backup failure aborts the open before anything is rewritten.
+2. With no queued edits, the recorded state is the acknowledged state and becomes
+   the base.
+3. With queued edits, the base is recovered by fetching the text at the first
+   queued edit's parents, then accepting it only if replaying every unchanged
+   queued edit reproduces each recorded `Repr-Digest` and the persisted text.
+   Otherwise the journal stays legacy and `SimpletonStatus::recovery` reports
+   `NeedsLegacyBaseline`; behavior is unchanged and a drained queue also resolves it.
+
+Rollback: restore the `.bak` file over the journal while the client is stopped.
+Older binaries ignore the new fields. The peer identity and queued operation
+bytes are never rewritten.
+
+**Acknowledgments.** `ChannelConfig::application_acknowledgments` defaults to
+`false`, which keeps automatic acknowledgment. The Simpleton client opts in; it
+advances its base and removes the outbox entry in one journal transaction through
+`ReliableChannel::commit_ack`. `ReliableChannel::next()` and `queue()` are
+unchanged; `next_event()` additionally returns `ChannelEvent::PutAcknowledged`.
+
+**Type additions.** `BraidError::Payload` is a new variant; code that matches
+`BraidError` exhaustively must add an arm. `BraidNetwork::put_stream` has a
+default implementation (buffered, 32 MiB), so existing implementors compile.
+`JournalBackend::backup` has a default no-op; durable backends must override it.
+
+**Replication ingestion.** The path prefix `/.well-known/braid/replication/` is
+reserved. Creating new resources inside it is refused. Existing resources, policies
+or legacy-named files that occupy it are reported by
+`ReplicaStore::replication_namespace_collisions`; they are never renamed, deleted or
+adopted, and `POST /.well-known/braid/replication/v1/history` answers 503 until
+they are resolved by an operator.
+
+**JSON snapshots.** Resources may use the `json-snapshot` profile (schema 1) with a
+declared `application/json` or `application/linked+json` type. Text resources are
+never reinterpreted. A resource's profile cannot change; a mismatched merge type is
+a conflict.
