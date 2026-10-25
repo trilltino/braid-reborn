@@ -3,6 +3,7 @@
     deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
 )]
 #![deny(unsafe_code)]
+#![cfg_attr(test, deny(warnings))]
 //! braid-core: Unified Braid Protocol implementation in Rust.
 //!
 //! This crate consolidates several Braid-related components into a single library:

@@ -1,3 +1,4 @@
+#![cfg_attr(test, deny(warnings))]
 #![forbid(unsafe_code)]
 #![cfg_attr(
     not(test),

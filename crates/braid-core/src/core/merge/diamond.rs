@@ -169,6 +169,7 @@ impl DiamondCRDT {
 
     // ========== Local Editing Methods ==========
 
+    #[cfg(feature = "native")]
     pub(crate) fn parent_frontier(
         &self,
         parents: &[braid_http::types::Version],
@@ -188,6 +189,7 @@ impl DiamondCRDT {
         Ok(self.oplog.cg.graph.find_dominators(&versions))
     }
 
+    #[cfg(feature = "native")]
     pub(crate) fn content_at_parents(
         &self,
         parents: &[braid_http::types::Version],
@@ -201,6 +203,7 @@ impl DiamondCRDT {
 
     /// Each wire event gets a deterministic agent and an operation chain rooted
     /// in its own parents. Other concurrent tips never become implicit parents.
+    #[cfg(feature = "native")]
     pub(crate) fn apply_wire_event(
         &mut self,
         update: &braid_http::types::Update,
