@@ -14,7 +14,7 @@ application data is used for implementation or migration testing.
 | Canonical chat streaming (F03/F05/F08/F10) | Chat store replay/subscribe boundary and codec | release_streams: snapshot/subscribe overlap, lag, drop and invalid headers | Codec/race/lag repairs implemented; broader independent app-route interop and legacy history recovery remain pending |
 | Transforming Simpleton (phase 3) | Shared Diamond replica and per-subscriber view | release_simpleton_server; pinned JS/Rust Unicode, echo, restart/lost ACK; H3 observer reconstruction | Implemented for retained history; missing legacy events remain explicit unavailable boundaries |
 | Resource ACL and migration (phases 5/6/8) | Common policy and all app/transport routes | Two users/peers; grants/revocation; blob references; legacy dry-run/rollback | Policies, application/H3 enforcement, resumable owner assignment and origin credentials implemented; complete backup/fault matrix and multiplex binding still open |
-| Browser/native/H3 channel (phase 4; F10/F12) | Portable worker, journal, transport | IndexedDB/Web Locks; reload/quota/cancel/slow read in three browsers | Pending; native API compatibility required |
+| Browser/native/H3 channel (phase 4; F10/F12) | Portable worker, journal, transport | IndexedDB/Web Locks; reload/quota/cancel/slow read in three browsers | Shared channel/Simpleton actor and journal boundary compile native/WASM; IndexedDB, Web Locks, runtime browser tests and H3 adapter pending |
 | Iroh repair (phase 6; F09) | Owned peer/resource reconciliation | Partition, late join, missed gossip, relay, gap, revoke, restart | Pending; gossip never acknowledges commits |
 | Binary/NFS recovery (phase 5; F02/F11/F14) | Binary outbox, immutable conflicts, namespace journal | Lost ACK, competing binaries, destination-before-tombstone, mounted NFS | Pending; retain both binary versions |
 | Quotas, inspection and safe GC (phases 5/8) | Storage administration and retention roots | Disk full, interrupted GC/migration, roots in history/outbox/conflicts | Pending; dry-run default, no eviction of pending/acknowledged data |
@@ -89,3 +89,25 @@ equating process termination with a power cut.
 - No dependency/lockfile version or engine storage format changed. Browser
   ownership/journals, Iroh repair, binary durability, extension deployment and
   remaining provenance/performance/chaos evidence are unfinished.
+
+## Portable actor and journal checkpoint
+
+- The channel state machine and production Simpleton owner compile natively and
+  for WASM. Native public paths and stored checkpoint fields are preserved.
+  `JournalBackend` owns atomic whole-record publication and exclusive writing;
+  `FileJournal` adapts the existing bounded file store and kernel lease.
+- Full all-feature workspace: 418 passed, 0 failed, 26 ignored. The native
+  channel regression suite adds failed queue/cursor stores and failed durable
+  acknowledgment removal followed by exact PUT replay after restart.
+- Workspace all-target/all-feature Clippy passes with warnings denied. The HTTP
+  minimal, core client and core native profiles pass isolated library checks and
+  tests. Core WASM warnings-denied Clippy is included in CI.
+- The final channel suite passes 11 tests (one process-only helper ignored).
+  The independent pinned JavaScript/production Rust Simpleton fixture passes its
+  five Unicode, lost-ACK, idempotency, historical-read and replacement scenarios.
+- Native task ownership retains Send/Sync and abort/join; a missing Tokio runtime
+  returns a capability error before network work. Browser futures remain local.
+- No registry package, lockfile version or native journal/engine format changed.
+  The original input-document hashes remain identical. Browser capabilities,
+  IndexedDB transactions, Web Locks, Fetch cancellation and three-engine runtime
+  scenarios still block this milestone's completion. H3 channel wiring is open.

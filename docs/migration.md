@@ -168,3 +168,11 @@ preservation, live-daemon exclusion and status redaction are documented in
 [origin credentials](origin-credentials.md). The app settings bridge requires
 explicit owner management of the control/daemon policy. Legacy cookie routes
 remain HTTPS/default-port adapters and do not grant ordinary users control.
+
+The portable journal extraction preserves every native checkpoint field and the
+existing `ChannelJournal::open` interface. No journal format migration runs.
+Reads now enforce the 32 MiB limit while reading, and malformed JSON errors omit
+stored values. The public `JournalBackend` boundary requires atomic whole-record
+publication and exclusive writing; an implementation must not report success on
+an IndexedDB request before its enclosing transaction completes. The browser
+storage adapter and its separate schema are not yet implemented.

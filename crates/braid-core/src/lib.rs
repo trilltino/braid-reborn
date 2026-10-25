@@ -19,7 +19,7 @@ pub mod access;
 pub mod core;
 #[cfg(feature = "native")]
 pub mod replica;
-#[cfg(feature = "native")]
+#[cfg(any(feature = "native", feature = "client"))]
 pub mod simpleton;
 // Copied algorithms have their own upstream assertions, lints and formatting.
 #[cfg(all(feature = "serde", feature = "smallvec"))]

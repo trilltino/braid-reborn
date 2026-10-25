@@ -238,3 +238,10 @@ URL, HTTP, serde, SHA-256 and async-channel dependencies. No package or lockfile
 version changes are introduced. Existing constructors remain; the additional
 with_client_builder adapter applies library redirect policy while the older
 with_client constructor retains its caller-owned transport contract.
+
+The portable channel/journal boundary adds no registry packages or lockfile
+changes. The core client feature now explicitly enables Tokio sync/macros for
+the shared Simpleton owner; the wasm feature selects existing HTTP browser
+adapters. Native server/engine rand is target-scoped, rather than pulling its OS
+RNG into the standalone browser client. FileJournal retains the existing atomic
+file helper and lease. Owned task cancellation uses the existing futures crate.

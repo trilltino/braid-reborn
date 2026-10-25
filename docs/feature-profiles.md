@@ -30,7 +30,14 @@ all-target/all-feature Clippy. WASM is a distinct compile check:
 
 ```text
 cargo check -p braid-http --locked --target wasm32-unknown-unknown --no-default-features --features wasm
+cargo clippy -p braid-core --lib --locked --target wasm32-unknown-unknown --no-default-features --features wasm -- -D warnings
 ```
+
+The core `client` profile exports the shared Simpleton owner without enabling
+native storage/server features. `wasm` adds the HTTP browser runtime adapters.
+Tokio sync/select macros are portable; spawning and timers select the native or
+local browser implementation. Native server/engine helper `rand` is confined to
+native targets, so the standalone browser client does not require its OS RNG.
 
 These checks establish only their named target/profile combinations. They do not
 certify browser runtime persistence, Iroh relays, mounted NFS behavior on Windows,

@@ -1,6 +1,9 @@
 use async_trait::async_trait;
 use braid_http::{
-    client::{ChannelConfig, ChannelJournal, ChannelState, ReliableChannel, RetryConfig},
+    client::{
+        ChannelCheckpoint, ChannelConfig, ChannelJournal, ChannelState, JournalBackend,
+        ReliableChannel, RetryConfig,
+    },
     traits::BraidNetwork,
     types::{BraidRequest, Update, Version},
     BraidError, BraidResponse, Result,
@@ -67,6 +70,173 @@ fn config() -> ChannelConfig {
             .with_max_backoff(Duration::from_millis(2)),
         ..Default::default()
     }
+}
+
+#[derive(Default)]
+struct FaultStore {
+    bytes: Option<Vec<u8>>,
+    fail_next: bool,
+    fail_dequeue: bool,
+}
+struct FaultJournal(Arc<Mutex<FaultStore>>);
+#[async_trait]
+impl JournalBackend for FaultJournal {
+    async fn load(&mut self) -> Result<Option<Vec<u8>>> {
+        Ok(self.0.lock().unwrap().bytes.clone())
+    }
+    async fn store(&mut self, bytes: &[u8]) -> Result<()> {
+        let mut store = self.0.lock().unwrap();
+        let next: ChannelCheckpoint = serde_json::from_slice(bytes)?;
+        let previous: ChannelCheckpoint = store
+            .bytes
+            .as_deref()
+            .map(serde_json::from_slice)
+            .transpose()?
+            .unwrap_or_default();
+        let dequeue = store.fail_dequeue && !previous.outbox.is_empty() && next.outbox.is_empty();
+        if std::mem::take(&mut store.fail_next) || dequeue {
+            store.fail_dequeue = false;
+            return Err(std::io::Error::from(std::io::ErrorKind::StorageFull).into());
+        }
+        store.bytes = Some(bytes.to_vec());
+        Ok(())
+    }
+}
+
+#[test]
+fn missing_runtime_is_a_capability_error_before_network_work() {
+    fn retains_native_auto_traits<T: Send + Sync>() {}
+    retains_native_auto_traits::<ChannelJournal>();
+    retains_native_auto_traits::<ReliableChannel>();
+    let network = Arc::new(Network::default());
+    let result = ReliableChannel::start(
+        network.clone(),
+        "http://test/doc".into(),
+        BraidRequest::new(),
+        ChannelJournal::memory(),
+        config(),
+    );
+    assert!(matches!(
+        result,
+        Err(BraidError::CapabilityUnavailable {
+            capability: "Tokio runtime"
+        })
+    ));
+    assert!(network.subscriptions.lock().unwrap().is_empty());
+    assert!(network.puts.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn failed_backend_commit_does_not_ack_queue_or_cursor_and_recovery_is_atomic() {
+    let store = Arc::new(Mutex::new(FaultStore::default()));
+    let mut journal = ChannelJournal::from_backend(FaultJournal(store.clone()))
+        .await
+        .unwrap();
+    let original = serde_json::json!({"text":"before"});
+    journal
+        .initialize_application(vec![], original.clone())
+        .await
+        .unwrap();
+    let network = Arc::new(Network::default());
+    let (sender, receiver) = async_channel::bounded(1);
+    network.receivers.lock().unwrap().push_back(receiver);
+    network.pending.store(1, Ordering::SeqCst);
+    let channel = start(network.clone(), journal, config());
+    wait_for(|| channel.status().borrow().state == ChannelState::Online).await;
+    let baseline = store.lock().unwrap().bytes.clone();
+    store.lock().unwrap().fail_next = true;
+    let edit = Update::snapshot(Version::new("immutable-edit"), "after");
+    let application = serde_json::json!({"text":"after","pending_identity":"immutable-edit"});
+    assert!(channel
+        .queue(edit.clone(), Some(application.clone()))
+        .await
+        .is_err());
+    assert_eq!(store.lock().unwrap().bytes, baseline);
+    assert!(network.puts.lock().unwrap().is_empty());
+    assert_eq!(channel.status().borrow().outstanding_puts, 0);
+
+    channel
+        .queue(edit.clone(), Some(application.clone()))
+        .await
+        .unwrap();
+    wait_for(|| !network.puts.lock().unwrap().is_empty()).await;
+    let queued = store.lock().unwrap().bytes.clone();
+    sender
+        .send(Ok(Update::snapshot(Version::new("received"), "remote")))
+        .await
+        .unwrap();
+    channel.next().await.unwrap().unwrap();
+    store.lock().unwrap().fail_next = true;
+    assert!(channel
+        .applied(
+            vec![Version::new("received")],
+            Some(serde_json::json!({"text":"remote"}))
+        )
+        .await
+        .is_err());
+    wait_for(|| channel.status().borrow().state == ChannelState::RepairRequired).await;
+    channel.close().await;
+    assert_eq!(store.lock().unwrap().bytes, queued);
+    let reopened = ChannelJournal::from_backend(FaultJournal(store))
+        .await
+        .unwrap();
+    assert!(reopened.checkpoint().receive_frontier.is_empty());
+    assert_eq!(reopened.checkpoint().application, Some(application));
+    assert_eq!(
+        serde_json::to_value(&reopened.checkpoint().outbox[0]).unwrap(),
+        serde_json::to_value(edit).unwrap()
+    );
+    assert_eq!(network.canceled.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn failed_ack_persistence_replays_the_original_put_after_restart() {
+    let store = Arc::new(Mutex::new(FaultStore {
+        fail_dequeue: true,
+        ..Default::default()
+    }));
+    let journal = ChannelJournal::from_backend(FaultJournal(store.clone()))
+        .await
+        .unwrap();
+    let network = Arc::new(Network::default());
+    let (_sender, receiver) = async_channel::bounded(1);
+    network.receivers.lock().unwrap().push_back(receiver);
+    let channel = start(network.clone(), journal, config());
+    let edit = Update::snapshot(Version::new("uncertain-ack"), "content");
+    channel
+        .queue(edit, Some(serde_json::json!({"text":"content"})))
+        .await
+        .unwrap();
+    wait_for(|| channel.status().borrow().state == ChannelState::RepairRequired).await;
+    channel.close().await;
+    let journal = ChannelJournal::from_backend(FaultJournal(store.clone()))
+        .await
+        .unwrap();
+    assert_eq!(journal.checkpoint().outbox.len(), 1);
+    let (_sender, receiver) = async_channel::bounded(1);
+    network.receivers.lock().unwrap().push_back(receiver);
+    let channel = start(network.clone(), journal, config());
+    wait_for(|| {
+        network.puts.lock().unwrap().len() == 2 && channel.status().borrow().outstanding_puts == 0
+    })
+    .await;
+    channel.close().await;
+    {
+        let puts = network.puts.lock().unwrap();
+        assert_eq!(puts[0].method, puts[1].method);
+        assert_eq!(
+            braid_http::protocol::encode_request(&puts[0]).unwrap(),
+            braid_http::protocol::encode_request(&puts[1]).unwrap()
+        );
+    }
+    let recovered = ChannelJournal::from_backend(FaultJournal(store))
+        .await
+        .unwrap();
+    assert!(recovered.checkpoint().outbox.is_empty());
+    assert_eq!(
+        recovered.checkpoint().application,
+        Some(serde_json::json!({"text":"content"}))
+    );
 }
 
 #[tokio::test]

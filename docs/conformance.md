@@ -27,7 +27,7 @@ of drafts, not a claim of complete IETF standard conformance.
 | Malformed room paths/state fail closed | JsonChatStore | engineering_storage; NFS component name unit test |
 | JS encoder -> Rust and Rust encoder -> JS | tests/interoperability/codec.mjs | checked-in source-pinned protocol-fixtures; run script for both directions |
 | Historical frontiers and causal intervals | ReplicaDocument::snapshot_at / causal_history; shared HTTP/H3 adapter | release_regressions: branches, ordered intervals and selector-preserving HTTP 432; chat retained-event historical GET in release_streams |
-| Coordinated native PUT/subscription state machine | ReliableChannel + production Simpleton client + filesystem | reliable_channel, audit_shared_channel, independent reliable-updates and Simpleton suites; browser/H3 channel ownership remains separate |
+| Shared PUT/subscription state machine | ReliableChannel + production Simpleton client + filesystem | reliable_channel fault-injected queue/cursor/ACK persistence, audit_shared_channel, independent reliable-updates and Simpleton suites; native and WASM compilation, browser durability/H3 adapters remain open |
 | Full browser runtime/backpressure/cancellation semantics | wasm_network | compile check only; browser behavioral tests open |
 | Linked JSON, Range Query, multiplex network transport | extension modules | incomplete/unsupported; codec presence does not establish deployment support |
 | NFS offsets/truncate/rename/remove/restart | fs::nfs adapter/backing + fs::operations | binary/sparse/shell/attribute/inode/cookie unit tests; partitioned rename/restart/lost-ACK/offline-edit/remove integration; privileged Linux NFSv3 mount CI passed; raw TCP READDIR cookie/tiny-budget regression passed |

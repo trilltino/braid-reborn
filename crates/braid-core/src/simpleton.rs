@@ -3,7 +3,7 @@
 //! This is a coordinated client, not a general multi-writer merge engine.
 use base64::Engine;
 use braid_http::{
-    client::{ChannelConfig, ChannelJournal, ChannelState, ReliableChannel},
+    client::{ChannelConfig, ChannelJournal, ChannelState, OwnedTask, ReliableChannel},
     protocol::text::apply_text_patches,
     types::{BraidRequest, Patch, Update, Version},
     BraidClient, BraidError, Result,
@@ -68,7 +68,7 @@ enum Command {
 pub struct SimpletonClient {
     commands: mpsc::Sender<Command>,
     status: watch::Receiver<SimpletonStatus>,
-    task: tokio::task::JoinHandle<()>,
+    task: OwnedTask,
 }
 /// A previously persisted text replica, with an optional dirty local file.
 pub struct SimpletonBase {
@@ -147,7 +147,7 @@ impl SimpletonClient {
             .await?;
         let (commands, rx) = mpsc::channel(16);
         let (tx, status) = watch::channel(status_of(&state, false, 0, None));
-        let task = tokio::spawn(async move {
+        let task = OwnedTask::spawn(async move {
             let mut driver = Driver {
                 state,
                 channel,
@@ -166,7 +166,7 @@ impl SimpletonClient {
                 driver.status.send_replace(status);
             }
             driver.channel.close().await;
-        });
+        })?;
         Ok(Self {
             commands,
             status,
@@ -208,7 +208,7 @@ impl SimpletonClient {
     }
     pub async fn close(mut self) {
         self.shutdown().await;
-        let _ = (&mut self.task).await;
+        self.task.join().await;
     }
     /// Graceful shared-owner shutdown, including release of the journal lease.
     pub async fn shutdown(&self) {
@@ -476,6 +476,7 @@ mod tests {
         assert_eq!(scalar_diff("a\u{1f600}b", "a\u{1f601}b").unwrap().1, 2);
     }
     #[test]
+    #[cfg(all(feature = "serde", feature = "smallvec", not(target_arch = "wasm32")))]
     fn peer_versions_at_the_engine_agent_limit_do_not_panic() {
         for identity in [
             "x".repeat(49),

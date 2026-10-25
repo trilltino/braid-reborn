@@ -1,5 +1,13 @@
 # Release continuation, 2026-10-25
 
+The portable continuation extracts the channel journal and task/timer ownership
+from native filesystem dependencies, and exports the same Simpleton client for
+the standalone core client/WASM profiles. Native APIs and checkpoint fields are
+preserved. The all-feature workspace passed 418 tests, with 26 ignored; injected
+journal failures cover queue acknowledgment, cursor publication and replay after
+an accepted PUT whose ACK could not be persisted. IndexedDB, Web Locks and actual
+browser runtime checks remain open, along with the later release requirements.
+
 Commits 0ad15f3 and 1d2319d repair the four reproduced defects, add bounded
 historical reads, and implement the transforming Simpleton peer profile. The
 pinned JavaScript and production Rust clients converge through same-base Unicode

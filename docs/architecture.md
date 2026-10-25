@@ -37,14 +37,26 @@ echo suppression and delayed concurrent corrections. Original causal events are
 available through finite historical interval GET; they are separate from
 positional stream projections.
 
-The native `braid-http::client::ReliableChannel` actor owns a resource's GET and
+The shared `braid-http::client::ReliableChannel` actor owns a resource's GET and
 serial PUT queue. A durable journal separates received, optimistic and pending
 state; reconnect starts at the oldest unacknowledged update's parents. A PUT
 failure cancels the GET and vice versa. Retryable network/status failures back
 off together; malformed data, authorization and causal conflicts retain state
 and stop for repair. There are bounded command, receive and outbox queues, a PUT
-timeout, and a kernel writer lease. A queued identity and its exact bytes survive
+timeout, and a native kernel writer lease. A queued identity and its exact bytes survive
 an ambiguous ACK. Application state and its queue/cursor commit together.
+
+`JournalBackend` separates that transaction from filesystem dependencies. The
+existing `ChannelJournal::open` API adapts `FileJournal` without changing stored
+checkpoint fields. Custom backends must hold exclusive writing and acknowledge
+`store` only after atomic publication. A failed store leaves the actor's previous
+record in memory and returns an error. Recovery after uncertain publication may
+see the complete prior record or complete candidate, never a partial transaction.
+`OwnedTask` owns abort/join on Tokio or the browser local
+executor; shared retry and PUT timers select the corresponding runtime timer.
+The same Simpleton owner now compiles in the core `client`/`wasm` profiles.
+IndexedDB, browser writer exclusion and actual Fetch cancellation remain open;
+compilation alone does not establish durable browser editing.
 
 `braid-core::simpleton` owns scalar text diffs, peer counters, parent checks,
 representation digests and offline pending text, following the pinned upstream

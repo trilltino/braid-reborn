@@ -1,14 +1,16 @@
 //! Braid HTTP client implementation.
 
-#[cfg(not(target_arch = "wasm32"))]
 mod channel;
 mod config;
 mod credentials;
-#[cfg(not(target_arch = "wasm32"))]
-pub use channel::{
-    ChannelCheckpoint, ChannelConfig, ChannelJournal, ChannelState, ChannelStatus, ReliableChannel,
-};
+mod journal;
+mod runtime;
+pub use channel::{ChannelConfig, ChannelState, ChannelStatus, ReliableChannel};
 pub use credentials::{http_origin, validate_resource_url, OriginCredentials, ScopedCredentials};
+#[cfg(not(target_arch = "wasm32"))]
+pub use journal::FileJournal;
+pub use journal::{ChannelCheckpoint, ChannelJournal, JournalBackend, MAX_JOURNAL_BYTES};
+pub use runtime::OwnedTask;
 mod fetch;
 #[cfg(test)]
 mod fuzzer;

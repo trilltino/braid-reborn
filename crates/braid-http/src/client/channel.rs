@@ -1,17 +1,11 @@
 //! One owner for a subscription, immutable outgoing updates and their durable cursor.
-use super::{parse_retry_after, RetryConfig, RetryDecision, RetryState};
+use super::{parse_retry_after, ChannelJournal, OwnedTask, RetryConfig, RetryDecision, RetryState};
 use crate::{
     traits::BraidNetwork,
     types::{BraidRequest, Update, Version},
     BraidClient, BraidError, Result,
 };
-use serde::{Deserialize, Serialize};
-use std::{
-    collections::VecDeque,
-    path::{Path, PathBuf},
-    sync::Arc,
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 use tokio::sync::{mpsc, oneshot, watch};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -32,105 +26,6 @@ pub struct ChannelStatus {
     pub durable_receive_frontier: Vec<Version>,
     pub reconnects: u64,
     pub last_error: Option<String>,
-}
-
-/// Only pending entries are stored. A crashed in-flight send is replayed unchanged.
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct ChannelCheckpoint {
-    #[serde(default)]
-    pub resource_url: Option<String>,
-    pub receive_frontier: Vec<Version>,
-    pub local_frontier: Vec<Version>,
-    pub outbox: VecDeque<Update>,
-    pub application: Option<serde_json::Value>,
-}
-
-/// A single-writer journal; the optional application value shares the outbox transaction.
-pub struct ChannelJournal {
-    checkpoint: ChannelCheckpoint,
-    path: Option<PathBuf>,
-    _lease: Option<std::fs::File>,
-}
-
-impl ChannelJournal {
-    pub fn memory() -> Self {
-        Self {
-            checkpoint: ChannelCheckpoint::default(),
-            path: None,
-            _lease: None,
-        }
-    }
-
-    pub async fn open(path: impl AsRef<Path>) -> Result<Self> {
-        let path = std::path::absolute(path)?;
-        let parent = path
-            .parent()
-            .ok_or_else(|| BraidError::Config("Journal needs a parent directory".into()))?;
-        tokio::fs::create_dir_all(parent).await?;
-        let lease = crate::durable::writer_lease(&path.with_extension("lock")).await?;
-        let checkpoint: ChannelCheckpoint = match tokio::fs::metadata(&path).await {
-            Ok(meta) if meta.len() > 32 * 1024 * 1024 => {
-                return Err(BraidError::ResourceLimit {
-                    resource: "channel journal",
-                    limit: 32 * 1024 * 1024,
-                })
-            }
-            Ok(_) => serde_json::from_slice(&tokio::fs::read(&path).await?)?,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => ChannelCheckpoint::default(),
-            Err(e) => return Err(e.into()),
-        };
-        for update in &checkpoint.outbox {
-            let mut metadata = update.extra_headers.clone();
-            crate::protocol::strip_transport_headers(&mut metadata);
-            if metadata != update.extra_headers {
-                return Err(BraidError::Config("Legacy outbox contains transport headers; preserve it for explicit local migration".into()));
-            }
-        }
-        if let Some(url) = &checkpoint.resource_url {
-            super::validate_resource_url(url)?;
-        }
-        Ok(Self {
-            checkpoint,
-            path: Some(path),
-            _lease: Some(lease),
-        })
-    }
-
-    pub fn checkpoint(&self) -> &ChannelCheckpoint {
-        &self.checkpoint
-    }
-    /// Seed an empty journal from an already durable application replica.
-    pub async fn initialize_application(
-        &mut self,
-        frontier: Vec<Version>,
-        application: serde_json::Value,
-    ) -> Result<()> {
-        if self.checkpoint.application.is_some() || !self.checkpoint.outbox.is_empty() {
-            return Err(BraidError::Config(
-                "Cannot initialize a populated channel journal".into(),
-            ));
-        }
-        let mut next = self.checkpoint.clone();
-        next.receive_frontier = frontier.clone();
-        next.local_frontier = frontier;
-        next.application = Some(application);
-        self.commit(next).await
-    }
-
-    async fn commit(&mut self, next: ChannelCheckpoint) -> Result<()> {
-        let bytes = serde_json::to_vec(&next)?;
-        if bytes.len() > 32 * 1024 * 1024 {
-            return Err(BraidError::ResourceLimit {
-                resource: "channel journal",
-                limit: 32 * 1024 * 1024,
-            });
-        }
-        if let Some(path) = &self.path {
-            crate::durable::atomic_write(path, &bytes).await?;
-        }
-        self.checkpoint = next;
-        Ok(())
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -175,7 +70,7 @@ pub struct ReliableChannel {
     commands: mpsc::Sender<Command>,
     updates: async_channel::Receiver<Result<Update>>,
     status: watch::Receiver<ChannelStatus>,
-    task: tokio::task::JoinHandle<()>,
+    task: OwnedTask,
 }
 impl ReliableChannel {
     pub fn status(&self) -> watch::Receiver<ChannelStatus> {
@@ -240,7 +135,7 @@ impl ReliableChannel {
         if self.commands.send(Command::Stop(tx)).await.is_ok() {
             let _ = rx.await;
         }
-        let _ = (&mut self.task).await;
+        self.task.join().await;
     }
 }
 impl Drop for ReliableChannel {
@@ -322,7 +217,7 @@ impl ReliableChannel {
             reconnects: 0,
             last_error: None,
         });
-        let task = tokio::spawn(async move {
+        let task = OwnedTask::spawn(async move {
             let mut driver = Driver {
                 network,
                 url,
@@ -345,7 +240,7 @@ impl ReliableChannel {
             } else {
                 driver.state(ChannelState::Stopped);
             }
-        });
+        })?;
         Ok(Self {
             commands,
             updates,
@@ -354,6 +249,11 @@ impl ReliableChannel {
         })
     }
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+type PutFuture = futures::future::BoxFuture<'static, Result<crate::BraidResponse>>;
+#[cfg(target_arch = "wasm32")]
+type PutFuture = futures::future::LocalBoxFuture<'static, Result<crate::BraidResponse>>;
 
 struct Driver {
     network: Arc<dyn BraidNetwork>,
@@ -561,7 +461,7 @@ impl Driver {
                 s.reconnects = s.reconnects.saturating_add(1);
                 s.last_error = Some(error.to_string());
             });
-            let sleep = tokio::time::sleep(
+            let sleep = super::utils::sleep(
                 delay.saturating_add(Duration::from_millis(rand::random::<u64>() % 100)),
             );
             tokio::pin!(sleep);
@@ -574,9 +474,7 @@ impl Driver {
         }
     }
     async fn session(&mut self, receiver: async_channel::Receiver<Result<Update>>) -> Result<()> {
-        let mut inflight: Option<
-            futures::future::BoxFuture<'static, Result<crate::BraidResponse>>,
-        > = None;
+        let mut inflight: Option<PutFuture> = None;
         loop {
             if inflight.is_none() {
                 if let Some(update) = self.journal.checkpoint.outbox.front() {
@@ -594,9 +492,7 @@ impl Driver {
                     let url = self.url.clone();
                     let timeout = self.config.put_timeout;
                     inflight = Some(Box::pin(async move {
-                        tokio::time::timeout(timeout, network.fetch(&url, request))
-                            .await
-                            .map_err(|_| BraidError::Timeout)?
+                        super::runtime::timeout(timeout, network.fetch(&url, request)).await?
                     }));
                 }
             }

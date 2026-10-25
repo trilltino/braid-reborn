@@ -34,6 +34,7 @@ jobs:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - run: cargo check -p braid-http --locked --target wasm32-unknown-unknown --no-default-features --features wasm
+      - run: cargo clippy -p braid-core --lib --locked --target wasm32-unknown-unknown --no-default-features --features wasm -- -D warnings
   nfs-linux:
     runs-on: ubuntu-latest
     timeout-minutes: 20
