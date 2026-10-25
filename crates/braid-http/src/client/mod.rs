@@ -1,6 +1,8 @@
 //! Braid HTTP client implementation.
 
 mod channel;
+#[cfg(target_arch = "wasm32")]
+pub mod browser;
 mod config;
 mod credentials;
 mod journal;
