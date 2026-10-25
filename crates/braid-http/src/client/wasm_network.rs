@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 use wasm_bindgen::prelude::*;
 
 pub struct WasmNetwork;
+const PARSE_CHUNK_BYTES: usize = 64 * 1024;
 
 #[wasm_bindgen(module = "/src/client/browser_runtime.js")]
 extern "C" {
@@ -109,18 +110,23 @@ impl BraidNetwork for WasmNetwork {
                     Ok(None) => { if let Err(error) = parser.finish() { let _ = sender.send(Err(error)).await; } return; },
                     Err(error) => { let _ = sender.send(Err(error)).await; return; },
                 };
-                let messages = match parser.feed(&bytes) {
-                    Ok(messages) => messages,
-                    Err(error) => { let _ = sender.send(Err(error)).await; return; },
-                };
-                for message in messages {
-                    let update = crate::client::message_to_update(message).map(|mut update| {
-                        if update.merge_type.is_none() {update.merge_type = merge_type.clone();}
-                        if let Some(repr) = &repr_type {update.extra_headers.entry("repr-type".into()).or_insert_with(|| repr.clone());}
-                        update
-                    });
-                    let terminal = update.is_err();
-                    if sender.send(update).await.is_err() || terminal { return; }
+                // Browser chunks are transport-selected. Bound each parser drain
+                // instead of materializing every tiny frame in one large chunk
+                // before a slow application gets a chance to apply backpressure.
+                for slice in bytes.chunks(PARSE_CHUNK_BYTES) {
+                    let messages = match parser.feed(slice) {
+                        Ok(messages) => messages,
+                        Err(error) => { let _ = sender.send(Err(error)).await; return; },
+                    };
+                    for message in messages {
+                        let update = crate::client::message_to_update(message).map(|mut update| {
+                            if update.merge_type.is_none() {update.merge_type = merge_type.clone();}
+                            if let Some(repr) = &repr_type {update.extra_headers.entry("repr-type".into()).or_insert_with(|| repr.clone());}
+                            update
+                        });
+                        let terminal = update.is_err();
+                        if sender.send(update).await.is_err() || terminal { return; }
+                    }
                 }
             }
         });
