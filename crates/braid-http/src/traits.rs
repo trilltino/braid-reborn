@@ -18,11 +18,24 @@ pub trait BraidRuntime: Send + Sync + 'static {
     fn now_ms(&self) -> u64;
 }
 
+/// A response body before interpretation by the Braid or multiplex codecs.
+/// Dropping the stream must cancel the underlying transport request.
+pub struct RawStreamResponse {
+    pub status: u16,
+    pub headers: std::collections::BTreeMap<String, String>,
+    pub body: crate::client::PayloadStream,
+}
+
 /// Abstraction for network operations.
 #[cfg_attr(target_arch="wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 #[allow(clippy::double_must_use)] // async-trait emits must_use on an already must_use boxed Future.
 pub trait BraidNetwork: Send + Sync + 'static {
+    /// Optional streaming boundary for protocol extensions. Existing custom
+    /// transports keep working and explicitly decline unsupported raw streams.
+    async fn open_stream(&self, _url: &str, _request: BraidRequest) -> Result<RawStreamResponse> {
+        Err(crate::BraidError::CapabilityUnavailable { capability: "raw response streaming for this transport" })
+    }
     async fn fetch(&self, url: &str, req: BraidRequest) -> Result<BraidResponse>;
     async fn subscribe(
         &self,
@@ -93,7 +106,7 @@ impl BraidRuntime for WasmRuntime {
     }
 
     fn sleep(&self, duration: Duration) -> RuntimeFuture {
-        Box::pin(gloo_timers::future::sleep(duration))
+        Box::pin(crate::client::sleep(duration))
     }
 
     fn now_ms(&self) -> u64 {

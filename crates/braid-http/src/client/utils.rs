@@ -108,5 +108,14 @@ pub async fn sleep(duration: Duration) {
 
 #[cfg(target_arch = "wasm32")]
 pub async fn sleep(duration: Duration) {
-    gloo_timers::future::sleep(duration).await;
+    // Browser timers use signed 32-bit milliseconds. A long configured retry
+    // must remain a long wait instead of overflowing into a busy reconnect loop.
+    // Round a fractional millisecond up; never shorten a requested deadline.
+    let mut remaining = duration;
+    while !remaining.is_zero() {
+        let millis = remaining.as_millis().min(i32::MAX as u128) as u32;
+        let millis = millis.max(1);
+        gloo_timers::future::TimeoutFuture::new(millis).await;
+        remaining = remaining.saturating_sub(Duration::from_millis(u64::from(millis)));
+    }
 }

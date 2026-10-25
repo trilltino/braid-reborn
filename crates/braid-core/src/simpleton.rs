@@ -65,12 +65,16 @@ struct TextState {
     #[serde(default)]
     revision: u64,
 }
-impl Default for TextState {
-    fn default() -> Self {
-        Self {
+impl TextState {
+    fn new() -> Result<Self> {
+        #[cfg(target_arch = "wasm32")]
+        let peer = braid_http::client::browser::checked_peer_id()?;
+        #[cfg(not(target_arch = "wasm32"))]
+        let peer = uuid::Uuid::new_v4().to_string();
+        Ok(Self {
             schema: STATE_SCHEMA,
             base: None,
-            peer: uuid::Uuid::new_v4().to_string(),
+            peer,
             version: vec![],
             text: String::new(),
             pending: None,
@@ -78,7 +82,7 @@ impl Default for TextState {
             initialized: false,
             last_operation: 0,
             revision: 0,
-        }
+        })
     }
 }
 
@@ -144,6 +148,8 @@ impl SimpletonClient {
         request: BraidRequest,
         base: Option<SimpletonBase>,
     ) -> Result<Self> {
+        #[cfg(target_arch = "wasm32")]
+        braid_http::client::browser::check_runtime_capabilities()?;
         if journal.checkpoint().application.is_none() {
             if let Some(base) = base {
                 check_size(&base.text)?;
@@ -159,7 +165,7 @@ impl SimpletonClient {
                     pending: base.pending,
                     initialized: base.initialized,
                     last_operation: base.last_operation,
-                    ..Default::default()
+                    ..TextState::new()?
                 };
                 journal
                     .initialize_application(state.version.clone(), serde_json::to_value(state)?)
@@ -168,7 +174,7 @@ impl SimpletonClient {
         }
         let mut state: TextState = match &journal.checkpoint().application {
             Some(value) => serde_json::from_value(value.clone())?,
-            None => TextState::default(),
+            None => TextState::new()?,
         };
         let mut recovery = RecoveryState::Verified;
         if state.schema < STATE_SCHEMA && journal.checkpoint().application.is_some() {
