@@ -33,41 +33,80 @@ pub async fn get_chat_room(
 ) -> Result<Response, Response> {
     info!("GET /chat/{}", room_id);
 
-    // Parse Braid version header if present
-    let since_version = headers
-        .get(&headers::VERSION)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| parse_version_header(v).ok())
-        .and_then(|versions| versions.first().map(|v| v.to_string()));
-
-    // Get or create room
+    let fields = braid_http::protocol::headers_from_http(&headers)
+        .map_err(|_| StatusCode::BAD_REQUEST.into_response())?;
+    if fields.contains_key("version") && fields.contains_key("subscribe") {
+        return Err(StatusCode::BAD_REQUEST.into_response());
+    }
+    let version = fields
+        .get("version")
+        .map(|v| parse_version_header(v))
+        .transpose()
+        .map_err(|_| StatusCode::BAD_REQUEST.into_response())?;
+    let parents = fields
+        .get("parents")
+        .map(|v| parse_version_header(v))
+        .transpose()
+        .map_err(|_| StatusCode::BAD_REQUEST.into_response())?;
+    if fields
+        .get("subscribe")
+        .map(|v| braid_http::protocol::parse_subscribe(v))
+        .transpose()
+        .map_err(|_| StatusCode::BAD_REQUEST.into_response())?
+        .unwrap_or(false)
+    {
+        return crate::chat::handlers::braid_subscribe::braid_subscribe(
+            Path(room_id),
+            State(state),
+            headers,
+        )
+        .await
+        .map_err(IntoResponse::into_response);
+    }
     let room_lock = state
         .store
-        .get_or_create_room(&room_id, Some("anonymous"))
+        .get_room(&room_id)
         .await
-        .map_err(|e| {
-            error!("Failed to get/create room: {}", e);
+        .map_err(|error| {
+            error!(%error, "Could not load chat room");
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
-        })?;
-
-    // Get room info and version while holding lock
-    let (room_info, frontier) = {
+        })?
+        .ok_or_else(|| StatusCode::NOT_FOUND.into_response())?;
+    let (room_info, frontier, current, messages) = {
         let room = room_lock.read().await;
-        (room.room.clone(), room.crdt.get_frontier())
+        let current = room.crdt.get_frontier();
+        let target = version.unwrap_or_else(|| current.clone());
+        if let Some(parents) = &parents {
+            room.crdt
+                .validate_interval(parents, &target)
+                .map_err(braid_core::server::replica_http::error_response)?;
+        }
+        let view = room
+            .crdt
+            .snapshot_at(&target)
+            .map_err(braid_core::server::replica_http::error_response)?;
+        let exported = view.export_state();
+        let mut info = room.room.clone();
+        info.crdt_state = crate::core::models::CrdtState {
+            events: exported.events,
+            node_id: exported.node_id,
+            next_seq: exported.next_seq,
+            current_version: exported.current_version,
+            version_graph: exported.version_graph,
+            messages: exported.messages,
+        };
+        let messages = view
+            .get_messages_sorted()
+            .into_iter()
+            .filter(|message| !message.deleted)
+            .cloned()
+            .collect();
+        (info, target, current, messages)
     };
-
     let version_header = http::HeaderValue::from_str(&format_version_header(&frontier))
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())?;
-
-    // Get messages (optionally since a specific version) - NO LOCK HELD
-    let messages = state
-        .store
-        .get_messages(&room_id, since_version.as_deref())
-        .await
-        .map_err(|e| {
-            error!("Failed to get/messages: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR.into_response()
-        })?;
+    let current_header = http::HeaderValue::from_str(&format_version_header(&current))
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())?;
 
     // Build response headers using braid-http
     let mut response_headers = HeaderMap::new();
@@ -77,7 +116,14 @@ pub async fn get_chat_room(
         http::HeaderValue::from_static("application/json"),
     );
     response_headers.insert(headers::VERSION.clone(), version_header.clone());
-    response_headers.insert(headers::CURRENT_VERSION.clone(), version_header);
+    response_headers.insert(headers::CURRENT_VERSION.clone(), current_header);
+    if let Some(parents) = parents {
+        response_headers.insert(
+            headers::PARENTS.clone(),
+            http::HeaderValue::from_str(&format_version_header(&parents))
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())?,
+        );
+    }
 
     // Add Braid protocol support headers
     response_headers.insert(

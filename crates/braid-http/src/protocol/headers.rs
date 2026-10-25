@@ -110,6 +110,38 @@ pub fn parse_current_version_header(value: &str) -> Result<Vec<Version>> {
     parse_version_header(value)
 }
 
+/// Structured string identity, with bounded legacy token compatibility.
+pub fn parse_peer(value: &str) -> Result<String> {
+    let value = value.trim();
+    let peer = if value.starts_with('"') || value.starts_with('%') {
+        use sfv::{BareItem, Item, Parser};
+        let item = Parser::new(value)
+            .parse::<Item>()
+            .map_err(|e| BraidError::HeaderParse(format!("Invalid Peer string: {e}")))?;
+        if !item.params.is_empty() {
+            return Err(BraidError::HeaderParse(
+                "Peer parameters are unsupported".into(),
+            ));
+        }
+        match item.bare_item {
+            BareItem::String(peer) => peer.into(),
+            BareItem::DisplayString(peer) => peer,
+            _ => return Err(BraidError::HeaderParse("Peer must be a string".into())),
+        }
+    } else if value
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b))
+    {
+        value.to_owned()
+    } else {
+        return Err(BraidError::HeaderParse("Invalid peer identity".into()));
+    };
+    if peer.is_empty() || peer.len() > 512 || peer.chars().any(char::is_control) {
+        return Err(BraidError::HeaderParse("Invalid peer length".into()));
+    }
+    Ok(peer)
+}
+
 pub fn parse_content_range(value: &str) -> Result<(String, String)> {
     let parts: Vec<&str> = value.splitn(2, ' ').collect();
     if parts.len() != 2 {

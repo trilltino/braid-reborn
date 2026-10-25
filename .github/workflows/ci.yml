@@ -59,6 +59,8 @@ jobs:
       - run: node tests/interoperability/source-checkout.mjs
       - run: node scripts/run-upstream-conformance.mjs
       - run: node tests/interoperability/codec.mjs
+      - run: cargo build -p braid-core --locked --example simpleton_interop_server
+      - run: node tests/interoperability/simpleton-server.mjs
   fuzz:
     runs-on: ubuntu-latest
     timeout-minutes: 15

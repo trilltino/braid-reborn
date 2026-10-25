@@ -32,6 +32,81 @@ async fn application() -> (tempfile::TempDir, AppState) {
 }
 
 #[tokio::test]
+async fn chat_historical_get_returns_the_requested_message_revision() {
+    use local_link_server::core::models::{ChatSnapshot, MessageType};
+    let (_root, state) = application().await;
+    let first = state
+        .store
+        .add_message("room", "alice", "before", MessageType::Text, None, vec![])
+        .await
+        .unwrap();
+    let edited = state
+        .store
+        .edit_message("room", &first.id, "after")
+        .await
+        .unwrap();
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "version",
+        HeaderValue::from_str(&format!("\"{}\"", first.version)).unwrap(),
+    );
+    let response = local_link_server::chat::handlers::chat::get_chat_room(
+        Path("room".into()),
+        headers.clone(),
+        State(state.clone()),
+    )
+    .await
+    .unwrap();
+    assert_eq!(response.status(), 200);
+    assert_eq!(
+        response.headers()["version"],
+        format!("\"{}\"", first.version)
+    );
+    assert_eq!(
+        response.headers()["current-version"],
+        format!("\"{}\"", edited.version)
+    );
+    let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+        .await
+        .unwrap();
+    let snapshot: ChatSnapshot = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(snapshot.messages.len(), 1);
+    assert_eq!(snapshot.messages[0].content, "before");
+    assert_eq!(snapshot.messages[0].version, first.version);
+    for value in ["?0", "?1"] {
+        headers.insert("subscribe", HeaderValue::from_static(value));
+        let response = local_link_server::chat::handlers::chat::get_chat_room(
+            Path("room".into()),
+            headers.clone(),
+            State(state.clone()),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(response.status(), 400);
+    }
+}
+
+#[test]
+fn legacy_chat_snapshot_keeps_current_data_without_inventing_history() {
+    use local_link_server::{chat::crdt::ChatCrdt, core::models::MessageType};
+    let mut original = ChatCrdt::new("room", "legacy");
+    let (first, message) = original.add_message("alice", "before", MessageType::Text, None, vec![]);
+    original
+        .edit_message(&message.id, "after", "alice")
+        .unwrap();
+    let mut legacy = original.export_state();
+    legacy.events.clear();
+    let restored = ChatCrdt::import_state(legacy);
+    let current = restored.snapshot_at(&restored.get_frontier()).unwrap();
+    assert_eq!(current.get_messages_sorted()[0].content, "after");
+    assert!(matches!(
+        restored.snapshot_at(&[braid_http::types::Version::new(first)]),
+        Err(braid_core::replica::ReplicaError::HistoryUnavailable(_))
+    ));
+    assert_eq!(restored.export_state().events.len(), 0);
+}
+
+#[tokio::test]
 async fn subsecond_chat_heartbeat_must_not_panic_when_the_stream_is_polled() {
     let (_root, state) = application().await;
     let mut headers = HeaderMap::new();

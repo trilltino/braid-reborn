@@ -37,3 +37,21 @@ fn durations_are_precise_and_legacy_seconds_round_up() {
         );
     }
 }
+
+#[test]
+fn peer_is_one_bounded_structured_string_or_a_legacy_token() {
+    use braid_http::protocol::parse_peer;
+    assert_eq!(parse_peer("legacy-agent-7").unwrap(), "legacy-agent-7");
+    assert_eq!(parse_peer(r#""quoted\"agent""#).unwrap(), "quoted\"agent");
+    assert_eq!(parse_peer("%\"%c3%a9\"").unwrap(), "\u{e9}");
+    for invalid in [
+        "",
+        r#""""#,
+        r#""a", "b""#,
+        r#""a", "a""#,
+        "bad peer",
+        "\"a\";x=1",
+    ] {
+        assert!(parse_peer(invalid).is_err(), "{invalid}");
+    }
+}

@@ -195,3 +195,16 @@ async fn historical_frontiers_and_intervals_keep_independent_branches() {
     assert_eq!(response.status().as_u16(), 432);
     assert_eq!(response.headers()["version"], "\"unknown\"");
 }
+
+#[tokio::test]
+async fn unavailable_subscription_history_echoes_parents_not_a_fabricated_version() {
+    let root = tempfile::tempdir().unwrap();
+    let store = ReplicaStore::new(root.path().into()).unwrap();
+    let mut headers = HeaderMap::new();
+    headers.insert("subscribe", HeaderValue::from_static("?1"));
+    headers.insert("parents", HeaderValue::from_static("\"missing\""));
+    let response = replica_http::get(store, "doc".into(), headers, "simpleton").await;
+    assert_eq!(response.status().as_u16(), 432);
+    assert_eq!(response.headers()["parents"], "\"missing\"");
+    assert!(!response.headers().contains_key("version"));
+}

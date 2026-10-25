@@ -112,7 +112,13 @@ pub fn encode_request(request: &BraidRequest) -> Result<(BTreeMap<String, String
         headers.insert("heartbeats".into(), seconds.to_string());
     }
     if let Some(peer) = &request.peer {
-        headers.insert("peer".into(), serde_json::to_string(peer)?);
+        crate::protocol::parse_peer(&crate::protocol::format_version_header(&[
+            crate::types::Version::new(peer),
+        ]))?;
+        headers.insert(
+            "peer".into(),
+            crate::protocol::format_version_header(&[crate::types::Version::new(peer)]),
+        );
     }
     if let Some(ack) = &request.ack {
         headers.insert("ack".into(), crate::protocol::format_version_header(ack));

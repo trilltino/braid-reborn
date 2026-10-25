@@ -59,7 +59,7 @@ share the root `target/`.
 | Native snapshots, binary patch framing, 209 subscriptions | Tested with Rust and pinned upstream JS |
 | Durable history, duplicate retries, lost ACK recovery | Tested for the documented single-writer store |
 | Historical-parent Diamond concurrency | Opposite-order delivery, seeded schedules and restarts tested |
-| Simpleton client | Shared durable GET/PUT owner; independent JS convergence suites; Rust server rejects stale writes |
+| Simpleton client/server | Durable native owner and transforming peer profile; pinned JS/Rust concurrency and lost-ACK evidence |
 | Blob streaming, limits, digests and durable references | Tested; historical objects retained; no automatic GC |
 | Chat persistence and authentication | Tested regressions; per-resource ACLs incomplete |
 | Iroh 1.4.1 HTTP/3 | Local GET/PUT/209/revocation tested; relay and anti-entropy open |

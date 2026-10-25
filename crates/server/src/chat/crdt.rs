@@ -35,6 +35,67 @@ pub struct ChatCrdt {
 }
 
 impl ChatCrdt {
+    /// Reconstruct retained structured events at a causal frontier. Legacy
+    /// snapshots can still serve their current view, but cannot invent events.
+    pub fn snapshot_at(
+        &self,
+        frontier: &[braid_http::types::Version],
+    ) -> Result<Self, braid_core::replica::ReplicaError> {
+        use braid_core::replica::ReplicaError;
+        let ids: Vec<_> = frontier.iter().map(ToString::to_string).collect();
+        let current: Vec<_> = self.frontier.iter().map(ToString::to_string).collect();
+        if braid_core::replica::same_frontier(&ids, &current) {
+            return Ok(self.clone());
+        }
+        let known = self
+            .ancestors(frontier)
+            .map_err(|_| ReplicaError::HistoryUnavailable(frontier.to_vec()))?;
+        let retained: std::collections::HashSet<_> = self
+            .events
+            .iter()
+            .map(|event| event.version.as_str())
+            .collect();
+        if known.iter().any(|id| !retained.contains(id.as_str())) {
+            return Err(ReplicaError::HistoryUnavailable(frontier.to_vec()));
+        }
+        let mut candidate = Self::new(&self.room_id, &self.node_id);
+        for event in self
+            .events
+            .iter()
+            .filter(|event| known.contains(&event.version))
+        {
+            candidate
+                .merge_updates(vec![event.clone()])
+                .map_err(|error| {
+                    ReplicaError::Io(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        error.to_string(),
+                    ))
+                })?;
+        }
+        Ok(candidate)
+    }
+
+    pub fn validate_interval(
+        &self,
+        from: &[braid_http::types::Version],
+        to: &[braid_http::types::Version],
+    ) -> Result<(), braid_core::replica::ReplicaError> {
+        use braid_core::replica::ReplicaError;
+        let from_set = self
+            .ancestors(from)
+            .map_err(|_| ReplicaError::HistoryUnavailable(from.to_vec()))?;
+        let to_set = self
+            .ancestors(to)
+            .map_err(|_| ReplicaError::HistoryUnavailable(to.to_vec()))?;
+        if !from_set.is_subset(&to_set) {
+            return Err(ReplicaError::Invalid(
+                "Chat history boundaries are not causally ordered".into(),
+            ));
+        }
+        Ok(())
+    }
+
     pub fn new(room_id: &str, node_id: &str) -> Self {
         Self {
             events: Vec::new(),

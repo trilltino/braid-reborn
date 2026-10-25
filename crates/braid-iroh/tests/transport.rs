@@ -55,6 +55,9 @@ async fn scenario() {
         .unwrap();
     assert_eq!(response.status, 209);
     let mut stream = Box::pin(response.bytes_stream());
+    let mut parser = braid_http_rs::client::MessageParser::new();
+    let mut materialized = "a\u{1f600}".to_owned();
+    let mut frontier = vec![braid_http_rs::types::Version::new("one")];
     for (id, parent, text) in [("two", "one", "second"), ("three", "two", "third")] {
         let response = client
             .put(&url)
@@ -66,12 +69,24 @@ async fn scenario() {
             .await
             .unwrap();
         assert_eq!(response.status, 200);
-        let frame = tokio::time::timeout(Duration::from_secs(5), stream.next())
-            .await
-            .unwrap()
-            .unwrap()
-            .unwrap();
-        assert!(std::str::from_utf8(&frame).unwrap().contains(text));
+        while frontier != vec![braid_http_rs::types::Version::new(id)] {
+            let frame = tokio::time::timeout(Duration::from_secs(5), stream.next())
+                .await
+                .unwrap()
+                .unwrap()
+                .unwrap();
+            for frame in parser.feed(&frame).unwrap() {
+                let update = braid_http_rs::client::message_to_update(frame).unwrap();
+                assert_eq!(update.parents, frontier);
+                materialized = braid_http_rs::core::protocol_mod::text::apply_text_patches(
+                    &materialized,
+                    update.patches.as_ref().unwrap(),
+                )
+                .unwrap();
+                frontier = update.version;
+            }
+        }
+        assert_eq!(materialized, text);
     }
     // A lost acknowledgement/retry cannot rewind the committed head.
     assert_eq!(

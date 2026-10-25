@@ -428,7 +428,7 @@ impl Driver {
     }
 }
 
-fn digest(text: &str) -> String {
+pub(crate) fn digest(text: &str) -> String {
     format!(
         "sha-256=:{}:",
         base64::engine::general_purpose::STANDARD.encode(Sha256::digest(text.as_bytes()))

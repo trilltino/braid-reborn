@@ -27,6 +27,28 @@ pub fn error_response(error: ReplicaError) -> Response {
     };
     (status, error.to_string()).into_response()
 }
+fn selector_error_response(
+    error: ReplicaError,
+    fields: &std::collections::BTreeMap<String, String>,
+) -> Response {
+    let mut response = error_response(error);
+    if response.status().as_u16() == 432 {
+        response.headers_mut().remove("version");
+        for name in ["version", "parents"] {
+            if let Some(value) = fields.get(name) {
+                match axum::http::HeaderValue::from_str(value) {
+                    Ok(value) => {
+                        response
+                            .headers_mut()
+                            .insert(axum::http::HeaderName::from_static(name), value);
+                    }
+                    Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+                }
+            }
+        }
+    }
+    response
+}
 pub async fn get(
     store: ReplicaStore,
     resource: String,
@@ -69,6 +91,14 @@ pub async fn get(
         Ok(None) => std::time::Duration::from_secs(30),
         _ => return (StatusCode::BAD_REQUEST, "Unsupported heartbeat interval").into_response(),
     };
+    let peer = match fields
+        .get("peer")
+        .map(|value| braid_http::protocol::parse_peer(value))
+        .transpose()
+    {
+        Ok(peer) => peer,
+        Err(error) => return (StatusCode::BAD_REQUEST, error.to_string()).into_response(),
+    };
     let subscribe = match fields
         .get("subscribe")
         .map(|s| braid_http::protocol::parse_subscribe(s))
@@ -83,6 +113,23 @@ pub async fn get(
             Ok(subscription) => subscription,
             Err(e) => return error_response(e),
         };
+        if document.merge_type == "simpleton" {
+            return match (super::simpleton_stream::SimpletonSubscription {
+                store,
+                resource,
+                peer,
+                parents,
+                document,
+                receiver,
+                keepalive,
+                heartbeat,
+            })
+            .into_response()
+            {
+                Ok(response) => response,
+                Err(error) => selector_error_response(error, &fields),
+            };
+        }
         let initial = if let Some(parents) = parents {
             let frontier = parents
                 .into_iter()
@@ -90,7 +137,7 @@ pub async fn get(
                 .collect::<Vec<_>>();
             match document.replay_since(&frontier) {
                 Ok(updates) => updates,
-                Err(e) => return error_response(e),
+                Err(e) => return selector_error_response(e, &fields),
             }
         } else {
             vec![document.snapshot()]
@@ -132,7 +179,7 @@ pub async fn get(
                 let target = version.unwrap_or_else(|| document.snapshot().version);
                 let updates = match document.causal_history(&parents, &target) {
                     Ok(updates) => updates,
-                    Err(error) => return error_response(error),
+                    Err(error) => return selector_error_response(error, &fields),
                 };
                 let frames = updates
                     .iter()
@@ -163,7 +210,7 @@ pub async fn get(
                     |frontier| document.snapshot_at(&frontier),
                 ) {
                     Ok(update) => super::BraidUpdate(update).into_response(),
-                    Err(error) => error_response(error),
+                    Err(error) => selector_error_response(error, &fields),
                 }
             }
         }
@@ -182,12 +229,27 @@ pub async fn put(
         Ok(headers) => headers,
         Err(e) => return (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
     };
+    let transforming = match headers
+        .get("peer")
+        .map(|value| braid_http::protocol::parse_peer(value))
+        .transpose()
+    {
+        Ok(peer) => peer.is_some(),
+        Err(error) => return (StatusCode::BAD_REQUEST, error.to_string()).into_response(),
+    };
     let update = match WireCodec::decode_entity(headers, body) {
         Ok(update) => update,
         Err(e) => return (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
     };
     let negotiated = update.merge_type.as_deref().unwrap_or(merge_type);
-    match store.commit(&resource, &update, negotiated).await {
+    let committed = if transforming && negotiated == "simpleton" {
+        store
+            .commit_transforming_simpleton(&resource, &update)
+            .await
+    } else {
+        store.commit(&resource, &update, negotiated).await
+    };
+    match committed {
         Ok(document) => {
             let version = braid_http::protocol::format_version_header(&update.version);
             Response::builder()

@@ -4,6 +4,7 @@ mod config;
 mod middleware;
 mod parse_update;
 mod send_update;
+mod simpleton_stream;
 pub mod utils;
 
 pub mod conflict_resolver;

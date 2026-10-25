@@ -132,3 +132,26 @@ field is no longer emitted from structured batch responses.
 
 Do not run legacy publishing scripts as a migration tool. Refer to conformance.md
 and audit/engineering-status.md for the actual tested subset and remaining risks.
+
+## Transforming Simpleton profile
+
+HTTP/H3 Simpleton writes carrying a valid Peer use historical-parent transformation.
+The direct commit API and writes without Peer keep the conservative current-base
+contract. Existing caller signatures and persisted event identities are unchanged.
+All Simpleton subscriptions produce positional updates relative to that subscriber's
+view. Own-peer echoes are suppressed; concurrent corrections wait for the peer's
+quiet interval. Finite Parents history GET transfers original causal events instead.
+A lagged subscription terminates so its owner can reconnect and repair.
+
+Chat historical GET reconstructs retained structured events and returns the selected
+Version and the current frontier separately. Snapshot-only legacy rooms remain
+readable at their current frontier. Missing original events return HTTP 432; edit
+summaries are never converted into fabricated original event payloads.
+
+Independent evidence uses braid-text 1b50ed357dcbbf59a1f4554690f69d0458bc967e and
+braid-http 639b811ec91e5d1aae4a4a7d162616b499f95b07. Run
+node tests/interoperability/simpleton-server.mjs after building the
+simpleton_interop_server example. The test forces same-base Unicode edits between
+the pinned JavaScript client and the production Rust client, loses one accepted
+PUT acknowledgment, verifies historical content, and checks empty replacement.
+This does not close the browser runtime, partition repair or provenance gates.

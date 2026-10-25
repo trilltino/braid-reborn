@@ -90,10 +90,10 @@ impl ReplicaDocument {
     /// Materialize a known causal frontier without changing current state.
     pub fn snapshot_at(&self, frontier: &[Version]) -> Result<Update, ReplicaError> {
         let ids: Vec<_> = frontier.iter().map(ToString::to_string).collect();
-        self.ancestors(frontier)?;
         if same_frontier(&ids, &self.heads) {
             return Ok(self.snapshot());
         }
+        self.ancestors(frontier)?;
         if self.merge_state.is_null() {
             return Err(ReplicaError::HistoryUnavailable(frontier.to_vec()));
         }
@@ -111,7 +111,7 @@ impl ReplicaDocument {
         })
     }
 
-    fn ancestors(
+    pub(crate) fn ancestors(
         &self,
         frontier: &[Version],
     ) -> Result<std::collections::HashSet<String>, ReplicaError> {
@@ -188,6 +188,10 @@ impl ReplicaDocument {
     }
     /// Validate the entire update on a candidate; callers persist before publishing it.
     pub fn apply(&mut self, update: &Update) -> Result<bool, ReplicaError> {
+        self.apply_profile(update, false)
+    }
+
+    fn apply_profile(&mut self, update: &Update, transforming: bool) -> Result<bool, ReplicaError> {
         if update.version.len() != 1 {
             return Err(ReplicaError::Invalid(
                 "A mutation must name one event".into(),
@@ -258,7 +262,8 @@ impl ReplicaDocument {
                 return Err(ReplicaError::Conflict(format!("Unknown parent: {parent}")));
             }
         }
-        if self.merge_type == "simpleton" && !same_frontier(&self.heads, &parents) {
+        if self.merge_type == "simpleton" && !transforming && !same_frontier(&self.heads, &parents)
+        {
             return Err(ReplicaError::Conflict(
                 "Stale Simpleton positional update requires explicit reconciliation".into(),
             ));
@@ -431,12 +436,34 @@ impl ReplicaStore {
         update: &Update,
         merge_type: &str,
     ) -> Result<ReplicaDocument, ReplicaError> {
+        self.commit_profile(resource, update, merge_type, false)
+            .await
+    }
+
+    /// The caller must pair this profile with per-peer transformed subscriptions.
+    /// The conservative positional API retains its existing conflict behavior.
+    pub async fn commit_transforming_simpleton(
+        &self,
+        resource: &str,
+        update: &Update,
+    ) -> Result<ReplicaDocument, ReplicaError> {
+        self.commit_profile(resource, update, "simpleton", true)
+            .await
+    }
+
+    async fn commit_profile(
+        &self,
+        resource: &str,
+        update: &Update,
+        merge_type: &str,
+        transforming: bool,
+    ) -> Result<ReplicaDocument, ReplicaError> {
         let _guard = document_lock(self.path(resource)).await;
         let mut document = self
             .load(resource)
             .await?
             .unwrap_or_else(|| ReplicaDocument::empty(merge_type));
-        if document.apply(update)? {
+        if document.apply_profile(update, transforming)? {
             document.resource = Some(resource.to_owned());
             atomic_write(&self.path(resource), &serde_json::to_vec(&document)?).await?;
             let mut broadcast = update.clone();
