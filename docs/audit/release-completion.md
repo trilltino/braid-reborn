@@ -33,6 +33,8 @@ attempt interrupted for the clean is not a failed product test or a passing gate
 | File fault injection and SQLite contention | Current source/test definitions | Prepared; no execution under the no-build instruction |
 | Engine comparison and independent oracle | `d798f84`, `f89c63e` | Partial; original-copy attribution and historical project corpus remain open |
 
+What is left to do, in priority order, is in [remaining-work.md](remaining-work.md).
+
 ## How to read a row
 
 | Status | Meaning |
