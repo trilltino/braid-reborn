@@ -122,7 +122,10 @@ pub async fn run() -> anyhow::Result<()> {
         local_org_manager,
     };
 
-    let app = router(app_state);
+    let origins: Vec<String> = std::env::var("BRAID_ALLOWED_ORIGINS")
+        .ok().map(|value| value.split(',').map(str::trim).filter(|value| !value.is_empty()).map(str::to_owned).collect())
+        .unwrap_or_default();
+    let app = router_with_cors(app_state, &origins)?;
 
     // Start server
     let port = std::env::var("PORT")
@@ -141,6 +144,36 @@ pub async fn run() -> anyhow::Result<()> {
 
 /// Build the production routes with supplied application state.
 pub fn router(app_state: AppState) -> Router {
+    routes(app_state).layer(tower_http::cors::CorsLayer::new())
+}
+
+/// Browser access is opt-in per canonical origin. Credentials are never paired
+/// with wildcard origin, method or header policies.
+pub fn router_with_cors(app_state: AppState, allowed_origins: &[String]) -> anyhow::Result<Router> {
+    use axum::http::{HeaderName, HeaderValue, Method};
+    let origins = allowed_origins.iter().map(|origin| {
+        let canonical = braid_http::client::http_origin(origin)?;
+        anyhow::ensure!(canonical == *origin, "Allowed browser origins must be canonical HTTP origins");
+        HeaderValue::from_str(origin).map_err(|_| anyhow::anyhow!("Invalid browser origin"))
+    }).collect::<anyhow::Result<Vec<_>>>()?;
+    let names = [
+        "version", "parents", "current-version", "subscribe", "heartbeats",
+        "merge-type", "repr-type", "repr-digest", "content-range", "patches",
+        "retry-after", "multiplex-version", "multiplex-through",
+        "braid-graph-versions", "braid-graph-frontiers",
+    ];
+    let exposed: Vec<_> = names.into_iter().map(HeaderName::from_static).collect();
+    let mut allowed = exposed.clone();
+    allowed.extend(["authorization", "content-type", "peer", "range"].into_iter().map(HeaderName::from_static));
+    let methods = vec![Method::GET, Method::PUT, Method::POST, Method::PATCH,
+        Method::DELETE, Method::OPTIONS, Method::from_bytes(b"MULTIPLEX")?];
+    let cors = tower_http::cors::CorsLayer::new()
+        .allow_origin(origins).allow_methods(methods).allow_headers(allowed)
+        .expose_headers(exposed).allow_credentials(true);
+    Ok(routes(app_state).layer(cors))
+}
+
+fn routes(app_state: AppState) -> Router {
     let access_state = app_state.clone();
     // Services routers
     let core_router = core::router();
@@ -166,7 +199,6 @@ pub fn router(app_state: AppState) -> Router {
             access_state,
             core::access::enforce,
         ))
-        .layer(tower_http::cors::CorsLayer::permissive())
         .layer(tower_http::trace::TraceLayer::new_for_http())
 }
 
